@@ -1,99 +1,2481 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistem Aplikasi Web Modular</title>
-  <!-- Menghubungkan ke file CSS -->
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PUSDIKLATCAB TANGERANG - Sistem Informasi Manajemen & Pelatihan</title>
+  
+  <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Chart.js for Dashboard Visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            scout: {
+              dark: '#3E2723',
+              primary: '#4E342E',
+              medium: '#5D4037',
+              light: '#8D6E63',
+              khaki: '#C8B9A6',
+              cream: '#FAF7F2',
+              sand: '#F3EDE2',
+              green: '#2E7D32',
+              greenLight: '#E8F5E9',
+              gold: '#D4AF37',
+              goldLight: '#FDF8E6',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #FAF7F2;
+      color: #2D2420;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #F3EDE2;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #BCAAA4;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #8D6E63;
+    }
+
+    /* Smooth transitions */
+    .fade-in {
+      animation: fadeIn 0.25s ease-out forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Print Styles for Official Report */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #printable-report-area, #printable-report-area * {
+        visibility: visible;
+      }
+      #printable-report-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        background: white !important;
+        padding: 20px !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
 </head>
-<body>
+<body class="antialiased selection:bg-scout-gold/30 selection:text-scout-dark">
 
-  <!-- =========================================================
-       BAGIAN 1: NAVIGASI UTAMA (Muncul setelah Login / Beranda)
-       ========================================================= -->
-  <nav id="navbar" class="navbar hidden">
-    <div class="nav-brand" id="app-title">NAMA APLIKASI</div>
-    <div class="nav-menu">
-      <button onclick="bukaHalaman('view-dashboard')">Dashboard</button>
-      <button onclick="bukaHalaman('view-input')">Input Data</button>
-      <button onclick="bukaHalaman('view-laporan')">Laporan</button>
-      <!-- TAMBAHKAN TOMBOL MENU BARU DI BAWAH INI -->
-      
-      <button onclick="prosesLogout()" class="btn-danger">Keluar</button>
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- CONFIRMATION MODAL (Replacement for confirm()) -->
+  <div id="confirm-modal" class="fixed inset-0 z-[90] hidden items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-scout-khaki/40 fade-in">
+      <div class="flex items-start gap-4">
+        <div class="w-11 h-11 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+          <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+        </div>
+        <div class="flex-1">
+          <h3 id="confirm-title" class="text-lg font-bold text-gray-900">Konfirmasi Hapus</h3>
+          <p id="confirm-message" class="text-sm text-gray-600 mt-1">Apakah Anda yakin ingin menghapus data ini?</p>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-6">
+        <button id="confirm-cancel-btn" class="px-4 py-2.5 rounded-xl text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition">Batal</button>
+        <button id="confirm-ok-btn" class="px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 shadow-sm transition">Ya, Hapus</button>
+      </div>
     </div>
-  </nav>
+  </div>
 
-  <!-- =========================================================
-       BAGIAN 2: HALAMAN-HALAMAN APLIKASI (VIEWS)
-       ========================================================= -->
-  <main class="container">
+  <!-- ===================================================================== -->
+  <!-- VIEW 1: LOGIN SCREEN                                                  -->
+  <!-- ===================================================================== -->
+  <div id="login-view" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-[#3E2723] via-[#4E342E] to-[#2C1A16] relative overflow-hidden">
+    <!-- Decorative subtle geometric pattern -->
+    <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: radial-gradient(#D4AF37 1.5px, transparent 1.5px); background-size: 28px 28px;"></div>
+    
+    <div class="max-w-5xl w-full bg-scout-cream rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 border border-scout-gold/30 relative z-10">
+      
+      <!-- Left Branding Panel -->
+      <div class="lg:col-span-5 bg-gradient-to-b from-scout-primary to-scout-dark text-white p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
+        <div class="absolute -bottom-16 -right-16 w-64 h-64 rounded-full bg-scout-gold/10 blur-xl pointer-events-none"></div>
+        <div class="relative z-10">
+          <div class="flex items-center gap-3.5 mb-8">
+            <div id="login-logo-container" class="w-14 h-14 rounded-2xl bg-white/10 border border-scout-gold/40 flex items-center justify-center p-1.5 shadow-inner overflow-hidden shrink-0">
+              <!-- Default Scout Emblem SVG -->
+              <svg viewBox="0 0 64 64" class="w-10 h-10 text-scout-gold fill-current">
+                <path d="M32 4C27 12 22 18 22 26c0 5 3 9 7 11v9H21v4h8v10h6V50h8v-4h-8v-9c4-2 7-6 7-11 0-8-5-14-10-22zm0 9c3 5 5 9 5 13 0 3-2 6-5 7-3-1-5-4-5-7 0-4 2-8 5-13z"/>
+                <circle cx="17" cy="31" r="3"/>
+                <circle cx="47" cy="31" r="3"/>
+              </svg>
+            </div>
+            <div>
+              <span class="text-xs font-semibold tracking-widest uppercase text-scout-gold block">Gerakan Pramuka</span>
+              <h1 class="text-xl font-extrabold tracking-tight leading-tight">PUSDIKLATCAB TANGERANG</h1>
+            </div>
+          </div>
 
-    <!-- HALAMAN 1: LOGIN / AKSES AWAL -->
-    <section id="view-login" class="view-section">
-      <div class="card login-box">
-        <h2>Login Sistem</h2>
-        <p>Masukkan kode akses atau kredensial Anda</p>
-        <input type="text" id="input-kode" placeholder="Masukkan Kode / Username">
-        <button onclick="prosesLogin()" class="btn-primary">Masuk</button>
+          <h2 class="text-2xl sm:text-3xl font-bold leading-snug text-white mb-4">
+            Pusat Pendidikan & Pelatihan Kepramukaan Tingkat Cabang
+          </h2>
+          <p class="text-sm text-scout-khaki leading-relaxed">
+            Sistem terpadu pengelolaan data potensi pembina, administrasi kursus (KMD, KML, KPD, KPL), tata kelola persuratan, dan pelaporan Kwartir Cabang Tangerang.
+          </p>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-white/15 relative z-10">
+          <div class="flex items-center gap-3 text-xs text-scout-khaki">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Satyaku Kudarmakan, Darmaku Kubaktikan</span>
+          </div>
+        </div>
       </div>
-    </section>
 
-    <!-- HALAMAN 2: DASHBOARD -->
-    <section id="view-dashboard" class="view-section hidden">
-      <h2>Dashboard Utama</h2>
-      <div class="card">
-        <p>Selamat datang! Total Data Tersimpan: <strong id="stat-total">0</strong></p>
+      <!-- Right Form Panel -->
+      <div class="lg:col-span-7 p-6 sm:p-10 bg-white flex flex-col justify-center">
+        <div class="mb-6">
+          <h3 class="text-2xl font-bold text-scout-dark">Selamat Datang</h3>
+          <p class="text-sm text-gray-500 mt-1">Silakan masuk menggunakan akun atau pilih akses demo cepat sesuai Role.</p>
+        </div>
+
+        <form id="login-form" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1.5">Pilih Role Akses</label>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="role-selector-pills">
+              <button type="button" data-role="Admin" class="role-pill active py-2.5 px-3 rounded-xl border-2 border-scout-primary bg-scout-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="shield-check" class="w-4 h-4"></i> Admin
+              </button>
+              <button type="button" data-role="Pelatih" class="role-pill py-2.5 px-3 rounded-xl border border-gray-200 bg-scout-cream text-gray-700 hover:border-scout-medium text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="award" class="w-4 h-4"></i> Pelatih
+              </button>
+              <button type="button" data-role="Panitia" class="role-pill py-2.5 px-3 rounded-xl border border-gray-200 bg-scout-cream text-gray-700 hover:border-scout-medium text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="clipboard-list" class="w-4 h-4"></i> Panitia
+              </button>
+              <button type="button" data-role="Kwarran" class="role-pill py-2.5 px-3 rounded-xl border border-gray-200 bg-scout-cream text-gray-700 hover:border-scout-medium text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="map-pin" class="w-4 h-4"></i> Kwarran
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label for="login-nama" class="block text-sm font-medium text-gray-700 mb-1">Nama Pengguna / Akun</label>
+            <div class="relative">
+              <i data-lucide="user" class="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="text" id="login-nama" required placeholder="Masukkan nama akun..." class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-scout-primary focus:border-scout-primary outline-none text-sm transition" />
+            </div>
+          </div>
+
+          <div>
+            <label for="login-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <div class="relative">
+              <i data-lucide="lock" class="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="password" id="login-password" required placeholder="Masukkan password..." class="w-full pl-10 pr-10 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-scout-primary focus:border-scout-primary outline-none text-sm transition" />
+              <button type="button" id="toggle-login-pwd" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1">
+                <i data-lucide="eye" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="w-full py-3 px-4 rounded-xl bg-scout-primary hover:bg-scout-dark text-white font-semibold text-sm shadow-lg shadow-scout-primary/25 flex items-center justify-center gap-2 transition cursor-pointer">
+            <span>Masuk ke Sistem</span>
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </button>
+        </form>
+
+        <!-- Quick Demo Login Box -->
+        <div class="mt-6 pt-5 border-t border-gray-100">
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">Akses Instan Demo (1-Klik Login):</p>
+          <div id="quick-demo-accounts" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <!-- Populated dynamically by JS -->
+          </div>
+        </div>
       </div>
-      <!-- AREA WIDGET DASHBOARD BARU -->
-    </section>
+    </div>
+  </div>
 
-    <!-- HALAMAN 3: FORM INPUT DATA -->
-    <section id="view-input" class="view-section hidden">
-      <h2>Form Input Data</h2>
-      <div class="card">
-        <label>Nama / Keterangan:</label>
-        <input type="text" id="input-nama" placeholder="Ketik nama...">
-        
-        <label>Kategori / Kelas:</label>
-        <input type="text" id="input-kategori" placeholder="Ketik kategori...">
-        
-        <!-- TAMBAHKAN KOLOM INPUT BARU DI SINI -->
+  <!-- ===================================================================== -->
+  <!-- VIEW 2: MAIN APPLICATION SHELL                                        -->
+  <!-- ===================================================================== -->
+  <div id="app-view" class="hidden min-h-screen flex bg-scout-cream">
+    
+    <!-- Mobile Sidebar Overlay -->
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-black/50 z-30 hidden lg:hidden backdrop-blur-xs"></div>
 
-        <button onclick="prosesSimpanData()" class="btn-primary">Simpan Data</button>
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-40 w-72 bg-scout-dark text-white flex flex-col transform -translate-x-full lg:translate-x-0 transition-transform duration-200 ease-in-out shadow-xl shrink-0">
+      <!-- Brand Header -->
+      <div class="p-5 border-b border-white/10 flex items-center justify-between">
+        <div class="flex items-center gap-3 overflow-hidden">
+          <div id="sidebar-logo-box" class="w-11 h-11 rounded-xl bg-white/10 border border-scout-gold/40 flex items-center justify-center p-1 shrink-0 overflow-hidden">
+            <!-- Synced with Profile Logo -->
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10px] font-bold tracking-widest text-scout-gold uppercase">Kwarcab Tangerang</p>
+            <h1 class="text-sm font-extrabold tracking-tight text-white truncate">PUSDIKLATCAB</h1>
+            <p class="text-[11px] text-scout-khaki truncate">TANGERANG</p>
+          </div>
+        </div>
+        <button id="close-sidebar-btn" class="lg:hidden p-1.5 rounded-lg text-scout-khaki hover:bg-white/10">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
       </div>
-    </section>
 
-    <!-- HALAMAN 4: DATA & LAPORAN -->
-    <section id="view-laporan" class="view-section hidden">
-      <div class="header-laporan">
-        <h2>Rekapitulasi Data</h2>
-        <button onclick="window.print()" class="btn-secondary no-print">Cetak / PDF</button>
+      <!-- Active Kapusdiklatcab Mini Card -->
+      <div class="mx-4 mt-4 p-3 rounded-xl bg-white/5 border border-white/10">
+        <p class="text-[10px] uppercase tracking-wider text-scout-gold font-semibold">Kapusdiklatcab</p>
+        <p id="sidebar-kapus-name" class="text-xs font-semibold text-white truncate mt-0.5">Kak H. Ahmad Fauzi, M.Pd.</p>
       </div>
-      <div class="card">
-        <table id="tabel-data">
-          <thead>
-            <tr>
-              <th>No</th>
-              <th>Nama / Keterangan</th>
-              <th>Kategori</th>
-              <th class="no-print">Aksi</th>
-            </tr>
-          </thead>
-          <tbody id="tbody-data">
-            <!-- Data akan diisi otomatis oleh JavaScript -->
-          </tbody>
-        </table>
+
+      <!-- Navigation Links -->
+      <nav id="sidebar-nav" class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <!-- Rendered dynamically based on role permissions -->
+      </nav>
+
+      <!-- Sidebar Footer -->
+      <div class="p-4 border-t border-white/10 space-y-2">
+        <button id="reset-demo-btn" class="w-full py-2 px-3 rounded-xl text-xs font-medium text-scout-khaki hover:text-white hover:bg-white/10 flex items-center gap-2 transition">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+          <span>Reset Data Demo</span>
+        </button>
+        <button id="logout-btn" class="w-full py-2.5 px-3 rounded-xl text-xs font-semibold bg-red-500/20 text-red-200 hover:bg-red-600 hover:text-white flex items-center gap-2 transition">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
+          <span>Keluar / Logout</span>
+        </button>
       </div>
-    </section>
+    </aside>
 
-    <!-- =======================================================
-         TEMPAT MENAMBAHKAN HALAMAN (SECTION) BARU DI BAWAH INI
-         ======================================================= -->
+    <!-- MAIN CONTENT WRAPPER -->
+    <div class="flex-1 flex flex-col min-w-0">
+      
+      <!-- TOP HEADER -->
+      <header class="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-scout-khaki/30 px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <button id="open-sidebar-btn" class="lg:hidden p-2 rounded-xl bg-scout-sand text-scout-dark hover:bg-scout-khaki/40 transition">
+            <i data-lucide="menu" class="w-5 h-5"></i>
+          </button>
+          <div>
+            <h2 id="page-title" class="text-lg sm:text-xl font-bold text-scout-dark leading-tight">Dashboard</h2>
+            <p id="page-subtitle" class="text-xs text-gray-500 hidden sm:block">Ringkasan data potensi pembina, pelatihan, dan administrasi Pusdiklatcab Tangerang</p>
+          </div>
+        </div>
 
-  </main>
+        <div class="flex items-center gap-3">
+          <div class="hidden md:flex flex-col items-end">
+            <span id="header-user-name" class="text-sm font-bold text-scout-dark">Admin Pusdiklatcab</span>
+            <div class="flex items-center gap-1.5">
+              <span id="header-user-role-badge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-scout-greenLight text-scout-green">Admin</span>
+              <span id="header-kwarran-tag" class="hidden text-[11px] font-medium px-2 py-0.5 rounded-full bg-scout-sand text-scout-primary"></span>
+            </div>
+          </div>
+          <div class="w-10 h-10 rounded-xl bg-scout-primary text-scout-gold font-bold flex items-center justify-center shadow-sm border border-scout-gold/30" id="header-avatar">
+            A
+          </div>
+        </div>
+      </header>
 
-  <!-- Menghubungkan ke file JavaScript -->
-  <script src="app.js"></script>
+      <!-- DYNAMIC PAGE CONTAINER -->
+      <main id="main-content" class="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <!-- Active Section Injected Here -->
+      </main>
+
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- REUSABLE MODAL FOR FORMS (DATA POTENSI, KURSUS, SURAT, USER)          -->
+  <!-- ===================================================================== -->
+  <div id="form-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border border-scout-khaki/40 overflow-hidden my-auto fade-in">
+      <div class="px-6 py-4 bg-scout-primary text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <i id="form-modal-icon" data-lucide="file-plus" class="w-5 h-5 text-scout-gold"></i>
+          <h3 id="form-modal-title" class="font-bold text-base sm:text-lg">Tambah Data</h3>
+        </div>
+        <button id="close-form-modal" class="p-1.5 rounded-lg hover:bg-white/10 text-scout-khaki hover:text-white transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div id="form-modal-body" class="p-6 max-h-[80vh] overflow-y-auto">
+        <!-- Dynamic form fields -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- APPLICATION JAVASCRIPT                                                -->
+  <!-- ===================================================================== -->
+  <script>
+    // =========================================================================
+    // 1. CONSTANTS & INITIAL DUMMY DATA (WILAYAH TANGERANG)
+    // =========================================================================
+    const KWARRAN_LIST = [
+      "Tigaraksa", "Cikupa", "Balaraja", "Curug", "Kelapa Dua",
+      "Pasar Kemis", "Pagedangan", "Cisauk", "Legok", "Panongan",
+      "Sindang Jaya", "Rajeg", "Mauk", "Sepatan", "Teluknaga",
+      "Kosambi", "Kronjo", "Kresek", "Jayanti", "Solear",
+      "Karawaci", "Cipondoh", "Ciledug", "Pinang", "Cibodas", "Periuk"
+    ];
+
+    const JENJANG_LIST = ["Belum Kursus", "KMD", "KML", "KPD", "KPL"];
+
+    const DEFAULT_SVG_LOGO = `
+      <svg viewBox="0 0 64 64" class="w-full h-full text-scout-gold fill-current">
+        <path d="M32 4C27 12 22 18 22 26c0 5 3 9 7 11v9H21v4h8v10h6V50h8v-4h-8v-9c4-2 7-6 7-11 0-8-5-14-10-22zm0 9c3 5 5 9 5 13 0 3-2 6-5 7-3-1-5-4-5-7 0-4 2-8 5-13z"/>
+        <circle cx="17" cy="31" r="3"/>
+        <circle cx="47" cy="31" r="3"/>
+      </svg>
+    `;
+
+    const INITIAL_STATE = {
+      profile: {
+        kapusdiklatcab: "Kak H. Ahmad Fauzi, S.Pd., M.Pd.",
+        nta: "09.04.00.00124",
+        masaBakti: "2023 - 2028",
+        alamat: "Jl. Raya Tigaraksa Komplek Perkantoran Pemda Kab. Tangerang",
+        logoDataUrl: "" // Empty means default vector emblem
+      },
+      users: [
+        { id: "u1", nama: "Admin Pusdiklatcab", password: "admin123", role: "Admin", kwarran: "" },
+        { id: "u2", nama: "Kak Budi Santoso (Pelatih)", password: "pelatih123", role: "Pelatih", kwarran: "" },
+        { id: "u3", nama: "Kak Siti Aminah (Panitia)", password: "panitia123", role: "Panitia", kwarran: "" },
+        { id: "u4", nama: "Kwarran Cikupa", password: "cikupa123", role: "Kwarran", kwarran: "Cikupa" },
+        { id: "u5", nama: "Kwarran Tigaraksa", password: "tigaraksa123", role: "Kwarran", kwarran: "Tigaraksa" }
+      ],
+      potensi: [
+        { id: "p1", nama: "Dedi Kurniawan, S.Pd.", nta: "09.04.01.0041", jenjang: "KML", gender: "Putra", kwarran: "Tigaraksa", gugusDepan: "01.001 - SDN Tigaraksa 1" },
+        { id: "p2", nama: "Nurul Hidayah, S.Pd.I.", nta: "09.04.02.0112", jenjang: "KMD", gender: "Putri", kwarran: "Cikupa", gugusDepan: "02.014 - SMPN 1 Cikupa" },
+        { id: "p3", nama: "Hendra Wijaya, M.Pd.", nta: "09.04.03.0008", jenjang: "KPL", gender: "Putra", kwarran: "Balaraja", gugusDepan: "03.005 - SMAN 1 Balaraja" },
+        { id: "p4", nama: "Rina Marlina, S.Kom.", nta: "09.04.04.0089", jenjang: "KPD", gender: "Putri", kwarran: "Curug", gugusDepan: "04.022 - SMKN 2 Kab. Tangerang" },
+        { id: "p5", nama: "Fajar Sidik", nta: "09.04.05.0210", jenjang: "Belum Kursus", gender: "Putra", kwarran: "Kelapa Dua", gugusDepan: "05.031 - SDIT Al-Azhar" },
+        { id: "p6", nama: "Siti Rahmawati, S.Pd.", nta: "09.04.06.0175", jenjang: "KMD", gender: "Putri", kwarran: "Pasar Kemis", gugusDepan: "06.019 - SMPN 2 Pasar Kemis" },
+        { id: "p7", nama: "Agus Salim, S.Ag.", nta: "09.04.02.0155", jenjang: "KML", gender: "Putra", kwarran: "Cikupa", gugusDepan: "02.040 - MTsN 2 Tangerang" },
+        { id: "p8", nama: "Dewi Lestari", nta: "09.04.01.0298", jenjang: "Belum Kursus", gender: "Putri", kwarran: "Tigaraksa", gugusDepan: "01.055 - SDN Kaduagung 2" },
+        { id: "p9", nama: "M. Ridwan Kamil, S.Pd.", nta: "09.04.07.0063", jenjang: "KPD", gender: "Putra", kwarran: "Karawaci", gugusDepan: "07.011 - SMAN 5 Tangerang" },
+        { id: "p10", nama: "Fitriani Handayani", nta: "09.04.08.0190", jenjang: "KML", gender: "Putri", kwarran: "Cipondoh", gugusDepan: "08.027 - SMPN 10 Tangerang" },
+        { id: "p11", nama: "Rizky Pratama", nta: "09.04.09.0301", jenjang: "Belum Kursus", gender: "Putra", kwarran: "Ciledug", gugusDepan: "09.018 - SDN Sudimara 4" },
+        { id: "p12", nama: "Hj. Yuniarti, M.M.", nta: "09.04.10.0015", jenjang: "KPL", gender: "Putri", kwarran: "Pagedangan", gugusDepan: "10.002 - SMAN 22 Kab. Tangerang" }
+      ],
+      kursus: [
+        {
+          id: "k1",
+          nama: "Kursus Pembina Pramuka Mahir Tingkat Dasar (KMD)",
+          jenjang: "KMD",
+          angkatan: "Angkatan XLV / 2026",
+          tanggalMulai: "2026-12-10",
+          tanggalSelesai: "2026-12-15",
+          lokasi: "Bumi Perkemahan Kitri Bakti, Curug",
+          kuota: 60,
+          terdaftar: 52,
+          status: "Akan Datang",
+          pelatih: "Kak H. Ahmad Fauzi, M.Pd. & Tim Pelatih Cabang",
+          panitia: "Kwarran Curug & DKC Tangerang"
+        },
+        {
+          id: "k2",
+          nama: "Kursus Pembina Pramuka Mahir Tingkat Lanjutan (KML) Golongan Penggalang",
+          jenjang: "KML",
+          angkatan: "Angkatan XXII / 2026",
+          tanggalMulai: "2026-11-20",
+          tanggalSelesai: "2026-11-25",
+          lokasi: "Pusdiklatcab Tangerang, Tigaraksa",
+          kuota: 45,
+          terdaftar: 45,
+          status: "Berlangsung",
+          pelatih: "Kak Hendra Wijaya, M.Pd. (Pinsus)",
+          panitia: "Sangga Kerja Pusdiklatcab"
+        },
+        {
+          id: "k3",
+          nama: "Kursus Pelatih Pembina Pramuka Tingkat Dasar (KPD)",
+          jenjang: "KPD",
+          angkatan: "Angkatan VIII / 2026",
+          tanggalMulai: "2026-09-05",
+          tanggalSelesai: "2026-09-11",
+          lokasi: "Villa Bumi Cipanas / Kwarcab Tangerang",
+          kuota: 40,
+          terdaftar: 38,
+          status: "Selesai",
+          pelatih: "Tim Pelatih Kwarda Banten & Pusdiklatcab",
+          panitia: "Bidang Binawasa Kwarcab Tangerang"
+        },
+        {
+          id: "k4",
+          nama: "Orientasi Kepramukaan Bagi Kepala Sekolah (Mabigus)",
+          jenjang: "Orientasi",
+          angkatan: "Gelombang II / 2026",
+          tanggalMulai: "2026-10-14",
+          tanggalSelesai: "2026-10-14",
+          lokasi: "Gedung Serba Guna Tigaraksa",
+          kuota: 100,
+          terdaftar: 94,
+          status: "Selesai",
+          pelatih: "Kak Budi Santoso & Tim",
+          panitia: "Kwarran Tigaraksa"
+        }
+      ],
+      suratMasuk: [
+        {
+          id: "sm1",
+          nomorSurat: "045/09.04.02-B",
+          tanggalSurat: "2026-11-12",
+          tanggalTerima: "2026-11-13",
+          asal: "Kwarran Cikupa",
+          perihal: "Permohonan Rekomendasi & Tim Pelatih KMD Mandiri Kwarran Cikupa",
+          disposisi: "Diteruskan ke Kapusdiklatcab",
+          status: "Diproses",
+          lampiran: "Proposal_KMD_Cikupa_2026.pdf"
+        },
+        {
+          id: "sm2",
+          nomorSurat: "112/09.00-C",
+          tanggalSurat: "2026-11-08",
+          tanggalTerima: "2026-11-09",
+          asal: "Kwarda Gerakan Pramuka Banten",
+          perihal: "Edaran Pemutakhiran Data Potensi Pelatih & Pembina Mahir Tahun 2026",
+          disposisi: "Arsip & Tindak Lanjut Operator",
+          status: "Selesai",
+          lampiran: "SE_Kwarda_Banten_2026.pdf"
+        },
+        {
+          id: "sm3",
+          nomorSurat: "019/09.04.05-A",
+          tanggalSurat: "2026-11-18",
+          tanggalTerima: "2026-11-19",
+          asal: "Kwarran Kelapa Dua",
+          perihal: "Pengiriman Daftar Calon Peserta KML Golongan Siaga",
+          disposisi: "Panitia KML Angkatan XXII",
+          status: "Baru",
+          lampiran: "Daftar_Peserta_KelapaDua.xlsx"
+        }
+      ],
+      suratKeluar: [
+        {
+          id: "sk1",
+          nomorSurat: "088/09.04-PDK",
+          tanggalKeluar: "2026-11-15",
+          tujuan: "Seluruh Ketua Kwartir Ranting se-Tangerang",
+          perihal: "Panggilan Peserta Kursus Pembina Pramuka Mahir Tingkat Dasar (KMD) XLV",
+          penanggungJawab: "Kapusdiklatcab Tangerang",
+          lampiran: "Edaran_KMD_XLV_2026.pdf"
+        },
+        {
+          id: "sk2",
+          nomorSurat: "089/09.04-PDK",
+          tanggalKeluar: "2026-11-17",
+          tujuan: "Korps Pelatih Pusdiklatcab Tangerang",
+          perihal: "Surat Tugas Tim Pelatih KML Angkatan XXII Tahun 2026",
+          penanggungJawab: "Sekretaris Pusdiklatcab",
+          lampiran: "SK_Tim_Pelatih_KML22.pdf"
+        }
+      ]
+    };
+
+    // Role Permissions Matrix
+    const ROLE_PERMISSIONS = {
+      Admin: ["dashboard", "profile", "potensi", "kursus", "administrasi", "laporan", "user"],
+      Pelatih: ["dashboard", "potensi", "kursus", "laporan"],
+      Panitia: ["dashboard", "potensi", "kursus", "administrasi", "laporan"],
+      Kwarran: ["dashboard", "potensi", "kursus", "laporan"]
+    };
+
+    const MENU_CONFIG = [
+      { id: "dashboard", label: "Dashboard", icon: "layout-dashboard" },
+      { id: "profile", label: "Profile Pusdiklatcab", icon: "landmark" },
+      { id: "potensi", label: "Data Potensi", icon: "users" },
+      { id: "kursus", label: "Kursus & Pelatihan", icon: "graduation-cap" },
+      { id: "administrasi", label: "Administrasi Surat", icon: "mail" },
+      { id: "laporan", label: "Laporan & Cetak", icon: "file-spreadsheet" },
+      { id: "user", label: "Manajemen User", icon: "user-cog" }
+    ];
+
+    // =========================================================================
+    // 2. APPLICATION STATE & STORAGE MANAGEMENT
+    // =========================================================================
+    const STORAGE_KEY = "pusdiklatcab_tangerang_v1";
+    let appState = loadState();
+    let currentUser = null;
+    let activeMenu = "dashboard";
+    let chartInstances = {};
+
+    // Filter states
+    let potensiFilter = { search: "", jenjang: "ALL", gender: "ALL", kwarran: "ALL" };
+    let adminTab = "masuk"; // 'masuk' or 'keluar'
+    let adminSearch = "";
+    let reportType = "potensi"; // 'potensi', 'kursus', 'surat'
+    let reportKwarran = "ALL";
+    let reportJenjang = "ALL";
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          return JSON.parse(raw);
+        }
+      } catch (e) {
+        console.error("Failed to load state:", e);
+      }
+      return JSON.parse(JSON.stringify(INITIAL_STATE));
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      } catch (e) {
+        showToast("Gagal menyimpan ke penyimpanan lokal (ukuran file terlalu besar).", "error");
+      }
+    }
+
+    // =========================================================================
+    // 3. UI UTILITIES (TOAST, CONFIRM, LOGO SYNC, CLIPBOARD)
+    // =========================================================================
+    function showToast(message, type = "success") {
+      const container = document.getElementById("toast-container");
+      const toast = document.createElement("div");
+      const bgMap = {
+        success: "bg-scout-dark text-white border-scout-gold",
+        error: "bg-red-700 text-white border-red-400",
+        info: "bg-scout-primary text-white border-scout-khaki"
+      };
+      const iconMap = {
+        success: "check-circle-2",
+        error: "alert-circle",
+        info: "info"
+      };
+
+      toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border-l-4 ${bgMap[type] || bgMap.success} fade-in`;
+      toast.innerHTML = `
+        <i data-lucide="${iconMap[type] || 'check-circle-2'}" class="w-5 h-5 text-scout-gold shrink-0"></i>
+        <span class="text-xs sm:text-sm font-medium leading-snug">${message}</span>
+      `;
+      container.appendChild(toast);
+      lucide.createIcons({ nodes: [toast] });
+
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(-6px)";
+        toast.style.transition = "all 0.25s ease";
+        setTimeout(() => toast.remove(), 250);
+      }, 3200);
+    }
+
+    function showConfirm(title, message, onConfirm) {
+      const modal = document.getElementById("confirm-modal");
+      document.getElementById("confirm-title").textContent = title;
+      document.getElementById("confirm-message").textContent = message;
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+
+      const okBtn = document.getElementById("confirm-ok-btn");
+      const cancelBtn = document.getElementById("confirm-cancel-btn");
+
+      const cleanup = () => {
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+      };
+
+      cancelBtn.onclick = cleanup;
+      okBtn.onclick = () => {
+        cleanup();
+        onConfirm();
+      };
+    }
+
+    function copyTextToClipboard(text, successMsg = "Berhasil disalin ke clipboard!") {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand("copy");
+        showToast(successMsg, "success");
+      } catch (err) {
+        showToast("Gagal menyalin teks.", "error");
+      }
+      document.body.removeChild(textArea);
+    }
+
+    function getLogoHtml(className = "w-full h-full object-contain") {
+      if (appState.profile.logoDataUrl) {
+        return `<img src="${appState.profile.logoDataUrl}" alt="Logo Pusdiklatcab" class="${className}" />`;
+      }
+      return DEFAULT_SVG_LOGO;
+    }
+
+    function syncBrandingUI() {
+      const loginLogo = document.getElementById("login-logo-container");
+      const sidebarLogo = document.getElementById("sidebar-logo-box");
+      const sidebarKapus = document.getElementById("sidebar-kapus-name");
+
+      if (loginLogo) loginLogo.innerHTML = getLogoHtml("w-11 h-11 object-contain rounded-lg");
+      if (sidebarLogo) sidebarLogo.innerHTML = getLogoHtml("w-9 h-9 object-contain rounded-lg");
+      if (sidebarKapus) sidebarKapus.textContent = appState.profile.kapusdiklatcab;
+    }
+
+    // =========================================================================
+    // 4. AUTHENTICATION & LOGIN LOGIC
+    // =========================================================================
+    function initLoginView() {
+      syncBrandingUI();
+      let selectedRole = "Admin";
+      const pills = document.querySelectorAll(".role-pill");
+
+      pills.forEach(pill => {
+        pill.addEventListener("click", () => {
+          selectedRole = pill.dataset.role;
+          pills.forEach(p => {
+            p.className = "role-pill py-2.5 px-3 rounded-xl border border-gray-200 bg-scout-cream text-gray-700 hover:border-scout-medium text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer";
+          });
+          pill.className = "role-pill active py-2.5 px-3 rounded-xl border-2 border-scout-primary bg-scout-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer";
+          
+          // Auto-fill matching demo user for convenience
+          const match = appState.users.find(u => u.role === selectedRole);
+          if (match) {
+            document.getElementById("login-nama").value = match.nama;
+            document.getElementById("login-password").value = match.password;
+          }
+        });
+      });
+
+      // Set initial default values to first Admin
+      const defaultAdmin = appState.users.find(u => u.role === "Admin") || appState.users[0];
+      if (defaultAdmin) {
+        document.getElementById("login-nama").value = defaultAdmin.nama;
+        document.getElementById("login-password").value = defaultAdmin.password;
+      }
+
+      // Toggle Password visibility
+      document.getElementById("toggle-login-pwd").addEventListener("click", () => {
+        const pwdInput = document.getElementById("login-password");
+        pwdInput.type = pwdInput.type === "password" ? "text" : "password";
+      });
+
+      // Render Quick Demo Accounts
+      renderQuickDemoAccounts();
+
+      // Handle Login Submit
+      document.getElementById("login-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const namaInput = document.getElementById("login-nama").value.trim();
+        const pwdInput = document.getElementById("login-password").value;
+
+        const user = appState.users.find(
+          u => u.nama.toLowerCase() === namaInput.toLowerCase() && u.password === pwdInput && u.role === selectedRole
+        );
+
+        if (!user) {
+          showToast(`Login gagal! Pastikan Nama, Password, dan Role (${selectedRole}) sesuai.`, "error");
+          return;
+        }
+
+        loginAsUser(user);
+      });
+    }
+
+    function renderQuickDemoAccounts() {
+      const container = document.getElementById("quick-demo-accounts");
+      const demoRoles = ["Admin", "Pelatih", "Panitia", "Kwarran"];
+      container.innerHTML = demoRoles.map(role => {
+        const u = appState.users.find(item => item.role === role);
+        if (!u) return "";
+        return `
+          <button type="button" data-uid="${u.id}" class="quick-login-btn text-left p-2.5 rounded-xl border border-scout-khaki/50 bg-scout-cream/70 hover:bg-scout-sand hover:border-scout-primary transition flex items-center justify-between group cursor-pointer">
+            <div class="min-w-0">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-scout-green block">${u.role}${u.kwarran ? ' • ' + u.kwarran : ''}</span>
+              <span class="text-xs font-semibold text-scout-dark truncate block">${u.nama}</span>
+            </div>
+            <i data-lucide="log-in" class="w-4 h-4 text-scout-medium group-hover:translate-x-0.5 transition shrink-0"></i>
+          </button>
+        `;
+      }).join("");
+
+      lucide.createIcons({ nodes: [container] });
+
+      container.querySelectorAll(".quick-login-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const user = appState.users.find(u => u.id === btn.dataset.uid);
+          if (user) loginAsUser(user);
+        });
+      });
+    }
+
+    function loginAsUser(user) {
+      currentUser = user;
+      document.getElementById("login-view").classList.add("hidden");
+      document.getElementById("app-view").classList.remove("hidden");
+
+      // Header User Info
+      document.getElementById("header-user-name").textContent = user.nama;
+      document.getElementById("header-user-role-badge").textContent = user.role;
+      document.getElementById("header-avatar").textContent = user.nama.charAt(0).toUpperCase();
+
+      const kwarranTag = document.getElementById("header-kwarran-tag");
+      if (user.role === "Kwarran" && user.kwarran) {
+        kwarranTag.textContent = "Kwarran " + user.kwarran;
+        kwarranTag.classList.remove("hidden");
+        potensiFilter.kwarran = user.kwarran;
+      } else {
+        kwarranTag.classList.add("hidden");
+        potensiFilter.kwarran = "ALL";
+      }
+
+      syncBrandingUI();
+      activeMenu = "dashboard";
+      renderSidebarNav();
+      renderActivePage();
+      showToast(`Selamat datang, ${user.nama} (${user.role})!`, "success");
+    }
+
+    function logoutUser() {
+      currentUser = null;
+      document.getElementById("app-view").classList.add("hidden");
+      document.getElementById("login-view").classList.remove("hidden");
+      renderQuickDemoAccounts();
+      showToast("Anda telah keluar dari sistem.", "info");
+    }
+
+    // =========================================================================
+    // 5. NAVIGATION & SHELL CONTROLLERS
+    // =========================================================================
+    function renderSidebarNav() {
+      const nav = document.getElementById("sidebar-nav");
+      const allowed = ROLE_PERMISSIONS[currentUser.role] || ["dashboard"];
+
+      nav.innerHTML = MENU_CONFIG.filter(m => allowed.includes(m.id)).map(menu => {
+        const isActive = activeMenu === menu.id;
+        return `
+          <button data-menu="${menu.id}" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+            isActive
+              ? "bg-scout-gold text-scout-dark font-bold shadow-md"
+              : "text-scout-khaki hover:bg-white/10 hover:text-white"
+          }">
+            <i data-lucide="${menu.icon}" class="w-4 h-4 shrink-0"></i>
+            <span class="truncate">${menu.label}</span>
+          </button>
+        `;
+      }).join("");
+
+      lucide.createIcons({ nodes: [nav] });
+
+      nav.querySelectorAll(".nav-item").forEach(btn => {
+        btn.addEventListener("click", () => {
+          activeMenu = btn.dataset.menu;
+          renderSidebarNav();
+          renderActivePage();
+          closeMobileSidebar();
+        });
+      });
+    }
+
+    function closeMobileSidebar() {
+      document.getElementById("sidebar").classList.add("-translate-x-full");
+      document.getElementById("sidebar-backdrop").classList.add("hidden");
+    }
+
+    function openMobileSidebar() {
+      document.getElementById("sidebar").classList.remove("-translate-x-full");
+      document.getElementById("sidebar-backdrop").classList.remove("hidden");
+    }
+
+    // =========================================================================
+    // 6. PAGE ROUTER
+    // =========================================================================
+    function renderActivePage() {
+      const titleEl = document.getElementById("page-title");
+      const subEl = document.getElementById("page-subtitle");
+      const main = document.getElementById("main-content");
+
+      // Destroy existing charts before re-rendering
+      Object.values(chartInstances).forEach(ch => ch && ch.destroy());
+      chartInstances = {};
+
+      switch (activeMenu) {
+        case "dashboard":
+          titleEl.textContent = "Dashboard Pusdiklatcab";
+          subEl.textContent = "Ikhtisar statistik pembina, kursus kepramukaan, dan administrasi cabang";
+          renderDashboardPage(main);
+          break;
+        case "profile":
+          titleEl.textContent = "Profile Pusdiklatcab Tangerang";
+          subEl.textContent = "Pengaturan identitas Kapusdiklatcab dan logo resmi lembaga";
+          renderProfilePage(main);
+          break;
+        case "potensi":
+          titleEl.textContent = "Data Potensi Pembina";
+          subEl.textContent = "Basis data pembina pramuka berdasarkan jenjang kursus, gender, dan Kwarran";
+          renderPotensiPage(main);
+          break;
+        case "kursus":
+          titleEl.textContent = "Manajemen Kursus & Pelatihan";
+          subEl.textContent = "Jadwal dan pelaksanaan KMD, KML, KPD, KPL, serta Orientasi";
+          renderKursusPage(main);
+          break;
+        case "administrasi":
+          titleEl.textContent = "Administrasi Persuratan";
+          subEl.textContent = "Agenda pengelolaan Surat Masuk dan Surat Keluar Pusdiklatcab";
+          renderAdministrasiPage(main);
+          break;
+        case "laporan":
+          titleEl.textContent = "Laporan & Ekspor Data";
+          subEl.textContent = "Rekapitulasi resmi siap cetak (PDF) dan ekspor spreadsheet (CSV)";
+          renderLaporanPage(main);
+          break;
+        case "user":
+          titleEl.textContent = "Manajemen Akun Pengguna";
+          subEl.textContent = "Kelola kredensial akses Admin, Pelatih, Panitia, dan Kwartir Ranting";
+          renderUserPage(main);
+          break;
+      }
+
+      lucide.createIcons({ nodes: [main] });
+    }
+
+    // =========================================================================
+    // PAGE 1: DASHBOARD
+    // =========================================================================
+    function renderDashboardPage(container) {
+      const totalPotensi = appState.potensi.length;
+      const putraCount = appState.potensi.filter(p => p.gender === "Putra").length;
+      const putriCount = appState.potensi.filter(p => p.gender === "Putri").length;
+      const kursusAktif = appState.kursus.filter(k => k.status !== "Selesai").length;
+      const totalSurat = appState.suratMasuk.length + appState.suratKeluar.length;
+
+      const jenjangCounts = JENJANG_LIST.reduce((acc, j) => {
+        acc[j] = appState.potensi.filter(p => p.jenjang === j).length;
+        return acc;
+      }, {});
+
+      container.innerHTML = `
+        <div class="space-y-6 fade-in">
+          <!-- Welcome Banner -->
+          <div class="bg-gradient-to-r from-scout-primary via-scout-medium to-scout-dark rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-scout-gold/30">
+            <div>
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-scout-gold/20 text-scout-gold border border-scout-gold/30 mb-2">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Sistem Informasi Terpadu
+              </span>
+              <h3 class="text-xl sm:text-2xl font-bold">PUSDIKLATCAB GERAKAN PRAMUKA TANGERANG</h3>
+              <p class="text-xs sm:text-sm text-scout-khaki mt-1">
+                Kapusdiklatcab: <strong class="text-white">${appState.profile.kapusdiklatcab}</strong> • Masa Bakti ${appState.profile.masaBakti}
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button onclick="navigateTo('potensi')" class="px-4 py-2.5 rounded-xl bg-scout-gold text-scout-dark font-bold text-xs hover:brightness-105 transition shadow cursor-pointer flex items-center gap-1.5">
+                <i data-lucide="users" class="w-4 h-4"></i> Lihat Data Potensi
+              </button>
+              <button onclick="navigateTo('laporan')" class="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-semibold text-xs transition cursor-pointer flex items-center gap-1.5">
+                <i data-lucide="printer" class="w-4 h-4"></i> Cetak Laporan
+              </button>
+            </div>
+          </div>
+
+          <!-- Top Stat Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-2xl border border-scout-khaki/30 shadow-xs flex items-center justify-between">
+              <div>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Data Potensi</p>
+                <p class="text-3xl font-extrabold text-scout-dark mt-1">${totalPotensi}</p>
+                <p class="text-xs text-scout-green font-medium mt-1">${putraCount} Putra • ${putriCount} Putri</p>
+              </div>
+              <div class="w-12 h-12 rounded-2xl bg-scout-sand text-scout-primary flex items-center justify-center">
+                <i data-lucide="users" class="w-6 h-6"></i>
+              </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-scout-khaki/30 shadow-xs flex items-center justify-between">
+              <div>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pembina Mahir (KMD-KPL)</p>
+                <p class="text-3xl font-extrabold text-scout-green mt-1">${totalPotensi - jenjangCounts["Belum Kursus"]}</p>
+                <p class="text-xs text-gray-500 mt-1">${jenjangCounts["Belum Kursus"]} Belum Kursus</p>
+              </div>
+              <div class="w-12 h-12 rounded-2xl bg-scout-greenLight text-scout-green flex items-center justify-center">
+                <i data-lucide="award" class="w-6 h-6"></i>
+              </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-scout-khaki/30 shadow-xs flex items-center justify-between">
+              <div>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Program Kursus</p>
+                <p class="text-3xl font-extrabold text-scout-dark mt-1">${appState.kursus.length}</p>
+                <p class="text-xs text-amber-700 font-medium mt-1">${kursusAktif} Aktif / Akan Datang</p>
+              </div>
+              <div class="w-12 h-12 rounded-2xl bg-scout-goldLight text-amber-700 flex items-center justify-center">
+                <i data-lucide="graduation-cap" class="w-6 h-6"></i>
+              </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-scout-khaki/30 shadow-xs flex items-center justify-between">
+              <div>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Arsip Persuratan</p>
+                <p class="text-3xl font-extrabold text-scout-dark mt-1">${totalSurat}</p>
+                <p class="text-xs text-gray-500 mt-1">${appState.suratMasuk.length} Masuk • ${appState.suratKeluar.length} Keluar</p>
+              </div>
+              <div class="w-12 h-12 rounded-2xl bg-scout-sand text-scout-medium flex items-center justify-center">
+                <i data-lucide="mail" class="w-6 h-6"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Jenjang Breakdown Pills -->
+          <div class="bg-white p-5 rounded-2xl border border-scout-khaki/30 shadow-xs">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Rekapitulasi Jenjang Kursus Pembina</h4>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              ${JENJANG_LIST.map(j => `
+                <div class="p-3.5 rounded-xl bg-scout-cream border border-scout-khaki/40 flex items-center justify-between">
+                  <span class="text-xs font-bold text-scout-dark">${j}</span>
+                  <span class="px-2.5 py-1 rounded-lg bg-scout-primary text-white text-xs font-extrabold">${jenjangCounts[j]}</span>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+
+          <!-- Charts Section -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div class="lg:col-span-7 bg-white p-6 rounded-2xl border border-scout-khaki/30 shadow-xs">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h4 class="font-bold text-scout-dark text-base">Sebaran Potensi Berdasarkan Jenjang</h4>
+                  <p class="text-xs text-gray-500">Perbandingan Putra dan Putri tiap jenjang kursus</p>
+                </div>
+              </div>
+              <div class="h-64 relative">
+                <canvas id="chart-jenjang"></canvas>
+              </div>
+            </div>
+
+            <div class="lg:col-span-5 bg-white p-6 rounded-2xl border border-scout-khaki/30 shadow-xs">
+              <div class="mb-4">
+                <h4 class="font-bold text-scout-dark text-base">Komposisi Gender Pembina</h4>
+                <p class="text-xs text-gray-500">Proporsi Pembina Putra & Putri terdaftar</p>
+              </div>
+              <div class="h-64 relative flex items-center justify-center">
+                <canvas id="chart-gender"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Upcoming Courses & Recent Letters -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-2xl border border-scout-khaki/30 shadow-xs">
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="font-bold text-scout-dark text-base">Jadwal Kursus & Pelatihan</h4>
+                <button onclick="navigateTo('kursus')" class="text-xs font-semibold text-scout-green hover:underline cursor-pointer">Lihat Semua →</button>
+              </div>
+              <div class="space-y-3">
+                ${appState.kursus.slice(0, 3).map(k => `
+                  <div class="p-3.5 rounded-xl bg-scout-cream/70 border border-scout-khaki/30 flex items-start justify-between gap-3">
+                    <div>
+                      <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-scout-primary text-scout-gold mb-1">${k.jenjang}</span>
+                      <h5 class="text-sm font-bold text-scout-dark leading-snug">${k.nama}</h5>
+                      <p class="text-xs text-gray-500 mt-1"><i data-lucide="calendar" class="w-3 h-3 inline mr-1"></i>${k.tanggalMulai} • ${k.lokasi}</p>
+                    </div>
+                    <span class="shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
+                      k.status === 'Berlangsung' ? 'bg-emerald-100 text-emerald-700' :
+                      k.status === 'Akan Datang' ? 'bg-amber-100 text-amber-800' : 'bg-gray-200 text-gray-700'
+                    }">${k.status}</span>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-scout-khaki/30 shadow-xs">
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="font-bold text-scout-dark text-base">Log Surat Masuk Terbaru</h4>
+                ${ROLE_PERMISSIONS[currentUser.role].includes('administrasi')
+                  ? `<button onclick="navigateTo('administrasi')" class="text-xs font-semibold text-scout-green hover:underline cursor-pointer">Kelola Surat →</button>`
+                  : ''}
+              </div>
+              <div class="space-y-3">
+                ${appState.suratMasuk.slice(0, 3).map(s => `
+                  <div class="p-3.5 rounded-xl bg-scout-cream/70 border border-scout-khaki/30 flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="text-[11px] font-bold text-scout-medium">${s.nomorSurat} • ${s.asal}</p>
+                      <h5 class="text-sm font-semibold text-gray-800 truncate mt-0.5">${s.perihal}</h5>
+                      <p class="text-xs text-gray-500 mt-1">Diterima: ${s.tanggalTerima}</p>
+                    </div>
+                    <span class="shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-scout-sand text-scout-dark">${s.status}</span>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Initialize Charts
+      setTimeout(() => {
+        const ctxJenjang = document.getElementById("chart-jenjang");
+        if (ctxJenjang) {
+          const putraPerJenjang = JENJANG_LIST.map(j => appState.potensi.filter(p => p.jenjang === j && p.gender === "Putra").length);
+          const putriPerJenjang = JENJANG_LIST.map(j => appState.potensi.filter(p => p.jenjang === j && p.gender === "Putri").length);
+
+          chartInstances.jenjang = new Chart(ctxJenjang, {
+            type: "bar",
+            data: {
+              labels: JENJANG_LIST,
+              datasets: [
+                {
+                  label: "Putra",
+                  data: putraPerJenjang,
+                  backgroundColor: "#4E342E",
+                  borderRadius: 6
+                },
+                {
+                  label: "Putri",
+                  data: putriPerJenjang,
+                  backgroundColor: "#D4AF37",
+                  borderRadius: 6
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: "bottom" } },
+              scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+              }
+            }
+          });
+        }
+
+        const ctxGender = document.getElementById("chart-gender");
+        if (ctxGender) {
+          chartInstances.gender = new Chart(ctxGender, {
+            type: "doughnut",
+            data: {
+              labels: ["Pembina Putra", "Pembina Putri"],
+              datasets: [{
+                data: [putraCount, putriCount],
+                backgroundColor: ["#4E342E", "#2E7D32"],
+                borderWidth: 2,
+                borderColor: "#FFFFFF"
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              cutout: "65%",
+              plugins: { legend: { position: "bottom" } }
+            }
+          });
+        }
+      }, 50);
+    }
+
+    window.navigateTo = function(menuId) {
+      if (ROLE_PERMISSIONS[currentUser.role].includes(menuId)) {
+        activeMenu = menuId;
+        renderSidebarNav();
+        renderActivePage();
+      }
+    };
+
+    // =========================================================================
+    // PAGE 2: PROFILE PUSDIKLATCAB (INPUT KAPUSDIKLATCAB & UPLOAD LOGO)
+    // =========================================================================
+    function renderProfilePage(container) {
+      const p = appState.profile;
+      container.innerHTML = `
+        <div class="max-w-4xl mx-auto space-y-6 fade-in">
+          <div class="bg-white rounded-2xl border border-scout-khaki/40 shadow-xs overflow-hidden">
+            <div class="bg-gradient-to-r from-scout-primary to-scout-dark px-6 py-5 text-white">
+              <h3 class="text-lg font-bold">Identitas Resmi PUSDIKLATCAB TANGERANG</h3>
+              <p class="text-xs text-scout-khaki mt-0.5">Data Nama Kapusdiklatcab dan Logo akan otomatis tampil pada Sidebar serta Kop Laporan Cetak.</p>
+            </div>
+
+            <form id="profile-form" class="p-6 sm:p-8 space-y-6">
+              <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                
+                <!-- Logo Upload Section -->
+                <div class="md:col-span-4 flex flex-col items-center p-5 rounded-2xl bg-scout-cream border-2 border-dashed border-scout-khaki">
+                  <div id="profile-logo-preview" class="w-32 h-32 rounded-2xl bg-white shadow-md border border-scout-khaki/40 flex items-center justify-center p-2 mb-4 overflow-hidden">
+                    ${getLogoHtml("w-24 h-24 object-contain")}
+                  </div>
+                  <label class="cursor-pointer px-4 py-2 rounded-xl bg-scout-primary hover:bg-scout-dark text-white text-xs font-semibold transition flex items-center gap-2 shadow-sm">
+                    <i data-lucide="upload" class="w-4 h-4"></i>
+                    <span>Upload Logo Baru</span>
+                    <input type="file" id="profile-logo-input" accept="image/*" class="hidden" />
+                  </label>
+                  ${p.logoDataUrl ? `
+                    <button type="button" id="remove-logo-btn" class="mt-2 text-xs text-red-600 hover:underline cursor-pointer">Gunakan Logo Default</button>
+                  ` : ''}
+                  <p class="text-[11px] text-gray-500 text-center mt-2">Format PNG, JPG, atau SVG (Maks. 2MB)</p>
+                </div>
+
+                <!-- Kapusdiklatcab Form Fields -->
+                <div class="md:col-span-8 space-y-4">
+                  <div>
+                    <label class="block text-sm font-semibold text-scout-dark mb-1">Nama Kapusdiklatcab (Beserta Gelar) <span class="text-red-500">*</span></label>
+                    <input type="text" id="prof-kapus" required value="${p.kapusdiklatcab}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-scout-primary outline-none text-sm" placeholder="Contoh: Kak H. Ahmad Fauzi, M.Pd." />
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-semibold text-scout-dark mb-1">Nomor Tanda Anggota (NTA)</label>
+                      <input type="text" id="prof-nta" value="${p.nta || ''}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-scout-primary outline-none text-sm" placeholder="09.04.00.xxxxx" />
+                    </div>
+                    <div>
+                      <label class="block text-sm font-semibold text-scout-dark mb-1">Masa Bakti</label>
+                      <input type="text" id="prof-masabakti" value="${p.masaBakti || ''}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-scout-primary outline-none text-sm" placeholder="2023 - 2028" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-semibold text-scout-dark mb-1">Alamat Sekretariat Pusdiklatcab</label>
+                    <textarea id="prof-alamat" rows="2" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-scout-primary outline-none text-sm">${p.alamat || ''}</textarea>
+                  </div>
+
+                  <div class="pt-2 flex justify-end">
+                    <button type="submit" class="px-6 py-2.5 rounded-xl bg-scout-green hover:bg-emerald-800 text-white font-semibold text-sm shadow-md flex items-center gap-2 transition cursor-pointer">
+                      <i data-lucide="save" class="w-4 h-4"></i>
+                      <span>Simpan Perubahan Profile</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </form>
+          </div>
+        </div>
+      `;
+
+      // Handle Logo File Upload
+      document.getElementById("profile-logo-input").addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+          showToast("Ukuran gambar maksimal 2MB.", "error");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          appState.profile.logoDataUrl = evt.target.result;
+          saveState();
+          syncBrandingUI();
+          renderProfilePage(container);
+          lucide.createIcons({ nodes: [container] });
+          showToast("Logo Pusdiklatcab berhasil diperbarui!", "success");
+        };
+        reader.readAsDataURL(file);
+      });
+
+      const removeLogoBtn = document.getElementById("remove-logo-btn");
+      if (removeLogoBtn) {
+        removeLogoBtn.addEventListener("click", () => {
+          appState.profile.logoDataUrl = "";
+          saveState();
+          syncBrandingUI();
+          renderProfilePage(container);
+          lucide.createIcons({ nodes: [container] });
+          showToast("Logo dikembalikan ke lambang default.", "info");
+        });
+      }
+
+      // Handle Form Save
+      document.getElementById("profile-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        appState.profile.kapusdiklatcab = document.getElementById("prof-kapus").value.trim();
+        appState.profile.nta = document.getElementById("prof-nta").value.trim();
+        appState.profile.masaBakti = document.getElementById("prof-masabakti").value.trim();
+        appState.profile.alamat = document.getElementById("prof-alamat").value.trim();
+        saveState();
+        syncBrandingUI();
+        showToast("Data Profile & Nama Kapusdiklatcab berhasil disimpan!", "success");
+      });
+    }
+
+    // =========================================================================
+    // PAGE 3: DATA POTENSI PEMBINA
+    // =========================================================================
+    function renderPotensiPage(container) {
+      const isKwarranRole = currentUser.role === "Kwarran" && currentUser.kwarran;
+
+      // Filter dataset
+      const filtered = appState.potensi.filter(item => {
+        const matchSearch = item.nama.toLowerCase().includes(potensiFilter.search.toLowerCase()) ||
+                            (item.nta && item.nta.toLowerCase().includes(potensiFilter.search.toLowerCase())) ||
+                            (item.gugusDepan && item.gugusDepan.toLowerCase().includes(potensiFilter.search.toLowerCase()));
+        const matchJenjang = potensiFilter.jenjang === "ALL" || item.jenjang === potensiFilter.jenjang;
+        const matchGender = potensiFilter.gender === "ALL" || item.gender === potensiFilter.gender;
+        const matchKwarran = potensiFilter.kwarran === "ALL" || item.kwarran === potensiFilter.kwarran;
+        return matchSearch && matchJenjang && matchGender && matchKwarran;
+      });
+
+      const canEdit = ["Admin", "Panitia", "Kwarran"].includes(currentUser.role);
+
+      container.innerHTML = `
+        <div class="space-y-5 fade-in">
+          <!-- Top Action & Quick Counters -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-scout-khaki/30 shadow-xs">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="px-3 py-1.5 rounded-xl bg-scout-primary text-white text-xs font-bold">Total Tampil: ${filtered.length}</span>
+              <span class="px-3 py-1.5 rounded-xl bg-scout-sand text-scout-dark text-xs font-semibold">Putra: ${filtered.filter(i => i.gender === 'Putra').length}</span>
+              <span class="px-3 py-1.5 rounded-xl bg-scout-goldLight text-amber-900 text-xs font-semibold">Putri: ${filtered.filter(i => i.gender === 'Putri').length}</span>
+            </div>
+            ${canEdit ? `
+              <button id="add-potensi-btn" class="px-4 py-2.5 rounded-xl bg-scout-green hover:bg-emerald-800 text-white text-xs sm:text-sm font-semibold shadow-sm flex items-center justify-center gap-2 transition cursor-pointer">
+                <i data-lucide="user-plus" class="w-4 h-4"></i>
+                <span>Tambah Data Potensi</span>
+              </button>
+            ` : ''}
+          </div>
+
+          <!-- Filter Bar -->
+          <div class="bg-white p-4 rounded-2xl border border-scout-khaki/30 shadow-xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="relative">
+              <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="text" id="pot-search" value="${potensiFilter.search}" placeholder="Cari Nama / NTA / Gudep..." class="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-300 text-xs sm:text-sm focus:ring-2 focus:ring-scout-primary outline-none" />
+            </div>
+
+            <select id="pot-jenjang" class="px-3 py-2 rounded-xl border border-gray-300 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-scout-primary outline-none">
+              <option value="ALL">Semua Jenjang Kursus</option>
+              ${JENJANG_LIST.map(j => `<option value="${j}" ${potensiFilter.jenjang === j ? 'selected' : ''}>${j}</option>`).join("")}
+            </select>
+
+            <select id="pot-gender" class="px-3 py-2 rounded-xl border border-gray-300 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-scout-primary outline-none">
+              <option value="ALL">Semua Jenis Kelamin</option>
+              <option value="Putra" ${potensiFilter.gender === 'Putra' ? 'selected' : ''}>Putra</option>
+              <option value="Putri" ${potensiFilter.gender === 'Putri' ? 'selected' : ''}>Putri</option>
+            </select>
+
+            <select id="pot-kwarran" ${isKwarranRole ? 'disabled' : ''} class="px-3 py-2 rounded-xl border border-gray-300 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-scout-primary outline-none disabled:bg-gray-100">
+              <option value="ALL">Semua Asal Kwarran</option>
+              ${KWARRAN_LIST.map(k => `<option value="${k}" ${potensiFilter.kwarran === k ? 'selected' : ''}>Kwarran ${k}</option>`).join("")}
+            </select>
+          </div>
+
+          <!-- Data Table -->
+          <div class="bg-white rounded-2xl border border-scout-khaki/30 shadow-xs overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-scout-sand/80 text-scout-dark text-xs uppercase tracking-wider border-b border-scout-khaki/40">
+                    <th class="py-3.5 px-4 font-bold">No</th>
+                    <th class="py-3.5 px-4 font-bold">Nama Pembina & NTA</th>
+                    <th class="py-3.5 px-4 font-bold">Jenjang Kursus</th>
+                    <th class="py-3.5 px-4 font-bold">Putra / Putri</th>
+                    <th class="py-3.5 px-4 font-bold">Asal Kwarran</th>
+                    <th class="py-3.5 px-4 font-bold">Gugus Depan</th>
+                    ${canEdit ? '<th class="py-3.5 px-4 font-bold text-right">Aksi</th>' : ''}
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 text-sm">
+                  ${filtered.length === 0 ? `
+                    <tr>
+                      <td colspan="7" class="py-10 text-center text-gray-500 text-sm">Tidak ada data potensi pembina yang sesuai filter.</td>
+                    </tr>
+                  ` : filtered.map((item, idx) => {
+                    const badgeColor = {
+                      "Belum Kursus": "bg-gray-100 text-gray-700 border-gray-300",
+                      "KMD": "bg-blue-50 text-blue-700 border-blue-200",
+                      "KML": "bg-emerald-50 text-emerald-700 border-emerald-200",
+                      "KPD": "bg-amber-50 text-amber-800 border-amber-200",
+                      "KPL": "bg-purple-50 text-purple-800 border-purple-200"
+                    }[item.jenjang] || "bg-gray-100 text-gray-700";
+
+                    return `
+                      <tr class="hover:bg-scout-cream/50 transition">
+                        <td class="py-3 px-4 text-gray-500 font-medium">${idx + 1}</td>
+                        <td class="py-3 px-4">
+                          <div class="font-bold text-scout-dark">${item.nama}</div>
+                          <div class="text-xs text-gray-500">NTA: ${item.nta || '-'}</div>
+                        </td>
+                        <td class="py-3 px-4">
+                          <span class="inline-block px-2.5 py-1 rounded-lg text-xs font-bold border ${badgeColor}">${item.jenjang}</span>
+                        </td>
+                        <td class="py-3 px-4">
+                          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                            item.gender === 'Putra' ? 'bg-scout-sand text-scout-primary' : 'bg-scout-goldLight text-amber-900'
+                          }">
+                            ${item.gender}
+                          </span>
+                        </td>
+                        <td class="py-3 px-4 font-medium text-gray-800">Kwarran ${item.kwarran}</td>
+                        <td class="py-3 px-4 text-xs text-gray-600">${item.gugusDepan || '-'}</td>
+                        ${canEdit ? `
+                          <td class="py-3 px-4 text-right whitespace-nowrap">
+                            <button onclick="openPotensiModal('${item.id}')" class="p-2 rounded-lg text-amber-700 hover:bg-amber-50 transition cursor-pointer" title="Edit">
+                              <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deletePotensi('${item.id}')" class="p-2 rounded-lg text-red-600 hover:bg-red-50 transition cursor-pointer" title="Hapus">
+                              <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                          </td>
+                        ` : ''}
+                      </tr>
+                    `;
+                  }).join("")}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Bind Filter Events
+      document.getElementById("pot-search").addEventListener("input", (e) => {
+        potensiFilter.search = e.target.value;
+        renderPotensiPage(container);
+        lucide.createIcons({ nodes: [container] });
+        const input = document.getElementById("pot-search");
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      });
+
+      document.getElementById("pot-jenjang").addEventListener("change", (e) => {
+        potensiFilter.jenjang = e.target.value;
+        renderPotensiPage(container);
+        lucide.createIcons({ nodes: [container] });
+      });
+
+      document.getElementById("pot-gender").addEventListener("change", (e) => {
+        potensiFilter.gender = e.target.value;
+        renderPotensiPage(container);
+        lucide.createIcons({ nodes: [container] });
+      });
+
+      document.getElementById("pot-kwarran").addEventListener("change", (e) => {
+        potensiFilter.kwarran = e.target.value;
+        renderPotensiPage(container);
+        lucide.createIcons({ nodes: [container] });
+      });
+
+      const addBtn = document.getElementById("add-potensi-btn");
+      if (addBtn) {
+        addBtn.addEventListener("click", () => openPotensiModal(null));
+      }
+    }
+
+    window.openPotensiModal = function(id) {
+      const item = id ? appState.potensi.find(p => p.id === id) : null;
+      const isKwarranRole = currentUser.role === "Kwarran" && currentUser.kwarran;
+      const defaultKwarran = item ? item.kwarran : (isKwarranRole ? currentUser.kwarran : KWARRAN_LIST[0]);
+
+      openFormModal(
+        item ? "Edit Data Potensi Pembina" : "Tambah Data Potensi Pembina",
+        "user-plus",
+        `
+          <form id="potensi-modal-form" class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Nama Lengkap Pembina (Beserta Gelar) *</label>
+              <input type="text" id="f-pot-nama" required value="${item ? item.nama : ''}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-scout-primary outline-none" placeholder="Contoh: Kak Dedi Kurniawan, S.Pd." />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">NTA (Nomor Tanda Anggota)</label>
+                <input type="text" id="f-pot-nta" value="${item ? (item.nta || '') : ''}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-scout-primary outline-none" placeholder="09.04.xx.xxxx" />
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Jenjang / Status Kursus *</label>
+                <select id="f-pot-jenjang" required class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-scout-primary outline-none">
+                  ${JENJANG_LIST.map(j => `<option value="${j}" ${item && item.jenjang === j ? 'selected' : ''}>${j}</option>`).join("")}
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Jenis Kelamin (Putra / Putri) *</label>
+                <select id="f-pot-gender" required class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-scout-primary outline-none">
+                  <option value="Putra" ${item && item.gender === 'Putra' ? 'selected' : ''}>Putra</option>
+                  <option value="Putri" ${item && item.gender === 'Putri' ? 'selected' : ''}>Putri</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Asal Kwarran *</label>
+                <select id="f-pot-kwarran" ${isKwarranRole ? 'disabled' : ''} required class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-scout-primary outline-none disabled:bg-gray-100">
+                  ${KWARRAN_LIST.map(k => `<option value="${k}" ${defaultKwarran === k ? 'selected' : ''}>Kwarran ${k}</option>`).join("")}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Pangkalan / Gugus Depan</label>
+              <input type="text" id="f-pot-gudep" value="${item ? (item.gugusDepan || '') : ''}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-scout-primary outline-none" placeholder="Contoh: 01.001 - SDN Tigaraksa 1" />
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
+              <button type="button" onclick="closeFormModal()" class="px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium cursor-pointer">Batal</button>
+              <button type="submit" class="px-5 py-2.5 rounded-xl bg-scout-green hover:bg-emerald-800 text-white text-sm font-semibold shadow-sm cursor-pointer">Simpan Data</button>
+            </div>
+          </form>
+        `
+      );
+
+      document.getElementById("potensi-modal-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const payload = {
+          id: item ? item.id : "p" + Date.now(),
+          nama: document.getElementById("f-pot-nama").value.trim(),
+          nta: document.getElementById("f-pot-nta").value.trim(),
+          jenjang: document.getElementById("f-pot-jenjang").value,
+          gender: document.getElementById("f-pot-gender").value,
+          kwarran: document.getElementById("f-pot-kwarran").value,
+          gugusDepan: document.getElementById("f-pot-gudep").value.trim()
+        };
+
+        if (item) {
+          const idx = appState.potensi.findIndex(p => p.id === item.id);
+          appState.potensi[idx] = payload;
+          showToast("Data potensi pembina berhasil diperbarui!", "success");
+        } else {
+          appState.potensi.unshift(payload);
+          showToast("Data potensi pembina baru berhasil ditambahkan!", "success");
+        }
+        saveState();
+        closeFormModal();
+        renderActivePage();
+      });
+    };
+
+    window.deletePotensi = function(id) {
+      const target = appState.potensi.find(p => p.id === id);
+      showConfirm("Hapus Data Potensi", `Yakin ingin menghapus data pembina "${target?.nama}"?`, () => {
+        appState.potensi = appState.potensi.filter(p => p.id !== id);
+        saveState();
+        renderActivePage();
+        showToast("Data potensi berhasil dihapus.", "info");
+      });
+    };
+
+    // =========================================================================
+    // PAGE 4: KURSUS & PELATIHAN
+    // =========================================================================
+    function renderKursusPage(container) {
+      const canManage = ["Admin", "Pelatih", "Panitia"].includes(currentUser.role);
+
+      container.innerHTML = `
+        <div class="space-y-5 fade-in">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-scout-khaki/30 shadow-xs">
+            <div>
+              <h3 class="font-bold text-scout-dark text-base">Daftar Kegiatan Kursus & Pelatihan</h3>
+              <p class="text-xs text-gray-500">Total ${appState.kursus.length} program pelatihan tercatat di Pusdiklatcab Tangerang</p>
+            </div>
+            ${canManage ? `
+              <button onclick="openKursusModal(null)" class="px-4 py-2.5 rounded-xl bg-scout-green hover:bg-emerald-800 text-white text-xs sm:text-sm font-semibold shadow-sm flex items-center justify-center gap-2 transition cursor-pointer">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span>Tambah Jadwal Kursus</span>
+              </button>
+            ` : ''}
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            ${appState.kursus.map(k => {
+              const pct = Math.min(100, Math.round((k.terdaftar / (k.kuota || 1)) * 100));
+              const statusBadge = k.status === "Berlangsung"
+                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                : k.status === "Akan Datang"
+                  ? "bg-amber-100 text-amber-800 border-amber-200"
+                  : "bg-gray-100 text-gray-700 border-gray-200";
+
+              return `
+                <div class="bg-white rounded-2xl border border-scout-khaki/40 shadow-xs p-6 flex flex-col justify-between hover:shadow-md transition">
+                  <div>
+                    <div class="flex items-center justify-between gap-2 mb-3">
+                      <div class="flex items-center gap-2">
+                        <span class="px-2.5 py-1 rounded-lg bg-scout-primary text-scout-gold text-xs font-extrabold">${k.jenjang}</span>
+                        <span class="text-xs font-semibold text-gray-500">${k.angkatan}</span>
+                      </div>
+                      <span class="px-2.5 py-1 rounded-full text-xs font-bold border ${statusBadge}">${k.status}</span>
+                    </div>
+
+                    <h4 class="text-base font-bold text-scout-dark leading-snug mb-3">${k.nama}</h4>
+
+                    <div class="space-y-2 text-xs text-gray-600 bg-scout-cream/70 p-3.5 rounded-xl border border-scout-khaki/30">
+                      <div class="flex items-center gap-2">
+                        <i data-lucide="calendar" class="w-4 h-4 text-scout-medium shrink-0"></i>
+                        <span><strong>Tanggal:</strong> ${k.tanggalMulai} s.d. ${k.tanggalSelesai}</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <i data-lucide="map-pin" class="w-4 h-4 text-scout-medium shrink-0"></i>
+                        <span><strong>Lokasi:</strong> ${k.lokasi}</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <i data-lucide="award" class="w-4 h-4 text-scout-medium shrink-0"></i>
+                        <span><strong>Tim Pelatih:</strong> ${k.pelatih}</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <i data-lucide="users" class="w-4 h-4 text-scout-medium shrink-0"></i>
+                        <span><strong>Panitia:</strong> ${k.panitia}</span>
+                      </div>
+                    </div>
+
+                    <!-- Quota Progress Bar -->
+                    <div class="mt-4">
+                      <div class="flex justify-between text-xs font-semibold mb-1">
+                        <span class="text-gray-600">Peserta Terdaftar</span>
+                        <span class="text-scout-dark">${k.terdaftar} / ${k.kuota} Peserta (${pct}%)</span>
+                      </div>
+                      <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div class="h-full bg-scout-green rounded-full" style="width: ${pct}%"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  ${canManage ? `
+                    <div class="flex justify-end gap-2 mt-5 pt-4 border-t border-gray-100">
+                      <button onclick="openKursusModal('${k.id}')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 flex items-center gap-1 transition cursor-pointer">
+                        <i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
+                      </button>
+                      <button onclick="deleteKursus('${k.id}')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 flex items-center gap-1 transition cursor-pointer">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Hapus
+                      </button>
+                    </div>
+                  ` : ''}
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    window.openKursusModal = function(id) {
+      const item = id ? appState.kursus.find(k => k.id === id) : null;
+      openFormModal(
+        item ? "Edit Program Kursus" : "Tambah Program Kursus Baru",
+        "graduation-cap",
+        `
+          <form id="kursus-modal-form" class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Nama Kegiatan Kursus *</label>
+              <input type="text" id="f-kur-nama" required value="${item ? item.nama : ''}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm" placeholder="Contoh: Kursus Pembina Pramuka Mahir Tingkat Dasar (KMD)" />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Jenjang *</label>
+                <select id="f-kur-jenjang" class="w-full px-3 py-2.5 rounded-xl border border-gray-300 text-sm bg-white">
+                  ${["KMD", "KML", "KPD", "KPL", "Orientasi"].map(j => `<option value="${j}" ${item && item.jenjang === j ? 'selected' : ''}>${j}</option>`).join("")}
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Angkatan / Tahun *</label>
+                <input type="text" id="f-kur-angkatan" required value="${item ? item.angkatan : 'Angkatan I / 2026'}" class="w-full px-3 py-2.5 rounded-xl border border-gray-300 text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Status *</label>
+                <select id="f-kur-status" class="w-full px-3 py-2.5 rounded-xl border border-gray-300 text-sm bg-white">
+                  ${["Akan Datang", "Berlangsung", "Selesai"].map(s => `<option value="${s}" ${item && item.status === s ? 'selected' : ''}>${s}</option>`).join("")}
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Tanggal Mulai *</label>
+                <input type="date" id="f-kur-mulai" required value="${item ? item.tanggalMulai : '2026-12-01'}" class="w-full px-3 py-2.5 rounded-xl border border-gray-300 text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Tanggal Selesai *</label>
+                <input type="date" id="f-kur-selesai" required value="${item ? item.tanggalSelesai : '2026-12-06'}" class="w-full px-3 py-2.5 rounded-xl border border-gray-300 text-sm" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Lokasi Pelaksanaan *</label>
+              <input type="text" id="f-kur-lokasi" required value="${item ? item.lokasi : ''}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm" placeholder="Contoh: Bumi Perkemahan Kitri Bakti, Curug" />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Kuota Maksimal *</label>
+                <input type="number" id="f-kur-kuota" min="1" required value="${item ? item.kuota : 50}" class="w-full px-3 py-2.5 rounded-xl border border-gray-300 text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Peserta Terdaftar *</label>
+                <input type="number" id="f-kur-terdaftar" min="0" required value="${item ? item.terdaftar : 0}" class="w-full px-3 py-2.5 rounded-xl border border-gray-300 text-sm" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Penugasan Pelatih</label>
+                <input type="text" id="f-kur-pelatih" value="${item ? item.pelatih : ''}" class="w-full px-3 py-2.5 rounded-xl border border-gray-300 text-sm" placeholder="Nama Pinsus / Tim Pelatih" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Penugasan Panitia</label>
+                <input type="text" id="f-kur-panitia" value="${item ? item.panitia : ''}" class="w-full px-3 py-2.5 rounded-xl border border-gray-300 text-sm" placeholder="Nama Sangga Kerja / Kwarran" />
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
+              <button type="button" onclick="closeFormModal()" class="px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium cursor-pointer">Batal</button>
+              <button type="submit" class="px-5 py-2.5 rounded-xl bg-scout-green hover:bg-emerald-800 text-white text-sm font-semibold shadow-sm cursor-pointer">Simpan Kursus</button>
+            </div>
+          </form>
+        `
+      );
+
+      document.getElementById("kursus-modal-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const payload = {
+          id: item ? item.id : "k" + Date.now(),
+          nama: document.getElementById("f-kur-nama").value.trim(),
+          jenjang: document.getElementById("f-kur-jenjang").value,
+          angkatan: document.getElementById("f-kur-angkatan").value.trim(),
+          status: document.getElementById("f-kur-status").value,
+          tanggalMulai: document.getElementById("f-kur-mulai").value,
+          tanggalSelesai: document.getElementById("f-kur-selesai").value,
+          lokasi: document.getElementById("f-kur-lokasi").value.trim(),
+          kuota: parseInt(document.getElementById("f-kur-kuota").value, 10) || 50,
+          terdaftar: parseInt(document.getElementById("f-kur-terdaftar").value, 10) || 0,
+          pelatih: document.getElementById("f-kur-pelatih").value.trim(),
+          panitia: document.getElementById("f-kur-panitia").value.trim()
+        };
+
+        if (item) {
+          const idx = appState.kursus.findIndex(k => k.id === item.id);
+          appState.kursus[idx] = payload;
+          showToast("Jadwal kursus berhasil diperbarui!", "success");
+        } else {
+          appState.kursus.unshift(payload);
+          showToast("Program kursus baru berhasil ditambahkan!", "success");
+        }
+        saveState();
+        closeFormModal();
+        renderActivePage();
+      });
+    };
+
+    window.deleteKursus = function(id) {
+      const target = appState.kursus.find(k => k.id === id);
+      showConfirm("Hapus Jadwal Kursus", `Yakin ingin menghapus kegiatan "${target?.nama}"?`, () => {
+        appState.kursus = appState.kursus.filter(k => k.id !== id);
+        saveState();
+        renderActivePage();
+        showToast("Jadwal kursus berhasil dihapus.", "info");
+      });
+    };
+
+    // =========================================================================
+    // PAGE 5: ADMINISTRASI (SURAT MASUK & SURAT KELUAR)
+    // =========================================================================
+    function renderAdministrasiPage(container) {
+      const isMasuk = adminTab === "masuk";
+      const list = isMasuk ? appState.suratMasuk : appState.suratKeluar;
+
+      const filtered = list.filter(item => {
+        const text = JSON.stringify(item).toLowerCase();
+        return text.includes(adminSearch.toLowerCase());
+      });
+
+      container.innerHTML = `
+        <div class="space-y-5 fade-in">
+          <!-- Tabs & Add Button -->
+          <div class="bg-white p-4 sm:p-5 rounded-2xl border border-scout-khaki/30 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex bg-scout-sand p-1.5 rounded-xl w-full sm:w-auto">
+              <button id="tab-surat-masuk" class="flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
+                isMasuk ? "bg-scout-primary text-white shadow-sm" : "text-scout-dark hover:bg-white/50"
+              }">
+                <i data-lucide="inbox" class="w-4 h-4"></i>
+                <span>Surat Masuk (${appState.suratMasuk.length})</span>
+              </button>
+              <button id="tab-surat-keluar" class="flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
+                !isMasuk ? "bg-scout-primary text-white shadow-sm" : "text-scout-dark hover:bg-white/50"
+              }">
+                <i data-lucide="send" class="w-4 h-4"></i>
+                <span>Surat Keluar (${appState.suratKeluar.length})</span>
+              </button>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-2.5">
+              <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                <input type="text" id="admin-search-input" value="${adminSearch}" placeholder="Cari nomor / perihal surat..." class="w-full sm:w-64 pl-9 pr-3 py-2 rounded-xl border border-gray-300 text-xs sm:text-sm outline-none focus:ring-2 focus:ring-scout-primary" />
+              </div>
+              <button onclick="openSuratModal(null)" class="px-4 py-2 rounded-xl bg-scout-green hover:bg-emerald-800 text-white text-xs sm:text-sm font-semibold shadow-sm flex items-center justify-center gap-2 cursor-pointer">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>Catat ${isMasuk ? 'Surat Masuk' : 'Surat Keluar'}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="bg-white rounded-2xl border border-scout-khaki/30 shadow-xs overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-scout-sand/80 text-scout-dark text-xs uppercase tracking-wider border-b border-scout-khaki/40">
+                    <th class="py-3.5 px-4 font-bold">No. Surat</th>
+                    <th class="py-3.5 px-4 font-bold">${isMasuk ? 'Tgl Terima / Surat' : 'Tanggal Keluar'}</th>
+                    <th class="py-3.5 px-4 font-bold">${isMasuk ? 'Asal Instansi / Kwarran' : 'Tujuan Surat'}</th>
+                    <th class="py-3.5 px-4 font-bold">Perihal</th>
+                    <th class="py-3.5 px-4 font-bold">${isMasuk ? 'Disposisi & Status' : 'Penanggung Jawab'}</th>
+                    <th class="py-3.5 px-4 font-bold">Lampiran</th>
+                    <th class="py-3.5 px-4 font-bold text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 text-sm">
+                  ${filtered.length === 0 ? `
+                    <tr><td colspan="7" class="py-10 text-center text-gray-500">Belum ada data surat yang sesuai pencarian.</td></tr>
+                  ` : filtered.map(s => `
+                    <tr class="hover:bg-scout-cream/50 transition">
+                      <td class="py-3 px-4 font-bold text-scout-primary whitespace-nowrap">${s.nomorSurat}</td>
+                      <td class="py-3 px-4 text-xs text-gray-600 whitespace-nowrap">
+                        ${isMasuk ? `<div>Terima: <strong>${s.tanggalTerima}</strong></div><div>Surat: ${s.tanggalSurat}</div>` : `<strong>${s.tanggalKeluar}</strong>`}
+                      </td>
+                      <td class="py-3 px-4 font-semibold text-gray-800">${isMasuk ? s.asal : s.tujuan}</td>
+                      <td class="py-3 px-4 text-gray-700 max-w-xs">${s.perihal}</td>
+                      <td class="py-3 px-4">
+                        ${isMasuk ? `
+                          <span class="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold bg-scout-goldLight text-amber-900 mb-1">${s.status}</span>
+                          <div class="text-xs text-gray-500">${s.disposisi || '-'}</div>
+                        ` : `<span class="text-xs font-medium text-gray-700">${s.penanggungJawab}</span>`}
+                      </td>
+                      <td class="py-3 px-4">
+                        ${s.lampiran ? `
+                          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-scout-sand text-scout-dark text-xs font-medium">
+                            <i data-lucide="paperclip" class="w-3.5 h-3.5 text-scout-green"></i>
+                            <span class="truncate max-w-[130px]">${s.lampiran}</span>
+                          </span>
+                        ` : '<span class="text-xs text-gray-400">-</span>'}
+                      </td>
+                      <td class="py-3 px-4 text-right whitespace-nowrap">
+                        <button onclick="openSuratModal('${s.id}')" class="p-2 rounded-lg text-amber-700 hover:bg-amber-50 cursor-pointer" title="Edit">
+                          <i data-lucide="pencil" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="deleteSurat('${s.id}')" class="p-2 rounded-lg text-red-600 hover:bg-red-50 cursor-pointer" title="Hapus">
+                          <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById("tab-surat-masuk").addEventListener("click", () => {
+        adminTab = "masuk";
+        renderAdministrasiPage(container);
+        lucide.createIcons({ nodes: [container] });
+      });
+
+      document.getElementById("tab-surat-keluar").addEventListener("click", () => {
+        adminTab = "keluar";
+        renderAdministrasiPage(container);
+        lucide.createIcons({ nodes: [container] });
+      });
+
+      document.getElementById("admin-search-input").addEventListener("input", (e) => {
+        adminSearch = e.target.value;
+        renderAdministrasiPage(container);
+        lucide.createIcons({ nodes: [container] });
+        const inp = document.getElementById("admin-search-input");
+        inp.focus();
+        inp.setSelectionRange(inp.value.length, inp.value.length);
+      });
+    }
+
+    window.openSuratModal = function(id) {
+      const isMasuk = adminTab === "masuk";
+      const list = isMasuk ? appState.suratMasuk : appState.suratKeluar;
+      const item = id ? list.find(s => s.id === id) : null;
+
+      openFormModal(
+        item ? `Edit ${isMasuk ? 'Surat Masuk' : 'Surat Keluar'}` : `Catat ${isMasuk ? 'Surat Masuk' : 'Surat Keluar'} Baru`,
+        "mail",
+        `
+          <form id="surat-modal-form" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Nomor Surat *</label>
+                <input type="text" id="f-sur-nomor" required value="${item ? item.nomorSurat : ''}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm" placeholder="090/09.04-PDK" />
+              </div>
+              ${isMasuk ? `
+                <div>
+                  <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Tanggal Terima *</label>
+                  <input type="date" id="f-sur-tglterima" required value="${item ? item.tanggalTerima : '2026-11-22'}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm" />
+                </div>
+              ` : `
+                <div>
+                  <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Tanggal Keluar *</label>
+                  <input type="date" id="f-sur-tglkeluar" required value="${item ? item.tanggalKeluar : '2026-11-22'}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm" />
+                </div>
+              `}
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              ${isMasuk ? `
+                <div>
+                  <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Tanggal Pada Surat *</label>
+                  <input type="date" id="f-sur-tglsurat" required value="${item ? item.tanggalSurat : '2026-11-20'}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm" />
+                </div>
+                <div>
+                  <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Asal Instansi / Kwarran *</label>
+                  <input type="text" id="f-sur-asal" required value="${item ? item.asal : ''}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm" placeholder="Kwarran / Kwarda / Gudep" />
+                </div>
+              ` : `
+                <div class="sm:col-span-2">
+                  <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Tujuan Surat *</label>
+                  <input type="text" id="f-sur-tujuan" required value="${item ? item.tujuan : ''}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm" placeholder="Ketua Kwarran / Ka. Kwarcab / Peserta" />
+                </div>
+              `}
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Perihal Surat *</label>
+              <textarea id="f-sur-perihal" rows="2" required class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm" placeholder="Ringkasan isi / perihal surat...">${item ? item.perihal : ''}</textarea>
+            </div>
+
+            ${isMasuk ? `
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Disposisi</label>
+                  <input type="text" id="f-sur-disposisi" value="${item ? (item.disposisi || '') : ''}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm" placeholder="Diteruskan kepada..." />
+                </div>
+                <div>
+                  <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Status Surat</label>
+                  <select id="f-sur-status" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm bg-white">
+                    ${["Baru", "Diproses", "Selesai"].map(st => `<option value="${st}" ${item && item.status === st ? 'selected' : ''}>${st}</option>`).join("")}
+                  </select>
+                </div>
+              </div>
+            ` : `
+              <div>
+                <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Penanggung Jawab</label>
+                <input type="text" id="f-sur-pj" value="${item ? (item.penanggungJawab || 'Kapusdiklatcab Tangerang') : 'Kapusdiklatcab Tangerang'}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm" />
+              </div>
+            `}
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Lampiran Dokumen (Nama File / Unggah)</label>
+              <div class="flex flex-col sm:flex-row gap-2">
+                <input type="text" id="f-sur-lampiran" value="${item ? (item.lampiran || '') : ''}" class="flex-1 px-3.5 py-2 rounded-xl border border-gray-300 text-sm" placeholder="Nama dokumen lampiran.pdf" />
+                <label class="px-3.5 py-2 rounded-xl bg-scout-sand hover:bg-scout-khaki/50 text-scout-dark text-xs font-semibold cursor-pointer flex items-center justify-center gap-1.5 shrink-0">
+                  <i data-lucide="upload" class="w-4 h-4"></i> Pilih File
+                  <input type="file" id="f-sur-file-picker" class="hidden" />
+                </label>
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
+              <button type="button" onclick="closeFormModal()" class="px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium cursor-pointer">Batal</button>
+              <button type="submit" class="px-5 py-2.5 rounded-xl bg-scout-green hover:bg-emerald-800 text-white text-sm font-semibold shadow-sm cursor-pointer">Simpan Surat</button>
+            </div>
+          </form>
+        `
+      );
+
+      document.getElementById("f-sur-file-picker").addEventListener("change", (e) => {
+        if (e.target.files[0]) {
+          document.getElementById("f-sur-lampiran").value = e.target.files[0].name;
+        }
+      });
+
+      document.getElementById("surat-modal-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (isMasuk) {
+          const payload = {
+            id: item ? item.id : "sm" + Date.now(),
+            nomorSurat: document.getElementById("f-sur-nomor").value.trim(),
+            tanggalTerima: document.getElementById("f-sur-tglterima").value,
+            tanggalSurat: document.getElementById("f-sur-tglsurat").value,
+            asal: document.getElementById("f-sur-asal").value.trim(),
+            perihal: document.getElementById("f-sur-perihal").value.trim(),
+            disposisi: document.getElementById("f-sur-disposisi").value.trim(),
+            status: document.getElementById("f-sur-status").value,
+            lampiran: document.getElementById("f-sur-lampiran").value.trim()
+          };
+          if (item) {
+            const idx = appState.suratMasuk.findIndex(s => s.id === item.id);
+            appState.suratMasuk[idx] = payload;
+          } else {
+            appState.suratMasuk.unshift(payload);
+          }
+        } else {
+          const payload = {
+            id: item ? item.id : "sk" + Date.now(),
+            nomorSurat: document.getElementById("f-sur-nomor").value.trim(),
+            tanggalKeluar: document.getElementById("f-sur-tglkeluar").value,
+            tujuan: document.getElementById("f-sur-tujuan").value.trim(),
+            perihal: document.getElementById("f-sur-perihal").value.trim(),
+            penanggungJawab: document.getElementById("f-sur-pj").value.trim(),
+            lampiran: document.getElementById("f-sur-lampiran").value.trim()
+          };
+          if (item) {
+            const idx = appState.suratKeluar.findIndex(s => s.id === item.id);
+            appState.suratKeluar[idx] = payload;
+          } else {
+            appState.suratKeluar.unshift(payload);
+          }
+        }
+
+        saveState();
+        closeFormModal();
+        renderActivePage();
+        showToast("Agenda persuratan berhasil disimpan!", "success");
+      });
+    };
+
+    window.deleteSurat = function(id) {
+      const isMasuk = adminTab === "masuk";
+      showConfirm("Hapus Agenda Surat", "Yakin ingin menghapus data surat ini dari agenda?", () => {
+        if (isMasuk) {
+          appState.suratMasuk = appState.suratMasuk.filter(s => s.id !== id);
+        } else {
+          appState.suratKeluar = appState.suratKeluar.filter(s => s.id !== id);
+        }
+        saveState();
+        renderActivePage();
+        showToast("Agenda surat berhasil dihapus.", "info");
+      });
+    };
+
+    // =========================================================================
+    // PAGE 6: LAPORAN & CETAK (OFFICIAL LETTERHEAD + CSV EXPORT + PRINT)
+    // =========================================================================
+    function renderLaporanPage(container) {
+      const isKwarranRole = currentUser.role === "Kwarran" && currentUser.kwarran;
+      if (isKwarranRole) reportKwarran = currentUser.kwarran;
+
+      // Filter Potensi for Report
+      const filteredPotensi = appState.potensi.filter(p => {
+        const okKw = reportKwarran === "ALL" || p.kwarran === reportKwarran;
+        const okJj = reportJenjang === "ALL" || p.jenjang === reportJenjang;
+        return okKw && okJj;
+      });
+
+      let reportTitle = "";
+      let tableHtml = "";
+
+      if (reportType === "potensi") {
+        reportTitle = "LAPORAN REKAPITULASI DATA POTENSI PEMBINA PRAMUKA";
+        tableHtml = `
+          <table class="w-full text-left border-collapse border border-gray-400 text-xs">
+            <thead>
+              <tr class="bg-scout-sand text-scout-dark">
+                <th class="border border-gray-400 py-2 px-3">No</th>
+                <th class="border border-gray-400 py-2 px-3">Nama Lengkap Pembina</th>
+                <th class="border border-gray-400 py-2 px-3">NTA</th>
+                <th class="border border-gray-400 py-2 px-3">Jenjang Kursus</th>
+                <th class="border border-gray-400 py-2 px-3">Putra/Putri</th>
+                <th class="border border-gray-400 py-2 px-3">Asal Kwarran</th>
+                <th class="border border-gray-400 py-2 px-3">Gugus Depan</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredPotensi.map((p, i) => `
+                <tr>
+                  <td class="border border-gray-400 py-1.5 px-3">${i + 1}</td>
+                  <td class="border border-gray-400 py-1.5 px-3 font-semibold">${p.nama}</td>
+                  <td class="border border-gray-400 py-1.5 px-3">${p.nta || '-'}</td>
+                  <td class="border border-gray-400 py-1.5 px-3 font-bold">${p.jenjang}</td>
+                  <td class="border border-gray-400 py-1.5 px-3">${p.gender}</td>
+                  <td class="border border-gray-400 py-1.5 px-3">Kwarran ${p.kwarran}</td>
+                  <td class="border border-gray-400 py-1.5 px-3">${p.gugusDepan || '-'}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      } else if (reportType === "kursus") {
+        reportTitle = "LAPORAN PELAKSANAAN KURSUS & PELATIHAN KEPRAMUKAAN";
+        tableHtml = `
+          <table class="w-full text-left border-collapse border border-gray-400 text-xs">
+            <thead>
+              <tr class="bg-scout-sand text-scout-dark">
+                <th class="border border-gray-400 py-2 px-3">No</th>
+                <th class="border border-gray-400 py-2 px-3">Nama Kegiatan</th>
+                <th class="border border-gray-400 py-2 px-3">Jenjang</th>
+                <th class="border border-gray-400 py-2 px-3">Tanggal</th>
+                <th class="border border-gray-400 py-2 px-3">Lokasi</th>
+                <th class="border border-gray-400 py-2 px-3">Peserta</th>
+                <th class="border border-gray-400 py-2 px-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${appState.kursus.map((k, i) => `
+                <tr>
+                  <td class="border border-gray-400 py-1.5 px-3">${i + 1}</td>
+                  <td class="border border-gray-400 py-1.5 px-3 font-semibold">${k.nama} (${k.angkatan})</td>
+                  <td class="border border-gray-400 py-1.5 px-3 font-bold">${k.jenjang}</td>
+                  <td class="border border-gray-400 py-1.5 px-3">${k.tanggalMulai} s.d. ${k.tanggalSelesai}</td>
+                  <td class="border border-gray-400 py-1.5 px-3">${k.lokasi}</td>
+                  <td class="border border-gray-400 py-1.5 px-3">${k.terdaftar}/${k.kuota}</td>
+                  <td class="border border-gray-400 py-1.5 px-3">${k.status}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      } else {
+        reportTitle = "LAPORAN AGENDA ADMINISTRASI SURAT MASUK & SURAT KELUAR";
+        tableHtml = `
+          <h5 class="font-bold text-xs uppercase mb-2">A. Agenda Surat Masuk</h5>
+          <table class="w-full text-left border-collapse border border-gray-400 text-xs mb-5">
+            <thead>
+              <tr class="bg-scout-sand text-scout-dark">
+                <th class="border border-gray-400 py-1.5 px-2.5">No</th>
+                <th class="border border-gray-400 py-1.5 px-2.5">Nomor Surat</th>
+                <th class="border border-gray-400 py-1.5 px-2.5">Tgl Terima</th>
+                <th class="border border-gray-400 py-1.5 px-2.5">Asal</th>
+                <th class="border border-gray-400 py-1.5 px-2.5">Perihal</th>
+                <th class="border border-gray-400 py-1.5 px-2.5">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${appState.suratMasuk.map((s, i) => `
+                <tr>
+                  <td class="border border-gray-400 py-1.5 px-2.5">${i + 1}</td>
+                  <td class="border border-gray-400 py-1.5 px-2.5 font-semibold">${s.nomorSurat}</td>
+                  <td class="border border-gray-400 py-1.5 px-2.5">${s.tanggalTerima}</td>
+                  <td class="border border-gray-400 py-1.5 px-2.5">${s.asal}</td>
+                  <td class="border border-gray-400 py-1.5 px-2.5">${s.perihal}</td>
+                  <td class="border border-gray-400 py-1.5 px-2.5">${s.status}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+
+          <h5 class="font-bold text-xs uppercase mb-2">B. Agenda Surat Keluar</h5>
+          <table class="w-full text-left border-collapse border border-gray-400 text-xs">
+            <thead>
+              <tr class="bg-scout-sand text-scout-dark">
+                <th class="border border-gray-400 py-1.5 px-2.5">No</th>
+                <th class="border border-gray-400 py-1.5 px-2.5">Nomor Surat</th>
+                <th class="border border-gray-400 py-1.5 px-2.5">Tgl Keluar</th>
+                <th class="border border-gray-400 py-1.5 px-2.5">Tujuan</th>
+                <th class="border border-gray-400 py-1.5 px-2.5">Perihal</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${appState.suratKeluar.map((s, i) => `
+                <tr>
+                  <td class="border border-gray-400 py-1.5 px-2.5">${i + 1}</td>
+                  <td class="border border-gray-400 py-1.5 px-2.5 font-semibold">${s.nomorSurat}</td>
+                  <td class="border border-gray-400 py-1.5 px-2.5">${s.tanggalKeluar}</td>
+                  <td class="border border-gray-400 py-1.5 px-2.5">${s.tujuan}</td>
+                  <td class="border border-gray-400 py-1.5 px-2.5">${s.perihal}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      }
+
+      const todayStr = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+      container.innerHTML = `
+        <div class="space-y-6 fade-in">
+          <!-- Controls Bar -->
+          <div class="bg-white p-5 rounded-2xl border border-scout-khaki/30 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
+            <div class="flex flex-wrap items-center gap-3">
+              <select id="rep-type" class="px-3.5 py-2.5 rounded-xl border border-gray-300 text-xs sm:text-sm font-semibold bg-white">
+                <option value="potensi" ${reportType === 'potensi' ? 'selected' : ''}>1. Laporan Data Potensi Pembina</option>
+                <option value="kursus" ${reportType === 'kursus' ? 'selected' : ''}>2. Laporan Pelaksanaan Kursus</option>
+                <option value="surat" ${reportType === 'surat' ? 'selected' : ''}>3. Laporan Administrasi Surat</option>
+              </select>
+
+              ${reportType === 'potensi' ? `
+                <select id="rep-kwarran" ${isKwarranRole ? 'disabled' : ''} class="px-3 py-2.5 rounded-xl border border-gray-300 text-xs sm:text-sm bg-white disabled:bg-gray-100">
+                  <option value="ALL">Semua Kwarran</option>
+                  ${KWARRAN_LIST.map(k => `<option value="${k}" ${reportKwarran === k ? 'selected' : ''}>Kwarran ${k}</option>`).join("")}
+                </select>
+                <select id="rep-jenjang" class="px-3 py-2.5 rounded-xl border border-gray-300 text-xs sm:text-sm bg-white">
+                  <option value="ALL">Semua Jenjang</option>
+                  ${JENJANG_LIST.map(j => `<option value="${j}" ${reportJenjang === j ? 'selected' : ''}>${j}</option>`).join("")}
+                </select>
+              ` : ''}
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+              <button id="export-csv-btn" class="px-4 py-2.5 rounded-xl bg-scout-green hover:bg-emerald-800 text-white text-xs sm:text-sm font-semibold flex items-center gap-2 cursor-pointer">
+                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Export CSV / Excel
+              </button>
+              <button onclick="window.print()" class="px-4 py-2.5 rounded-xl bg-scout-primary hover:bg-scout-dark text-white text-xs sm:text-sm font-semibold flex items-center gap-2 cursor-pointer">
+                <i data-lucide="printer" class="w-4 h-4"></i> Cetak / Simpan PDF
+              </button>
+            </div>
+          </div>
+
+          <!-- Printable Official Document Preview -->
+          <div id="printable-report-area" class="bg-white p-6 sm:p-10 rounded-2xl border border-scout-khaki/40 shadow-sm">
+            <!-- Official Letterhead (Kop Surat) -->
+            <div class="flex items-center gap-4 pb-4 border-b-4 border-double border-scout-dark mb-6">
+              <div class="w-16 h-16 sm:w-20 sm:h-20 shrink-0 flex items-center justify-center">
+                ${getLogoHtml("w-16 h-16 sm:w-20 sm:h-20 object-contain")}
+              </div>
+              <div class="flex-1 text-center">
+                <p class="text-xs sm:text-sm font-bold tracking-wider uppercase text-scout-medium">Gerakan Pramuka Kwartir Cabang Tangerang</p>
+                <h2 class="text-lg sm:text-2xl font-extrabold text-scout-dark tracking-tight">PUSAT PENDIDIKAN DAN PELATIHAN CABANG (PUSDIKLATCAB)</h2>
+                <p class="text-[11px] sm:text-xs text-gray-600 mt-0.5">${appState.profile.alamat}</p>
+              </div>
+            </div>
+
+            <div class="text-center mb-6">
+              <h3 class="text-sm sm:text-base font-extrabold underline text-gray-900">${reportTitle}</h3>
+              <p class="text-xs text-gray-500 mt-1">
+                ${reportType === 'potensi' ? `Filter: ${reportKwarran === 'ALL' ? 'Semua Kwarran' : 'Kwarran ' + reportKwarran} | Jenjang: ${reportJenjang}` : 'Tahun Anggaran 2026'}
+              </p>
+            </div>
+
+            <div class="overflow-x-auto">
+              ${tableHtml}
+            </div>
+
+            <!-- Official Signature Block -->
+            <div class="mt-10 flex justify-end">
+              <div class="text-center text-xs sm:text-sm w-64">
+                <p>Tangerang, ${todayStr}</p>
+                <p class="font-bold mt-0.5">Kapusdiklatcab Tangerang,</p>
+                <div class="h-16"></div>
+                <p class="font-extrabold underline text-scout-dark">${appState.profile.kapusdiklatcab}</p>
+                <p class="text-xs text-gray-600">NTA. ${appState.profile.nta || '-'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById("rep-type").addEventListener("change", (e) => {
+        reportType = e.target.value;
+        renderLaporanPage(container);
+        lucide.createIcons({ nodes: [container] });
+      });
+
+      const repKw = document.getElementById("rep-kwarran");
+      if (repKw) {
+        repKw.addEventListener("change", (e) => {
+          reportKwarran = e.target.value;
+          renderLaporanPage(container);
+          lucide.createIcons({ nodes: [container] });
+        });
+      }
+
+      const repJj = document.getElementById("rep-jenjang");
+      if (repJj) {
+        repJj.addEventListener("change", (e) => {
+          reportJenjang = e.target.value;
+          renderLaporanPage(container);
+          lucide.createIcons({ nodes: [container] });
+        });
+      }
+
+      document.getElementById("export-csv-btn").addEventListener("click", () => {
+        exportReportToCSV(filteredPotensi);
+      });
+    }
+
+    function exportReportToCSV(filteredPotensi) {
+      let csvRows = [];
+      let filename = "Laporan_Pusdiklatcab_Tangerang.csv";
+
+      if (reportType === "potensi") {
+        filename = "Laporan_Data_Potensi_Pusdiklatcab_Tangerang.csv";
+        csvRows.push(["No", "Nama Pembina", "NTA", "Jenjang Kursus", "Jenis Kelamin", "Asal Kwarran", "Gugus Depan"].join(","));
+        filteredPotensi.forEach((p, i) => {
+          csvRows.push([i + 1, `"${p.nama}"`, `"${p.nta || ''}"`, `"${p.jenjang}"`, `"${p.gender}"`, `"${p.kwarran}"`, `"${p.gugusDepan || ''}"`].join(","));
+        });
+      } else if (reportType === "kursus") {
+        filename = "Laporan_Kursus_Pusdiklatcab_Tangerang.csv";
+        csvRows.push(["No", "Nama Kursus", "Jenjang", "Angkatan", "Tanggal Mulai", "Tanggal Selesai", "Lokasi", "Terdaftar", "Kuota", "Status"].join(","));
+        appState.kursus.forEach((k, i) => {
+          csvRows.push([i + 1, `"${k.nama}"`, `"${k.jenjang}"`, `"${k.angkatan}"`, k.tanggalMulai, k.tanggalSelesai, `"${k.lokasi}"`, k.terdaftar, k.kuota, `"${k.status}"`].join(","));
+        });
+      } else {
+        filename = "Laporan_Administrasi_Surat_Pusdiklatcab_Tangerang.csv";
+        csvRows.push(["Jenis", "Nomor Surat", "Tanggal", "Asal/Tujuan", "Perihal", "Status/PJ"].join(","));
+        appState.suratMasuk.forEach(s => {
+          csvRows.push(["Surat Masuk", `"${s.nomorSurat}"`, s.tanggalTerima, `"${s.asal}"`, `"${s.perihal}"`, `"${s.status}"`].join(","));
+        });
+        appState.suratKeluar.forEach(s => {
+          csvRows.push(["Surat Keluar", `"${s.nomorSurat}"`, s.tanggalKeluar, `"${s.tujuan}"`, `"${s.perihal}"`, `"${s.penanggungJawab}"`].join(","));
+        });
+      }
+
+      const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`File ${filename} berhasil diunduh!`, "success");
+    }
+
+    // =========================================================================
+    // PAGE 7: MANAJEMEN USER (NAMA, PASSWORD, ROLE, AKSI: SALIN AKUN, EDIT, HAPUS)
+    // =========================================================================
+    let revealedPasswords = {};
+
+    function renderUserPage(container) {
+      container.innerHTML = `
+        <div class="space-y-5 fade-in">
+          <div class="bg-white p-5 rounded-2xl border border-scout-khaki/30 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 class="font-bold text-scout-dark text-base">Daftar Akun Pengguna Sistem</h3>
+              <p class="text-xs text-gray-500">Kelola akun Admin, Pelatih, Panitia, dan Operator Kwartir Ranting</p>
+            </div>
+            <button onclick="openUserModal(null)" class="px-4 py-2.5 rounded-xl bg-scout-green hover:bg-emerald-800 text-white text-xs sm:text-sm font-semibold shadow-sm flex items-center justify-center gap-2 cursor-pointer">
+              <i data-lucide="user-plus" class="w-4 h-4"></i>
+              <span>Tambah Akun Baru</span>
+            </button>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-scout-khaki/30 shadow-xs overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-scout-sand/80 text-scout-dark text-xs uppercase tracking-wider border-b border-scout-khaki/40">
+                    <th class="py-3.5 px-4 font-bold">No</th>
+                    <th class="py-3.5 px-4 font-bold">Nama Pengguna</th>
+                    <th class="py-3.5 px-4 font-bold">Password</th>
+                    <th class="py-3.5 px-4 font-bold">Role</th>
+                    <th class="py-3.5 px-4 font-bold text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 text-sm">
+                  ${appState.users.map((u, idx) => {
+                    const isShown = !!revealedPasswords[u.id];
+                    const roleColor = {
+                      Admin: "bg-scout-primary text-scout-gold",
+                      Pelatih: "bg-emerald-100 text-emerald-800",
+                      Panitia: "bg-amber-100 text-amber-800",
+                      Kwarran: "bg-blue-100 text-blue-800"
+                    }[u.role] || "bg-gray-100 text-gray-800";
+
+                    return `
+                      <tr class="hover:bg-scout-cream/50 transition">
+                        <td class="py-3.5 px-4 text-gray-500 font-medium">${idx + 1}</td>
+                        <td class="py-3.5 px-4">
+                          <div class="font-bold text-scout-dark">${u.nama}</div>
+                          ${u.role === 'Kwarran' && u.kwarran ? `<div class="text-xs text-gray-500">Wilayah: Kwarran ${u.kwarran}</div>` : ''}
+                        </td>
+                        <td class="py-3.5 px-4">
+                          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-100 font-mono text-xs text-gray-800">
+                            <span>${isShown ? u.password : '••••••••'}</span>
+                            <button onclick="toggleRevealPassword('${u.id}')" class="text-gray-500 hover:text-scout-dark cursor-pointer" title="${isShown ? 'Sembunyikan' : 'Lihat Password'}">
+                              <i data-lucide="${isShown ? 'eye-off' : 'eye'}" class="w-3.5 h-3.5"></i>
+                            </button>
+                          </div>
+                        </td>
+                        <td class="py-3.5 px-4">
+                          <span class="inline-block px-3 py-1 rounded-full text-xs font-bold ${roleColor}">${u.role}</span>
+                        </td>
+                        <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                          <div class="inline-flex items-center gap-1.5">
+                            <button onclick="copyUserAccount('${u.id}')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-scout-sand hover:bg-scout-khaki/50 text-scout-dark inline-flex items-center gap-1 transition cursor-pointer" title="Salin Akun">
+                              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                              <span>Salin Akun</span>
+                            </button>
+                            <button onclick="openUserModal('${u.id}')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 inline-flex items-center gap-1 transition cursor-pointer" title="Edit">
+                              <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                              <span>Edit</span>
+                            </button>
+                            <button onclick="deleteUserAccount('${u.id}')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-700 inline-flex items-center gap-1 transition cursor-pointer" title="Hapus">
+                              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                              <span>Hapus</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  }).join("")}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    window.toggleRevealPassword = function(uid) {
+      revealedPasswords[uid] = !revealedPasswords[uid];
+      renderActivePage();
+    };
+
+    window.copyUserAccount = function(uid) {
+      const u = appState.users.find(item => item.id === uid);
+      if (!u) return;
+      const text = `AKUN PUSDIKLATCAB TANGERANG\nNama: ${u.nama}\nRole: ${u.role}${u.kwarran ? ' (' + u.kwarran + ')' : ''}\nPassword: ${u.password}`;
+      copyTextToClipboard(text, `Kredensial akun "${u.nama}" berhasil disalin!`);
+    };
+
+    window.openUserModal = function(uid) {
+      const item = uid ? appState.users.find(u => u.id === uid) : null;
+      openFormModal(
+        item ? "Edit Akun Pengguna" : "Tambah Akun Pengguna Baru",
+        "user-cog",
+        `
+          <form id="user-modal-form" class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Nama Pengguna / Akun *</label>
+              <input type="text" id="f-usr-nama" required value="${item ? item.nama : ''}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm" placeholder="Contoh: Kwarran Balaraja / Kak Andi" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Password *</label>
+              <input type="text" id="f-usr-password" required value="${item ? item.password : ''}" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-mono" placeholder="Masukkan password akun..." />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Role Akses *</label>
+              <select id="f-usr-role" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm bg-white">
+                ${["Admin", "Pelatih", "Panitia", "Kwarran"].map(r => `<option value="${r}" ${item && item.role === r ? 'selected' : ''}>${r}</option>`).join("")}
+              </select>
+            </div>
+
+            <div id="f-usr-kwarran-wrap" class="${item && item.role === 'Kwarran' ? '' : 'hidden'}">
+              <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Wilayah Kwartir Ranting (Khusus Role Kwarran)</label>
+              <select id="f-usr-kwarran" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm bg-white">
+                ${KWARRAN_LIST.map(k => `<option value="${k}" ${item && item.kwarran === k ? 'selected' : ''}>Kwarran ${k}</option>`).join("")}
+              </select>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
+              <button type="button" onclick="closeFormModal()" class="px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium cursor-pointer">Batal</button>
+              <button type="submit" class="px-5 py-2.5 rounded-xl bg-scout-green hover:bg-emerald-800 text-white text-sm font-semibold shadow-sm cursor-pointer">Simpan Akun</button>
+            </div>
+          </form>
+        `
+      );
+
+      document.getElementById("f-usr-role").addEventListener("change", (e) => {
+        const wrap = document.getElementById("f-usr-kwarran-wrap");
+        if (e.target.value === "Kwarran") {
+          wrap.classList.remove("hidden");
+        } else {
+          wrap.classList.add("hidden");
+        }
+      });
+
+      document.getElementById("user-modal-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const roleVal = document.getElementById("f-usr-role").value;
+        const payload = {
+          id: item ? item.id : "u" + Date.now(),
+          nama: document.getElementById("f-usr-nama").value.trim(),
+          password: document.getElementById("f-usr-password").value.trim(),
+          role: roleVal,
+          kwarran: roleVal === "Kwarran" ? document.getElementById("f-usr-kwarran").value : ""
+        };
+
+        if (item) {
+          const idx = appState.users.findIndex(u => u.id === item.id);
+          appState.users[idx] = payload;
+          showToast("Akun pengguna berhasil diperbarui!", "success");
+        } else {
+          appState.users.push(payload);
+          showToast("Akun pengguna baru berhasil dibuat!", "success");
+        }
+        saveState();
+        closeFormModal();
+        renderActivePage();
+      });
+    };
+
+    window.deleteUserAccount = function(uid) {
+      if (appState.users.length <= 1) {
+        showToast("Minimal harus tersisa 1 akun di dalam sistem.", "error");
+        return;
+      }
+      if (currentUser && currentUser.id === uid) {
+        showToast("Anda tidak dapat menghapus akun yang sedang aktif digunakan.", "error");
+        return;
+      }
+      const target = appState.users.find(u => u.id === uid);
+      showConfirm("Hapus Akun Pengguna", `Apakah Anda yakin ingin menghapus akun "${target?.nama}"?`, () => {
+        appState.users = appState.users.filter(u => u.id !== uid);
+        saveState();
+        renderActivePage();
+        showToast("Akun pengguna berhasil dihapus.", "info");
+      });
+    };
+
+    // =========================================================================
+    // 7. MODAL HELPERS & APP BOOTSTRAP
+    // =========================================================================
+    function openFormModal(title, iconName, bodyHtml) {
+      const modal = document.getElementById("form-modal");
+      document.getElementById("form-modal-title").textContent = title;
+      document.getElementById("form-modal-icon").setAttribute("data-lucide", iconName);
+      document.getElementById("form-modal-body").innerHTML = bodyHtml;
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      lucide.createIcons({ nodes: [modal] });
+    }
+
+    window.closeFormModal = function() {
+      const modal = document.getElementById("form-modal");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    };
+
+    window.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      initLoginView();
+
+      document.getElementById("open-sidebar-btn").addEventListener("click", openMobileSidebar);
+      document.getElementById("close-sidebar-btn").addEventListener("click", closeMobileSidebar);
+      document.getElementById("sidebar-backdrop").addEventListener("click", closeMobileSidebar);
+      document.getElementById("close-form-modal").addEventListener("click", closeFormModal);
+      document.getElementById("logout-btn").addEventListener("click", logoutUser);
+
+      document.getElementById("reset-demo-btn").addEventListener("click", () => {
+        showConfirm(
+          "Reset Data Demo",
+          "Seluruh perubahan data akan dikembalikan ke data awal Pusdiklatcab Tangerang. Lanjutkan?",
+          () => {
+            localStorage.removeItem(STORAGE_KEY);
+            appState = JSON.parse(JSON.stringify(INITIAL_STATE));
+            saveState();
+            syncBrandingUI();
+            renderActivePage();
+            showToast("Seluruh data demo berhasil dikembalikan ke pengaturan awal.", "success");
+          }
+        );
+      });
+    });
+  </script>
 </body>
 </html>
