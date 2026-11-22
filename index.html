@@ -268,40 +268,6 @@
               <span>Masuk ke Sistem</span>
             </button>
           </form>
-
-          <!-- Akses Cepat 1-Klik Demo Login per Role & Kwarran -->
-          <div class="mt-6 pt-5 border-t border-scout-sand/80">
-            <p class="text-[11px] font-bold uppercase tracking-wider text-scout-medium mb-2.5">
-              Akses Cepat Akun Demo (1-Klik Masuk):
-            </p>
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <button type="button" onclick="quickDemoLogin('Admin Utama')"
-                class="px-3 py-2 rounded-xl bg-white hover:bg-scout-dark hover:text-white text-scout-dark border border-scout-sand text-xs font-bold flex items-center justify-center gap-1.5 transition">
-                <i data-lucide="shield" class="w-3.5 h-3.5 text-scout-gold"></i>
-                <span>Admin</span>
-              </button>
-              <button type="button" onclick="quickDemoLogin('Kak Drs. H. Ahmad Fauzi, M.Pd.')"
-                class="px-3 py-2 rounded-xl bg-white hover:bg-scout-forest hover:text-white text-scout-forest border border-scout-sand text-xs font-bold flex items-center justify-center gap-1.5 transition">
-                <i data-lucide="award" class="w-3.5 h-3.5"></i>
-                <span>Pelatih</span>
-              </button>
-              <button type="button" onclick="quickDemoLogin('Kak Rina Wulandari, S.Pd.')"
-                class="px-3 py-2 rounded-xl bg-white hover:bg-amber-800 hover:text-white text-amber-900 border border-scout-sand text-xs font-bold flex items-center justify-center gap-1.5 transition">
-                <i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i>
-                <span>Panitia</span>
-              </button>
-              <button type="button" onclick="quickDemoLogin('Kwarran Tigaraksa')"
-                class="px-3 py-2 rounded-xl bg-white hover:bg-teal-800 hover:text-white text-teal-900 border border-scout-sand text-xs font-bold flex items-center justify-center gap-1.5 transition">
-                <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
-                <span>Kwarran Tigaraksa</span>
-              </button>
-              <button type="button" onclick="quickDemoLogin('Kwarran Curug')"
-                class="col-span-2 sm:col-span-2 px-3 py-2 rounded-xl bg-scout-forest/10 hover:bg-scout-forest hover:text-white text-scout-forest border border-scout-forest/30 text-xs font-extrabold flex items-center justify-center gap-1.5 transition">
-                <i data-lucide="compass" class="w-3.5 h-3.5"></i>
-                <span>Kwarran Curug</span>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -464,203 +430,186 @@
       }
       // Prioritas 2: properti eksplisit user.kwarran atau user.kwarranName
       const fromProp = normalizeKwarranName(userObj.kwarran || userObj.kwarranName);
-      if (fromProp) return fromProp;
-      return fromName || '';
+      if (fromProp && KWARRAN_LIST.some(k => k.toLowerCase() === fromProp.toLowerCase())) {
+        return fromProp;
+      }
+      return fromName || fromProp || '';
     }
 
     function buildKwarranMetadata(rawName) {
       const normalized = normalizeKwarranName(rawName);
-      if (!normalized) {
-        return { kwarran: '', kwarranName: '', kwarran_id: '', kode_kwarran: '', wilayah: '' };
-      }
-      const slug = normalized.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-      const codeSuffix = normalized
-        .split(/\s+/)
-        .map(w => w.slice(0, 3).toUpperCase())
-        .join('')
-        .slice(0, 4);
+      const slug = normalized
+        ? normalized.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+        : '';
+      const abbr = normalized
+        ? normalized
+            .split(/\s+/)
+            .map(w => w.slice(0, 3).toUpperCase())
+            .join('-')
+        : 'GEN';
       return {
-        kwarran: normalized,
         kwarranName: normalized,
-        kwarran_id: `kwarran_${slug}`,
-        kode_kwarran: `KWR-${codeSuffix}`,
-        wilayah: `Kwartir Ranting ${normalized}`
+        kwarran_id: slug ? `kwarran_${slug}` : '',
+        kode_kwarran: normalized ? `KWR-${abbr}` : '',
+        wilayah: normalized ? `Kwartir Ranting ${normalized}` : ''
       };
     }
 
-    // Default SVG Logo Pusdiklatcab Tangerang (Tunas Kelapa + Perisai Emas)
-    const DEFAULT_LOGO_SVG = `
-      <svg viewBox="0 0 100 100" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="shieldGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#3E2723"/>
-            <stop offset="100%" stop-color="#6D4C41"/>
-          </linearGradient>
-          <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#F3E5AB"/>
-            <stop offset="50%" stop-color="#D4AF37"/>
-            <stop offset="100%" stop-color="#996515"/>
-          </linearGradient>
-        </defs>
-        <path d="M50 5 L90 22 V52 C90 76 72 90 50 96 C28 90 10 76 10 52 V22 L50 5 Z" fill="url(#shieldGrad)" stroke="url(#goldGrad)" stroke-width="4"/>
-        <circle cx="50" cy="52" r="24" fill="#2E5A36" stroke="#D4AF37" stroke-width="2"/>
-        <!-- Siluet Tunas Kelapa -->
-        <path d="M50 22 C45 30 43 38 47 45 C40 42 34 45 33 51 C39 51 44 53 47 57 C41 59 38 64 40 69 C45 65 48 64 50 64 C52 64 55 65 60 69 C62 64 59 59 53 57 C56 53 61 51 67 51 C66 45 60 42 53 45 C57 38 55 30 50 22 Z" fill="url(#goldGrad)"/>
-        <ellipse cx="50" cy="70" rx="9" ry="6" fill="#FAF7F2"/>
-        <rect x="48" y="20" width="4" height="54" rx="2" fill="url(#goldGrad)"/>
-      </svg>
-    `;
+    function isSameKwarran(a, b) {
+      const na = normalizeKwarranName(a);
+      const nb = normalizeKwarranName(b);
+      if (!na || !nb) return false;
+      return na.toLowerCase() === nb.toLowerCase();
+    }
 
     // =========================================================================
-    // 2. DUMMY DATA AWAL REALISTIS PUSDIKLATCAB TANGERANG
+    // 2. STATE & DATA AWAL (SEED DATA REALISTIS KAB./KOTA TANGERANG)
     // =========================================================================
-    function getInitialData() {
+    function createInitialSeedData() {
       return {
         profile: {
-          namaKapus: 'Kak H. Bambang Sudjatmiko, S.Pd., M.M.',
-          ntaKapus: '02.04.00.19740817.0001',
+          namaKapus: 'Kak H. Bambang Sudjatmiko, M.Pd.',
+          ntaKapus: '28.04.00.001',
           masaBakti: '2024 - 2029',
-          alamat: 'Gedung Kwartir Cabang Gerakan Pramuka Tangerang, Jl. H. Abdul Hamid, Tigaraksa, Tangerang',
-          telepon: '(021) 5991428',
+          telepon: '(021) 5991234',
           email: 'pusdiklatcab@pramukatangerang.or.id',
-          logoUrl: '' // kosong berarti gunakan DEFAULT_LOGO_SVG
+          alamat: 'Gedung Kwartir Cabang Gerakan Pramuka Tangerang, Jl. Raya Tigaraksa - Cisoka, Kab. Tangerang',
+          logoUrl: ''
         },
         users: [
-          { id: 'u1', nama: 'Admin Utama', password: 'admin123', role: 'Admin', kwarranName: '', kwarran_id: '', kode_kwarran: '', wilayah: '' },
-          { id: 'u2', nama: 'Kak Drs. H. Ahmad Fauzi, M.Pd.', password: 'pelatih123', role: 'Pelatih', kwarranName: '', kwarran_id: '', kode_kwarran: '', wilayah: '' },
-          { id: 'u3', nama: 'Kak Rina Wulandari, S.Pd.', password: 'panitia123', role: 'Panitia', kwarranName: '', kwarran_id: '', kode_kwarran: '', wilayah: '' },
-          { id: 'u4', nama: 'Kwarran Tigaraksa', password: 'kwarran123', role: 'Kwarran', kwarranName: 'Tigaraksa', kwarran_id: 'kwarran_tigaraksa', kode_kwarran: 'KWR-TIG', wilayah: 'Kwartir Ranting Tigaraksa' },
-          { id: 'u5', nama: 'Kwarran Cikupa', password: 'kwarran123', role: 'Kwarran', kwarranName: 'Cikupa', kwarran_id: 'kwarran_cikupa', kode_kwarran: 'KWR-CIK', wilayah: 'Kwartir Ranting Cikupa' },
-          { id: 'u6', nama: 'Kwarran Curug', password: 'kwarran123', role: 'Kwarran', kwarranName: 'Curug', kwarran_id: 'kwarran_curug', kode_kwarran: 'KWR-CRG', wilayah: 'Kwartir Ranting Curug' }
+          {
+            id: 'usr_admin',
+            nama: 'Admin Utama',
+            password: '123',
+            role: 'Admin',
+            kwarranName: '',
+            kwarran_id: '',
+            kode_kwarran: '',
+            wilayah: ''
+          },
+          {
+            id: 'usr_pelatih',
+            nama: 'Kak Drs. H. Ahmad Fauzi, M.Pd.',
+            password: '123',
+            role: 'Pelatih',
+            kwarranName: '',
+            kwarran_id: '',
+            kode_kwarran: '',
+            wilayah: ''
+          },
+          {
+            id: 'usr_panitia',
+            nama: 'Kak Rina Wulandari, S.Pd.',
+            password: '123',
+            role: 'Panitia',
+            kwarranName: '',
+            kwarran_id: '',
+            kode_kwarran: '',
+            wilayah: ''
+          },
+          {
+            id: 'usr_kwarran_tigaraksa',
+            nama: 'Kwarran Tigaraksa',
+            password: '123',
+            role: 'Kwarran',
+            ...buildKwarranMetadata('Tigaraksa')
+          },
+          {
+            id: 'usr_kwarran_curug',
+            nama: 'Kwarran Curug',
+            password: '123',
+            role: 'Kwarran',
+            ...buildKwarranMetadata('Curug')
+          }
         ],
         potensi: [
-          { id: 'p1', nama: 'Kak Drs. H. Ahmad Fauzi, M.Pd.', jenjang: 'KPL', gender: 'Putra', kwarran: 'Tigaraksa', pangkalan: 'SMAN 1 Kabupaten Tangerang' },
-          { id: 'p2', nama: 'Kak Hj. Siti Aminah, S.Pd., M.Si.', jenjang: 'KPL', gender: 'Putri', kwarran: 'Karawaci', pangkalan: 'SMPN 1 Kota Tangerang' },
-          { id: 'p3', nama: 'Kak Budi Santoso, S.Pd.', jenjang: 'KPD', gender: 'Putra', kwarran: 'Cikupa', pangkalan: 'SMKN 1 Kabupaten Tangerang' },
-          { id: 'p4', nama: 'Kak Dra. Nurhayati', jenjang: 'KPD', gender: 'Putri', kwarran: 'Cipondoh', pangkalan: 'MAN 1 Kota Tangerang' },
-          { id: 'p5', nama: 'Kak Hendra Gunawan, S.Kom.', jenjang: 'KML', gender: 'Putra', kwarran: 'Balaraja', pangkalan: 'SMPN 1 Balaraja' },
-          { id: 'p6', nama: 'Kak Dewi Kartika Sari, S.Pd.', jenjang: 'KML', gender: 'Putri', kwarran: 'Kelapa Dua', pangkalan: 'SDN Kelapa Dua II' },
-          { id: 'p7', nama: 'Kak Rahmat Hidayat, M.Pd.', jenjang: 'KML', gender: 'Putra', kwarran: 'Pasar Kemis', pangkalan: 'SMAN 13 Kabupaten Tangerang' },
-          { id: 'p8', nama: 'Kak Fitriani Lestari, S.Pd.SD.', jenjang: 'KMD', gender: 'Putri', kwarran: 'Tigaraksa', pangkalan: 'SDN Tigaraksa 01' },
-          { id: 'p9', nama: 'Kak Agus Salim, S.Ag.', jenjang: 'KMD', gender: 'Putra', kwarran: 'Curug', pangkalan: 'MTsN 2 Tangerang' },
-          { id: 'p10', nama: 'Kak Yuliana Pratiwi, S.Pd.', jenjang: 'KMD', gender: 'Putri', kwarran: 'Cisauk', pangkalan: 'SMPN 1 Cisauk' },
-          { id: 'p11', nama: 'Kak Dedi Kurniawan, S.Or.', jenjang: 'KMD', gender: 'Putra', kwarran: 'Legok', pangkalan: 'SDN Legok 02' },
-          { id: 'p12', nama: 'Kak Ratna Ningsih, S.Pd.', jenjang: 'Belum Kursus', gender: 'Putri', kwarran: 'Tigaraksa', pangkalan: 'SDN Kaduagung 01' },
-          { id: 'p13', nama: 'Kak Muhamad Rizky Pratama', jenjang: 'Belum Kursus', gender: 'Putra', kwarran: 'Cikupa', pangkalan: 'SMK Mandiri Cikupa' },
-          { id: 'p14', nama: 'Kak Nining Suryani, S.Pd.', jenjang: 'KML', gender: 'Putri', kwarran: 'Pagedangan', pangkalan: 'SMPN 1 Pagedangan' },
-          { id: 'p15', nama: 'Kak Irfan Hakim, S.T.', jenjang: 'KMD', gender: 'Putra', kwarran: 'Rajeg', pangkalan: 'SMAN 14 Kabupaten Tangerang' },
-          { id: 'p16', nama: 'Kak Sri Wahyuni, S.Pd.', jenjang: 'KPD', gender: 'Putri', kwarran: 'Ciledug', pangkalan: 'SMAN 3 Kota Tangerang' },
-          { id: 'p17', nama: 'Kak Taufik Hidayat, S.Pd.I.', jenjang: 'Belum Kursus', gender: 'Putra', kwarran: 'Sepatan', pangkalan: 'MI Al-Husna Sepatan' },
-          { id: 'p18', nama: 'Kak Melati Puspa Indah, S.Pd.', jenjang: 'KMD', gender: 'Putri', kwarran: 'Periuk', pangkalan: 'SDN Periuk 4' },
-          { id: 'p19', nama: 'Kak Endang Sulastri, S.Pd.', jenjang: 'KML', gender: 'Putri', kwarran: 'Curug', pangkalan: 'SDN Curug Kulon 01' },
-          { id: 'p20', nama: 'Kak Wahyu Hidayatullah, S.Pd.I.', jenjang: 'Belum Kursus', gender: 'Putra', kwarran: 'Curug', pangkalan: 'SMPN 1 Curug' }
+          { id: 'pot_1', nama: 'Kak Drs. H. Ahmad Fauzi, M.Pd.', jenjang: 'KPL', gender: 'Putra', kwarran: 'Tigaraksa', pangkalan: 'SMAN 6 Kab. Tangerang' },
+          { id: 'pot_2', nama: 'Kak Hj. Nurhayati, S.Pd., M.M.', jenjang: 'KPD', gender: 'Putri', kwarran: 'Tigaraksa', pangkalan: 'SMPN 1 Tigaraksa' },
+          { id: 'pot_3', nama: 'Kak Dedi Kurniawan, S.Pd.', jenjang: 'KML', gender: 'Putra', kwarran: 'Tigaraksa', pangkalan: 'SDN Tigaraksa 01' },
+          { id: 'pot_4', nama: 'Kak Siti Rahmawati, S.Pd.SD.', jenjang: 'KMD', gender: 'Putri', kwarran: 'Curug', pangkalan: 'SDN Curug 01' },
+          { id: 'pot_5', nama: 'Kak Muhammad Ridwan, S.Kom.', jenjang: 'KML', gender: 'Putra', kwarran: 'Curug', pangkalan: 'SMPN 1 Curug' },
+          { id: 'pot_6', nama: 'Kak Lilis Suryani, M.Pd.', jenjang: 'KPD', gender: 'Putri', kwarran: 'Curug', pangkalan: 'SMAN 3 Kab. Tangerang' },
+          { id: 'pot_7', nama: 'Kak Andi Pratama, S.Or.', jenjang: 'Belum Kursus', gender: 'Putra', kwarran: 'Curug', pangkalan: 'SDN Binong 02' },
+          { id: 'pot_8', nama: 'Kak Hendra Gunawan, S.Pd.', jenjang: 'KMD', gender: 'Putra', kwarran: 'Cikupa', pangkalan: 'SDN Cikupa 01' },
+          { id: 'pot_9', nama: 'Kak Dewi Kartika, S.Pd.', jenjang: 'KML', gender: 'Putri', kwarran: 'Balaraja', pangkalan: 'SMPN 1 Balaraja' },
+          { id: 'pot_10', nama: 'Kak Agus Salim, M.Pd.', jenjang: 'KPL', gender: 'Putra', kwarran: 'Pasar Kemis', pangkalan: 'SMAN 13 Kab. Tangerang' },
+          { id: 'pot_11', nama: 'Kak Fitria Handayani, S.Pd.', jenjang: 'KMD', gender: 'Putri', kwarran: 'Kelapa Dua', pangkalan: 'SDN Kelapa Dua 02' },
+          { id: 'pot_12', nama: 'Kak Rahmat Hidayat, S.T.', jenjang: 'Belum Kursus', gender: 'Putra', kwarran: 'Legok', pangkalan: 'SMKN 12 Kab. Tangerang' }
         ],
         kursus: [
           {
-            id: 'k1',
+            id: 'krs_1',
             nama: 'Kursus Pembina Pramuka Mahir Tingkat Dasar (KMD)',
-            angkatan: 'Angkatan XLII / 2026',
-            tanggal: '2026-12-04 s.d. 2026-12-09',
-            lokasi: 'Bumi Perkemahan Kitri Bakti, Curug - Tangerang',
-            kuota: 80,
-            terdaftar: 68,
+            angkatan: 'Angkatan XLI / 2026',
+            tanggal: '2026-11-27 s.d. 2026-12-02',
+            lokasi: 'Bumi Perkemahan Kitri Bakti, Curug',
+            kuota: 60,
+            terdaftar: 54,
             status: 'Akan Datang',
-            pelatih: 'Kak Drs. H. Ahmad Fauzi, M.Pd. (Pinsus)',
+            pelatih: 'Kak Drs. H. Ahmad Fauzi, M.Pd.',
             panitia: 'Kak Rina Wulandari, S.Pd.'
           },
           {
-            id: 'k2',
-            nama: 'Kursus Pembina Pramuka Mahir Tingkat Lanjutan (KML)',
-            angkatan: 'Angkatan XXI / 2026',
+            id: 'krs_2',
+            nama: 'Kursus Pembina Pramuka Mahir Tingkat Lanjutan (KML) Golongan Penggalang',
+            angkatan: 'Angkatan XXVIII / 2026',
             tanggal: '2026-11-20 s.d. 2026-11-25',
-            lokasi: 'Pusdiklatcab Tangerang, Tigaraksa',
-            kuota: 50,
-            terdaftar: 47,
+            lokasi: 'Sanggar Bakti Kwarcab Tangerang, Tigaraksa',
+            kuota: 45,
+            terdaftar: 45,
             status: 'Berlangsung',
-            pelatih: 'Kak Hj. Siti Aminah, S.Pd., M.Si.',
-            panitia: 'Tim Panitia Bidang Binawasa'
+            pelatih: 'Kak Hj. Nurhayati, S.Pd., M.M.',
+            panitia: 'Kak Rina Wulandari, S.Pd.'
           },
           {
-            id: 'k3',
+            id: 'krs_3',
             nama: 'Kursus Pelatih Pembina Pramuka Tingkat Dasar (KPD)',
             angkatan: 'Angkatan IX / 2026',
-            tanggal: '2026-09-12 s.d. 2026-09-18',
+            tanggal: '2026-09-10 s.d. 2026-09-16',
             lokasi: 'Bumi Perkemahan Kitri Bakti, Curug',
             kuota: 40,
-            terdaftar: 40,
+            terdaftar: 38,
             status: 'Selesai',
-            pelatih: 'Korps Pelatih Kwarda Banten & Pusdiklatcab Tangerang',
+            pelatih: 'Kak Agus Salim, M.Pd.',
             panitia: 'Kak Rina Wulandari, S.Pd.'
-          },
-          {
-            id: 'k4',
-            nama: 'Orientasi Kepramukaan Bagi Kepala Sekolah (Kamabigus)',
-            angkatan: 'Gelombang II / 2026',
-            tanggal: '2026-08-22',
-            lokasi: 'Aula Gedung Kwarcab Tangerang, Tigaraksa',
-            kuota: 120,
-            terdaftar: 115,
-            status: 'Selesai',
-            pelatih: 'Kak H. Bambang Sudjatmiko, S.Pd., M.M.',
-            panitia: 'Sekretariat Pusdiklatcab'
           }
         ],
         suratMasuk: [
           {
-            id: 'sm1',
-            nomor: '045/28.04.01-B',
+            id: 'sm_1',
+            nomor: '045/28.04.05-B',
             tanggalTerima: '2026-11-18',
-            tanggalSurat: '2026-11-16',
-            asal: 'Kwartir Ranting Tigaraksa',
-            perihal: 'Permohonan Rekomendasi & Tim Pelatih Penyelenggaraan KMD Mandiri',
+            tanggalSurat: '2026-11-17',
+            asal: 'Kwartir Ranting Curug',
+            perihal: 'Permohonan Rekomendasi & Tim Pelatih KMD Mandiri Kwarran Curug',
             disposisi: 'Ditindaklanjuti',
-            lampiran: 'Surat_Permohonan_KMD_Tigaraksa.pdf'
+            lampiran: 'Surat_Permohonan_KMD_Curug.pdf'
           },
           {
-            id: 'sm2',
-            nomor: '112/28.00-C',
-            tanggalTerima: '2026-11-15',
-            tanggalSurat: '2026-11-14',
-            asal: 'Kwartir Daerah Gerakan Pramuka Banten',
-            perihal: 'Edaran Pemutakhiran Data Potensi Pelatih & Pembina Mahir Tahun 2026',
-            disposisi: 'Selesai',
-            lampiran: 'Edaran_Kwarda_Banten_2026.pdf'
-          },
-          {
-            id: 'sm3',
-            nomor: '029/28.04.05-A',
+            id: 'sm_2',
+            nomor: '112/28.04.01-A',
             tanggalTerima: '2026-11-20',
             tanggalSurat: '2026-11-19',
-            asal: 'Kwartir Ranting Cikupa',
-            perihal: 'Pengajuan Daftar Calon Peserta KML Golongan Penggalang',
+            asal: 'Kwartir Ranting Tigaraksa',
+            perihal: 'Pengiriman Daftar Calon Peserta KML Tahun 2026',
             disposisi: 'Menunggu Disposisi',
-            lampiran: 'Daftar_Peserta_Cikupa.xlsx'
+            lampiran: 'Daftar_Peserta_Tigaraksa.pdf'
           }
         ],
         suratKeluar: [
           {
-            id: 'sk1',
+            id: 'sk_1',
             nomor: '088/28.04-Pusdiklatcab',
-            tanggalKeluar: '2026-11-19',
-            tujuan: 'Seluruh Kwartir Ranting se-Tangerang',
-            perihal: 'Pemanggilan Peserta Kursus Pembina Pramuka Mahir Tingkat Dasar (KMD) XLII',
-            penanggungJawab: 'Kak H. Bambang Sudjatmiko, S.Pd., M.M.',
-            lampiran: 'Surat_Pemanggilan_KMD_XLII.pdf'
-          },
-          {
-            id: 'sk2',
-            nomor: '089/28.04-Pusdiklatcab',
-            tanggalKeluar: '2026-11-21',
-            tujuan: 'Korps Pelatih Cabang Tangerang',
-            perihal: 'Surat Tugas Tim Pelatih Pendamping KMD Kwarran Tigaraksa',
-            penanggungJawab: 'Kak Drs. H. Ahmad Fauzi, M.Pd.',
-            lampiran: 'SK_Tim_Pelatih_Tigaraksa.pdf'
+            tanggalKeluar: '2026-11-15',
+            tujuan: 'Seluruh Kwartir Ranting se-Kabupaten/Kota Tangerang',
+            perihal: 'Edaran Pemutakhiran Data Potensi Pembina & Jadwal KMD/KML Akhir Tahun',
+            penanggungJawab: 'Kak H. Bambang Sudjatmiko, M.Pd.',
+            lampiran: 'Edaran_Pusdiklatcab_2026.pdf'
           }
         ],
-        // Data khusus Manajemen Kursus yang diselenggarakan oleh Kwarran
         kwarranCourses: [
           {
-            id: 'kc1',
+            id: 'kc_tigaraksa_1',
             kwarran: 'Tigaraksa',
             kwarran_id: 'kwarran_tigaraksa',
             namaKursus: 'KMD Golongan Siaga & Penggalang Kwarran Tigaraksa',
@@ -670,79 +619,47 @@
             createdAt: '2026-11-18'
           },
           {
-            id: 'kc2',
-            kwarran: 'Cikupa',
-            kwarran_id: 'kwarran_cikupa',
-            namaKursus: 'Orientasi Pembina Gugus Depan Kwarran Cikupa',
-            hari: 'Sabtu - Minggu',
-            tanggal: '2026-12-19 s.d. 2026-12-20',
-            lokasi: 'SMPN 1 Cikupa, Tangerang',
-            createdAt: '2026-11-19'
-          },
-          {
-            id: 'kc3',
+            id: 'kc_curug_1',
             kwarran: 'Curug',
             kwarran_id: 'kwarran_curug',
-            namaKursus: 'KMD Mandiri Pembina Gudep Kwarran Curug',
-            hari: 'Jumat - Minggu',
-            tanggal: '2026-12-18 s.d. 2026-12-20',
-            lokasi: 'Bumi Perkemahan Kitri Bakti & SDN Curug Kulon 01',
+            namaKursus: 'KMD Mandiri Kwartir Ranting Curug Tahun 2026',
+            hari: 'Sabtu - Minggu',
+            tanggal: '2026-12-19 s.d. 2026-12-20',
+            lokasi: 'Bumi Perkemahan Kitri Bakti, Curug',
             createdAt: '2026-11-20'
           }
         ],
         kwarranParticipants: [
           {
-            id: 'kp1',
-            courseId: 'kc1',
+            id: 'kp_tig_1',
+            courseId: 'kc_tigaraksa_1',
             kwarran: 'Tigaraksa',
             kwarran_id: 'kwarran_tigaraksa',
-            namaGelar: 'Siti Nurhaliza, S.Pd.',
+            namaGelar: 'Ahmad Subagja, S.Pd.',
             tempatLahir: 'Tangerang',
-            tanggalLahir: '1995-04-12',
-            golongan: 'Siaga',
+            tanggalLahir: '1992-05-14',
+            golongan: 'Penggalang',
             namaPangkalan: 'SDN Tigaraksa 01'
           },
           {
-            id: 'kp2',
-            courseId: 'kc1',
-            kwarran: 'Tigaraksa',
-            kwarran_id: 'kwarran_tigaraksa',
-            namaGelar: 'Ahmad Fajar Shodiq, S.Pd.I.',
-            tempatLahir: 'Serang',
-            tanggalLahir: '1992-08-24',
-            golongan: 'Penggalang',
-            namaPangkalan: 'SMPN 1 Tigaraksa'
-          },
-          {
-            id: 'kp3',
-            courseId: 'kc2',
-            kwarran: 'Cikupa',
-            kwarran_id: 'kwarran_cikupa',
-            namaGelar: 'Rizka Amalia Putri, S.Pd.',
-            tempatLahir: 'Tangerang',
-            tanggalLahir: '1997-01-15',
-            golongan: 'Penegak',
-            namaPangkalan: 'SMAN 4 Kabupaten Tangerang'
-          },
-          {
-            id: 'kp4',
-            courseId: 'kc3',
+            id: 'kp_crg_1',
+            courseId: 'kc_curug_1',
             kwarran: 'Curug',
             kwarran_id: 'kwarran_curug',
-            namaGelar: 'Nadia Rahmawati, S.Pd.',
+            namaGelar: 'Nurlaila Sari, S.Pd.SD.',
             tempatLahir: 'Tangerang',
-            tanggalLahir: '1996-06-18',
+            tanggalLahir: '1994-08-21',
             golongan: 'Siaga',
-            namaPangkalan: 'SDN Curug Kulon 01'
+            namaPangkalan: 'SDN Curug 01'
           },
           {
-            id: 'kp5',
-            courseId: 'kc3',
+            id: 'kp_crg_2',
+            courseId: 'kc_curug_1',
             kwarran: 'Curug',
             kwarran_id: 'kwarran_curug',
-            namaGelar: 'Dimas Prasetyo Nugroho, S.Or.',
-            tempatLahir: 'Jakarta',
-            tanggalLahir: '1993-11-05',
+            namaGelar: 'Rizky Ramadhan, S.Pd.',
+            tempatLahir: 'Serang',
+            tanggalLahir: '1991-03-10',
             golongan: 'Penggalang',
             namaPangkalan: 'SMPN 1 Curug'
           }
@@ -750,15 +667,93 @@
       };
     }
 
-    // =========================================================================
-    // 3. STATE MANAGEMENT & PERSISTENCE
-    // =========================================================================
+    function migrateAndNormalizeAppData(raw) {
+      const seed = createInitialSeedData();
+      const data = Object.assign({}, seed, raw || {});
+      data.profile = Object.assign({}, seed.profile, data.profile || {});
+      data.users = Array.isArray(data.users) && data.users.length ? data.users : seed.users;
+      data.potensi = Array.isArray(data.potensi) ? data.potensi : seed.potensi;
+      data.kursus = Array.isArray(data.kursus) ? data.kursus : seed.kursus;
+      data.suratMasuk = Array.isArray(data.suratMasuk) ? data.suratMasuk : seed.suratMasuk;
+      data.suratKeluar = Array.isArray(data.suratKeluar) ? data.suratKeluar : seed.suratKeluar;
+      data.kwarranCourses = Array.isArray(data.kwarranCourses) ? data.kwarranCourses : seed.kwarranCourses;
+      data.kwarranParticipants = Array.isArray(data.kwarranParticipants) ? data.kwarranParticipants : seed.kwarranParticipants;
+
+      // Pastikan setiap user Kwarran memiliki metadata wilayah eksplisit tanpa fallback ke Tigaraksa
+      data.users = data.users.map(u => {
+        if (u.role === 'Kwarran') {
+          const explicitKw = resolveExplicitUserKwarran(u);
+          return {
+            ...u,
+            ...buildKwarranMetadata(explicitKw)
+          };
+        }
+        return u;
+      });
+
+      // Pastikan akun Kwarran Curug tersedia jika belum ada di localStorage lama
+      if (!data.users.some(u => u.role === 'Kwarran' && isSameKwarran(resolveExplicitUserKwarran(u), 'Curug'))) {
+        data.users.push({
+          id: 'usr_kwarran_curug',
+          nama: 'Kwarran Curug',
+          password: '123',
+          role: 'Kwarran',
+          ...buildKwarranMetadata('Curug')
+        });
+      }
+
+      // Pastikan data seed awal Curug ikut tersuntik jika belum pernah ada data Curug di penyimpanan lama
+      if (!data.potensi.some(p => isSameKwarran(p.kwarran, 'Curug'))) {
+        data.potensi.push(...seed.potensi.filter(p => isSameKwarran(p.kwarran, 'Curug')));
+      }
+      if (!data.kwarranCourses.some(c => isSameKwarran(c.kwarran, 'Curug'))) {
+        data.kwarranCourses.push(...seed.kwarranCourses.filter(c => isSameKwarran(c.kwarran, 'Curug')));
+        data.kwarranParticipants.push(...seed.kwarranParticipants.filter(pt => isSameKwarran(pt.kwarran, 'Curug')));
+      }
+
+      // Normalisasi properti kwarran pada seluruh entitas
+      data.potensi = data.potensi.map(p => ({
+        ...p,
+        kwarran: normalizeKwarranName(p.kwarran)
+      }));
+      data.kwarranCourses = data.kwarranCourses.map(c => {
+        const kw = normalizeKwarranName(c.kwarran);
+        return {
+          ...c,
+          kwarran: kw,
+          kwarran_id: c.kwarran_id || buildKwarranMetadata(kw).kwarran_id
+        };
+      });
+      data.kwarranParticipants = data.kwarranParticipants.map(pt => {
+        const parentCourse = data.kwarranCourses.find(c => c.id === pt.courseId);
+        const kw = normalizeKwarranName(pt.kwarran || (parentCourse ? parentCourse.kwarran : ''));
+        return {
+          ...pt,
+          kwarran: kw,
+          kwarran_id: pt.kwarran_id || buildKwarranMetadata(kw).kwarran_id
+        };
+      });
+
+      return data;
+    }
+
+    function loadAppData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        const normalized = migrateAndNormalizeAppData(parsed);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+        return normalized;
+      } catch (err) {
+        return migrateAndNormalizeAppData(null);
+      }
+    }
+
     let appData = loadAppData();
     let currentUser = null;
-    let currentRoute = 'dashboard';
+    let activeRoute = 'dashboard';
     let chartsRegistry = {};
 
-    // State filter & pagination UI
     const uiState = {
       potensiSearch: '',
       potensiJenjang: 'ALL',
@@ -768,293 +763,175 @@
       potensiPerPage: 8,
       kursusSearch: '',
       kursusStatus: 'ALL',
-      adminTab: 'masuk', // 'masuk' | 'keluar'
+      adminTab: 'masuk',
       suratSearch: '',
-      suratStatus: 'ALL',
-      laporanType: 'potensi', // 'potensi' | 'kursus' | 'surat'
+      laporanType: 'potensi',
       laporanKwarran: 'ALL',
       laporanJenjang: 'ALL',
       revealedPasswords: {},
-      // State khusus Kwarran Manajemen Kursus
       kwarranSelectedCourseId: null,
-      kwarranParticipantSearch: '',
-      kwarranEditingParticipantId: null
+      kwarranEditingParticipantId: null,
+      kwarranParticipantSearch: ''
     };
 
-    function resetUiStateForSession(userObj = null) {
+    function saveAppData() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+      } catch (err) {
+        showToast('Gagal menyimpan data ke penyimpanan browser.', 'error');
+      }
+    }
+
+    // =========================================================================
+    // 3. RESOLUSI SCOPE WILAYAH & ISOLASI DATA KWARRAN
+    // =========================================================================
+    function getActiveKwarranScope() {
+      if (!currentUser || currentUser.role !== 'Kwarran') {
+        return { isKwarran: false, kwarranName: '', kwarran_id: '', kode_kwarran: '' };
+      }
+      const kwName = resolveExplicitUserKwarran(currentUser);
+      const meta = buildKwarranMetadata(kwName);
+      return {
+        isKwarran: true,
+        kwarranName: meta.kwarranName,
+        kwarran_id: meta.kwarran_id,
+        kode_kwarran: meta.kode_kwarran
+      };
+    }
+
+    function getActiveKwarranName() {
+      return getActiveKwarranScope().kwarranName;
+    }
+
+    function getScopedPotensiList() {
+      const scope = getActiveKwarranScope();
+      if (!scope.isKwarran) return appData.potensi;
+      if (!scope.kwarranName) return [];
+      return appData.potensi.filter(item => isSameKwarran(item.kwarran, scope.kwarranName));
+    }
+
+    function getScopedKwarranCourses() {
+      const scope = getActiveKwarranScope();
+      if (!scope.isKwarran) return appData.kwarranCourses;
+      if (!scope.kwarranName) return [];
+      return appData.kwarranCourses.filter(c => isSameKwarran(c.kwarran, scope.kwarranName));
+    }
+
+    function getScopedKwarranParticipants(courseId = null) {
+      const scope = getActiveKwarranScope();
+      const allowedCourseIds = new Set(getScopedKwarranCourses().map(c => c.id));
+      return appData.kwarranParticipants.filter(p => {
+        if (courseId && p.courseId !== courseId) return false;
+        if (!scope.isKwarran) return true;
+        if (!scope.kwarranName) return false;
+        return isSameKwarran(p.kwarran, scope.kwarranName) && allowedCourseIds.has(p.courseId);
+      });
+    }
+
+    function resetUiStateForSession() {
+      const scope = getActiveKwarranScope();
       uiState.potensiSearch = '';
       uiState.potensiJenjang = 'ALL';
       uiState.potensiGender = 'ALL';
+      uiState.potensiKwarran = scope.isKwarran ? scope.kwarranName : 'ALL';
       uiState.potensiPage = 1;
       uiState.kursusSearch = '';
       uiState.kursusStatus = 'ALL';
       uiState.adminTab = 'masuk';
       uiState.suratSearch = '';
-      uiState.suratStatus = 'ALL';
       uiState.laporanType = 'potensi';
+      uiState.laporanKwarran = scope.isKwarran ? scope.kwarranName : 'ALL';
       uiState.laporanJenjang = 'ALL';
       uiState.revealedPasswords = {};
       uiState.kwarranSelectedCourseId = null;
-      uiState.kwarranParticipantSearch = '';
       uiState.kwarranEditingParticipantId = null;
+      uiState.kwarranParticipantSearch = '';
+    }
 
-      if (userObj && userObj.role === 'Kwarran') {
-        const kwName = resolveExplicitUserKwarran(userObj);
-        uiState.potensiKwarran = kwName || 'ALL';
-        uiState.laporanKwarran = kwName || 'ALL';
+    // =========================================================================
+    // 4. SISTEM AUTENTIKASI & SESI
+    // =========================================================================
+    function establishUserSession(userObj, persist = true) {
+      if (!userObj) return;
+      if (userObj.role === 'Kwarran') {
+        const explicitKw = resolveExplicitUserKwarran(userObj);
+        currentUser = {
+          ...userObj,
+          ...buildKwarranMetadata(explicitKw)
+        };
       } else {
-        uiState.potensiKwarran = 'ALL';
-        uiState.laporanKwarran = 'ALL';
+        currentUser = { ...userObj };
       }
+
+      if (persist) {
+        try {
+          sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+            userId: currentUser.id,
+            role: currentUser.role,
+            kwarranName: currentUser.kwarranName || ''
+          }));
+        } catch (err) {
+          // Abaikan jika sessionStorage dibatasi
+        }
+      }
+
+      resetUiStateForSession();
+
+      // Perbarui header & sidebar user info
+      document.getElementById('sidebar-user-name').textContent = currentUser.nama;
+      document.getElementById('sidebar-user-avatar').textContent = (currentUser.nama || 'U').charAt(0).toUpperCase();
+      document.getElementById('sidebar-user-role').textContent = currentUser.role === 'Kwarran'
+        ? `Kwarran (${currentUser.kwarranName})`
+        : currentUser.role;
+
+      document.getElementById('header-user-name').textContent = currentUser.nama;
+      document.getElementById('header-user-role').textContent = currentUser.role === 'Kwarran'
+        ? `Role: Kwarran ${currentUser.kwarranName}`
+        : `Role: ${currentUser.role}`;
+
+      document.getElementById('login-view').classList.add('hidden');
+      document.getElementById('app-shell').classList.remove('hidden');
+
+      renderSidebarMenu();
+      navigateTo('dashboard');
     }
 
-    function migrateAndNormalizeAppData(mergedData, defaults) {
-      let changed = false;
-
-      // 1. Pastikan seluruh user Kwarran memetakan wilayahnya dari nama akun / properti eksplisit (tanpa fallback statis ke Tigaraksa)
-      mergedData.users = (mergedData.users || []).map(u => {
-        if (u.role === 'Kwarran') {
-          const explicitRegion = resolveExplicitUserKwarran(u);
-          const meta = buildKwarranMetadata(explicitRegion);
-          if (
-            u.kwarran !== meta.kwarran ||
-            u.kwarranName !== meta.kwarranName ||
-            u.kwarran_id !== meta.kwarran_id ||
-            u.kode_kwarran !== meta.kode_kwarran ||
-            u.wilayah !== meta.wilayah
-          ) {
-            changed = true;
-            return { ...u, ...meta };
-          }
-        }
-        return u;
-      });
-
-      // 2. Pastikan seed user bawaan (termasuk Kwarran Curug) tersedia bila belum ada
-      defaults.users.forEach(defUser => {
-        const exists = mergedData.users.some(u =>
-          u.nama.toLowerCase() === defUser.nama.toLowerCase() ||
-          (defUser.role === 'Kwarran' && u.role === 'Kwarran' &&
-            normalizeKwarranName(u.kwarranName || u.nama).toLowerCase() === defUser.kwarranName.toLowerCase())
-        );
-        if (!exists) {
-          mergedData.users.push({ ...defUser });
-          changed = true;
-        }
-      });
-
-      // 3. Sinkronkan seed potensi, kwarranCourses, dan kwarranParticipants milik Curug jika belum ada
-      defaults.potensi.forEach(defPot => {
-        if (!mergedData.potensi.some(p => p.id === defPot.id)) {
-          mergedData.potensi.push({ ...defPot });
-          changed = true;
-        }
-      });
-
-      mergedData.kwarranCourses = (mergedData.kwarranCourses || []).map(c => {
-        const meta = buildKwarranMetadata(c.kwarran);
-        if (c.kwarran !== meta.kwarranName || c.kwarran_id !== meta.kwarran_id) {
-          changed = true;
-          return { ...c, kwarran: meta.kwarranName, kwarran_id: meta.kwarran_id };
-        }
-        return c;
-      });
-      defaults.kwarranCourses.forEach(defCourse => {
-        if (!mergedData.kwarranCourses.some(c => c.id === defCourse.id)) {
-          mergedData.kwarranCourses.push({ ...defCourse });
-          changed = true;
-        }
-      });
-
-      mergedData.kwarranParticipants = (mergedData.kwarranParticipants || []).map(p => {
-        const meta = buildKwarranMetadata(p.kwarran);
-        if (p.kwarran !== meta.kwarranName || p.kwarran_id !== meta.kwarran_id) {
-          changed = true;
-          return { ...p, kwarran: meta.kwarranName, kwarran_id: meta.kwarran_id };
-        }
-        return p;
-      });
-      defaults.kwarranParticipants.forEach(defPart => {
-        if (!mergedData.kwarranParticipants.some(p => p.id === defPart.id)) {
-          mergedData.kwarranParticipants.push({ ...defPart });
-          changed = true;
-        }
-      });
-
-      return { data: mergedData, changed };
-    }
-
-    function loadAppData() {
-      const defaults = getInitialData();
+    function restorePersistedSession() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          const merged = { ...defaults, ...parsed };
-          const { data: migrated, changed } = migrateAndNormalizeAppData(merged, defaults);
-          if (changed) {
-            saveAppData(migrated);
-          }
-          return migrated;
+        const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.userId) return;
+        const found = appData.users.find(u => u.id === parsed.userId);
+        if (found) {
+          establishUserSession(found, false);
         }
-      } catch (e) {
-        console.error('Gagal membaca localStorage:', e);
-      }
-      saveAppData(defaults);
-      return defaults;
-    }
-
-    function saveAppData(dataObj = appData) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(dataObj));
-      } catch (e) {
-        showToast('Peringatan: Penyimpanan lokal penuh (kemungkinan ukuran logo terlalu besar).', 'error');
+      } catch (err) {
+        // Tetap di halaman login
       }
     }
 
-    function resetDemoData() {
-      openConfirmModal(
-        'Reset Data Demo?',
-        'Seluruh perubahan data akan dikembalikan ke data awal bawaan PUSDIKLATCAB Tangerang.',
-        () => {
-          appData = getInitialData();
-          saveAppData(appData);
-          if (currentUser) {
-            const refreshed = appData.users.find(u => u.id === currentUser.id) || appData.users[0];
-            currentUser = refreshed;
-          }
-          renderBrandLogos();
-          if (currentUser) {
-            renderSidebar();
-            navigateTo(currentRoute);
-          }
-          showToast('Data demo berhasil dipulihkan ke pengaturan awal.', 'success');
-        },
-        'Ya, Reset Data'
+    document.getElementById('login-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value;
+      const errBox = document.getElementById('login-error');
+
+      const matched = appData.users.find(
+        u => u.nama.toLowerCase() === username.toLowerCase() && u.password === password
       );
-    }
 
-    // =========================================================================
-    // 4. UTILITAS UI (TOAST, MODAL KONFIRMASI, MODAL FORM, LOGO)
-    // =========================================================================
-    function showToast(message, type = 'success') {
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
-      const styles = {
-        success: 'bg-scout-dark text-white border-l-4 border-scout-gold',
-        error: 'bg-red-800 text-white border-l-4 border-red-300',
-        info: 'bg-scout-forest text-white border-l-4 border-emerald-300'
-      };
-      const icons = {
-        success: 'check-circle-2',
-        error: 'alert-octagon',
-        info: 'info'
-      };
-
-      toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3.5 rounded-xl shadow-xl text-xs sm:text-sm font-medium transition-all duration-300 translate-x-4 opacity-0 ${styles[type] || styles.success}`;
-      toast.innerHTML = `
-        <i data-lucide="${icons[type] || 'check-circle-2'}" class="w-5 h-5 shrink-0 text-scout-gold"></i>
-        <span class="flex-1 leading-snug">${escapeHtml(message)}</span>
-      `;
-      container.appendChild(toast);
-      lucide.createIcons({ nodes: [toast] });
-
-      requestAnimationFrame(() => {
-        toast.classList.remove('translate-x-4', 'opacity-0');
-      });
-
-      setTimeout(() => {
-        toast.classList.add('translate-x-4', 'opacity-0');
-        setTimeout(() => toast.remove(), 300);
-      }, 3400);
-    }
-
-    function openConfirmModal(title, message, onConfirm, okLabel = 'Ya, Hapus') {
-      const modal = document.getElementById('confirm-modal');
-      document.getElementById('confirm-title').textContent = title;
-      document.getElementById('confirm-message').textContent = message;
-      const okBtn = document.getElementById('confirm-ok-btn');
-      const cancelBtn = document.getElementById('confirm-cancel-btn');
-      okBtn.textContent = okLabel;
-
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-
-      const cleanup = () => {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-        okBtn.onclick = null;
-        cancelBtn.onclick = null;
-      };
-
-      cancelBtn.onclick = cleanup;
-      okBtn.onclick = () => {
-        cleanup();
-        if (typeof onConfirm === 'function') onConfirm();
-      };
-    }
-
-    function openFormModal(title, htmlContent) {
-      const modal = document.getElementById('form-modal');
-      document.getElementById('form-modal-title').textContent = title;
-      document.getElementById('form-modal-body').innerHTML = htmlContent;
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-      lucide.createIcons({ nodes: [modal] });
-    }
-
-    function closeFormModal() {
-      const modal = document.getElementById('form-modal');
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-      document.getElementById('form-modal-body').innerHTML = '';
-    }
-
-    function getLogoHtml() {
-      if (appData.profile && appData.profile.logoUrl) {
-        return `<img src="${appData.profile.logoUrl}" alt="Logo Pusdiklatcab Tangerang" class="w-full h-full object-contain rounded-lg" />`;
+      if (!matched) {
+        errBox.classList.remove('hidden');
+        document.getElementById('login-error-text').textContent = 'Nama pengguna atau kata sandi tidak sesuai.';
+        return;
       }
-      return DEFAULT_LOGO_SVG;
-    }
 
-    function renderBrandLogos() {
-      const logoHtml = getLogoHtml();
-      ['login-logo-wrapper', 'sidebar-logo-wrapper', 'header-logo-wrapper'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.innerHTML = logoHtml;
-      });
-      const kapusEl = document.getElementById('sidebar-kapus-name');
-      if (kapusEl) kapusEl.textContent = appData.profile.namaKapus || 'Belum diatur';
-    }
+      errBox.classList.add('hidden');
+      establishUserSession(matched, true);
+      showToast(`Selamat datang, ${currentUser.nama}!`, 'success');
+    });
 
-    function escapeHtml(str) {
-      if (str === null || str === undefined) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    }
-
-    function formatDateIndo(dateStr) {
-      if (!dateStr) return '-';
-      // Jika berupa rentang tanggal (misal "2026-12-04 s.d. 2026-12-09"), tampilkan langsung dengan rapi
-      if (dateStr.includes('s.d.')) return dateStr;
-      const parts = dateStr.split('-');
-      if (parts.length !== 3) return dateStr;
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-      const mIdx = parseInt(parts[1], 10) - 1;
-      return `${parts[2]} ${months[mIdx] || parts[1]} ${parts[0]}`;
-    }
-
-    function generateId(prefix = 'id') {
-      return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    }
-
-    // =========================================================================
-    // 5. AUTENTIKASI & ROLE LOGIN
-    // =========================================================================
     function toggleLoginPassword() {
       const input = document.getElementById('login-password');
       const icon = document.getElementById('login-eye-icon');
@@ -1068,240 +945,30 @@
       lucide.createIcons();
     }
 
-    function quickDemoLogin(accountName) {
-      appData = loadAppData();
-      const targetUser = appData.users.find(u => u.nama.toLowerCase() === accountName.toLowerCase());
-      if (!targetUser) {
-        showToast(`Akun "${accountName}" tidak ditemukan.`, 'error');
-        return;
-      }
-      document.getElementById('login-username').value = targetUser.nama;
-      document.getElementById('login-password').value = targetUser.password;
-      document.getElementById('login-error').classList.add('hidden');
-      establishUserSession(targetUser, true);
-    }
-
-    document.getElementById('login-form').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const inputName = document.getElementById('login-username').value.trim();
-      const inputPass = document.getElementById('login-password').value;
-      const errorBox = document.getElementById('login-error');
-
-      // Pastikan data terbaru (termasuk akun hasil migrasi) dimuat sebelum autentikasi
-      appData = loadAppData();
-
-      const matchedUser = appData.users.find(u => {
-        if (u.password !== inputPass) return false;
-        if (u.nama.toLowerCase() === inputName.toLowerCase()) return true;
-        // Dukung pencocokan fleksibel untuk akun Kwarran (mis. "Curug" atau "Kwarran Curug")
-        if (u.role === 'Kwarran') {
-          const userKw = normalizeKwarranName(u.kwarranName || u.nama).toLowerCase();
-          const inputKw = normalizeKwarranName(inputName).toLowerCase();
-          return Boolean(userKw && inputKw && userKw === inputKw);
-        }
-        return false;
-      });
-
-      if (!matchedUser) {
-        errorBox.classList.remove('hidden');
-        document.getElementById('login-error-text').textContent =
-          'Nama pengguna atau kata sandi tidak sesuai. Silakan periksa kembali.';
-        return;
-      }
-
-      errorBox.classList.add('hidden');
-      establishUserSession(matchedUser, true);
-    });
-
-    function establishUserSession(userRecord, showWelcomeToast = false) {
-      // Bentuk objek sesi dengan identitas Kwarran tervalidasi dari nama akun / properti eksplisit
-      if (userRecord.role === 'Kwarran') {
-        const explicitRegion = resolveExplicitUserKwarran(userRecord);
-        const meta = buildKwarranMetadata(explicitRegion);
-        currentUser = {
-          ...userRecord,
-          kwarran: meta.kwarran,
-          kwarranName: meta.kwarranName,
-          kwarran_id: meta.kwarran_id,
-          kode_kwarran: userRecord.kode_kwarran && userRecord.kwarran === meta.kwarran
-            ? userRecord.kode_kwarran
-            : meta.kode_kwarran,
-          wilayah: meta.wilayah
-        };
-      } else {
-        currentUser = { ...userRecord };
-      }
-
-      // Reset seluruh state filter/pilihan dari sesi sebelumnya agar tidak terjadi kebocoran data
-      resetUiStateForSession(currentUser);
-
-      // Simpan sesi aktif terisolasi ke localStorage
-      try {
-        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
-          userId: currentUser.id,
-          role: currentUser.role,
-          kwarran: currentUser.kwarran || '',
-          kwarranName: currentUser.kwarranName || '',
-          kwarran_id: currentUser.kwarran_id || '',
-          kode_kwarran: currentUser.kode_kwarran || '',
-          wilayah: currentUser.wilayah || ''
-        }));
-      } catch (e) {
-        console.warn('Gagal menyimpan sesi ke localStorage:', e);
-      }
-
-      // Inisialisasi kursus terpilih khusus milik Kwarran yang sedang login
-      if (currentUser.role === 'Kwarran') {
-        const myCourses = getScopedKwarranCourses();
-        uiState.kwarranSelectedCourseId = myCourses.length ? myCourses[0].id : null;
-      }
-
-      document.getElementById('login-view').classList.add('hidden');
-      document.getElementById('app-shell').classList.remove('hidden');
-
-      updateUserHeaderUI();
-      renderSidebar();
-      navigateTo('dashboard');
-
-      if (showWelcomeToast) {
-        const roleLabel = currentUser.role === 'Kwarran'
-          ? `Kwarran ${currentUser.kwarranName}`
-          : currentUser.role;
-        showToast(`Selamat datang, ${currentUser.nama} (${roleLabel})!`, 'success');
-      }
-    }
-
-    function restorePersistedSession() {
-      try {
-        const rawSession = localStorage.getItem(SESSION_STORAGE_KEY);
-        if (!rawSession) return false;
-        const parsedSession = JSON.parse(rawSession);
-        if (!parsedSession || !parsedSession.userId) return false;
-
-        const userFound = appData.users.find(u => u.id === parsedSession.userId);
-        if (!userFound) {
-          localStorage.removeItem(SESSION_STORAGE_KEY);
-          return false;
-        }
-        establishUserSession(userFound, false);
-        return true;
-      } catch (e) {
-        localStorage.removeItem(SESSION_STORAGE_KEY);
-        return false;
-      }
-    }
-
     function handleLogout() {
       currentUser = null;
-      currentRoute = 'dashboard';
-      resetUiStateForSession(null);
-      destroyAllCharts();
+      activeRoute = 'dashboard';
+      destroyActiveCharts();
       try {
-        localStorage.removeItem(SESSION_STORAGE_KEY);
-      } catch (e) {
-        console.warn('Gagal menghapus sesi dari localStorage:', e);
-      }
-      document.getElementById('app-shell').classList.add('hidden');
-      document.getElementById('login-view').classList.remove('hidden');
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch (err) {}
       document.getElementById('login-username').value = '';
       document.getElementById('login-password').value = '';
-      showToast('Anda telah keluar dari sistem PUSDIKLATCAB Tangerang.', 'info');
-    }
-
-    // Helper terpusat scope & isolasi data Kwarran (Zero Data Leakage)
-    function getActiveKwarranScope() {
-      if (!currentUser || currentUser.role !== 'Kwarran') {
-        return {
-          isKwarran: false,
-          kwarran: '',
-          kwarranName: '',
-          kwarran_id: '',
-          kode_kwarran: '',
-          wilayah: ''
-        };
-      }
-      const explicitRegion = resolveExplicitUserKwarran(currentUser);
-      const meta = buildKwarranMetadata(explicitRegion);
-      return {
-        isKwarran: true,
-        kwarran: meta.kwarran,
-        kwarranName: meta.kwarranName,
-        kwarran_id: meta.kwarran_id,
-        kode_kwarran: meta.kode_kwarran,
-        wilayah: meta.wilayah
-      };
-    }
-
-    function isSameKwarran(entityKwarran, scopeKwarran) {
-      const a = normalizeKwarranName(entityKwarran).toLowerCase();
-      const b = normalizeKwarranName(scopeKwarran).toLowerCase();
-      return Boolean(a && b && a === b);
-    }
-
-    function getActiveKwarranName() {
-      return getActiveKwarranScope().kwarranName;
-    }
-
-    function getScopedPotensiList() {
-      const scope = getActiveKwarranScope();
-      if (!scope.isKwarran) return appData.potensi;
-      return appData.potensi.filter(p => isSameKwarran(p.kwarran, scope.kwarranName));
-    }
-
-    function getScopedKwarranCourses() {
-      const scope = getActiveKwarranScope();
-      if (!scope.isKwarran) return appData.kwarranCourses;
-      return appData.kwarranCourses.filter(c => isSameKwarran(c.kwarran, scope.kwarranName));
-    }
-
-    function getScopedKwarranParticipants(courseId = null) {
-      const scope = getActiveKwarranScope();
-      const allowedCourseIds = new Set(getScopedKwarranCourses().map(c => c.id));
-      return appData.kwarranParticipants.filter(p => {
-        if (courseId && p.courseId !== courseId) return false;
-        if (!scope.isKwarran) return true;
-        return isSameKwarran(p.kwarran, scope.kwarranName) && allowedCourseIds.has(p.courseId);
-      });
-    }
-
-    function updateUserHeaderUI() {
-      if (!currentUser) return;
-      document.getElementById('sidebar-user-name').textContent = currentUser.nama;
-      document.getElementById('sidebar-user-role').textContent =
-        currentUser.role === 'Kwarran' ? `Kwarran (${getActiveKwarranName()})` : currentUser.role;
-      document.getElementById('sidebar-user-avatar').textContent = currentUser.nama.charAt(0).toUpperCase();
-
-      document.getElementById('header-user-name').textContent = currentUser.nama;
-      document.getElementById('header-user-role').textContent =
-        currentUser.role === 'Kwarran' ? `Role: Kwarran ${getActiveKwarranName()}` : `Role: ${currentUser.role}`;
-    }
-
-    function toggleMobileSidebar(open) {
-      const sidebar = document.getElementById('sidebar');
-      const backdrop = document.getElementById('sidebar-backdrop');
-      if (open) {
-        sidebar.classList.remove('-translate-x-full');
-        backdrop.classList.remove('hidden');
-      } else {
-        sidebar.classList.add('-translate-x-full');
-        backdrop.classList.add('hidden');
-      }
+      document.getElementById('app-shell').classList.add('hidden');
+      document.getElementById('login-view').classList.remove('hidden');
+      lucide.createIcons();
+      showToast('Anda telah keluar dari sistem.', 'info');
     }
 
     // =========================================================================
-    // 6. NAVIGASI SIDEBAR BERDASARKAN ROLE
+    // 5. NAVIGASI SIDEBAR DINAMIS BERDASARKAN ROLE
     // =========================================================================
     function getMenuConfigForRole(role) {
       if (role === 'Kwarran') {
-        // ATURAN KHUSUS ROLE KWARRAN:
-        // Menampilkan menu utama "Manajemen Kursus" dengan 2 sub-menu:
-        // 1. Daftar Kursus
-        // 2. Input Data Peserta
-        // Plus menu pendukung Dashboard, Data Potensi, dan Laporan
         return [
           { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
           {
-            id: 'manajemen-kursus',
+            id: 'manajemen-kursus-group',
             label: 'Manajemen Kursus',
             icon: 'graduation-cap',
             children: [
@@ -1310,55 +977,58 @@
             ]
           },
           { id: 'data-potensi', label: 'Data Potensi', icon: 'users' },
-          { id: 'laporan', label: 'Laporan', icon: 'file-spreadsheet' }
+          { id: 'laporan', label: 'Laporan', icon: 'file-text' }
         ];
       }
 
-      // Menu untuk Admin, Pelatih, dan Panitia (100% dipertahankan)
-      const allMenus = [
-        { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard', roles: ['Admin', 'Pelatih', 'Panitia'] },
-        { id: 'profile', label: 'Profile', icon: 'award', roles: ['Admin'] },
-        { id: 'data-potensi', label: 'Data Potensi', icon: 'users', roles: ['Admin', 'Pelatih', 'Panitia'] },
-        { id: 'kursus', label: 'Kursus', icon: 'graduation-cap', roles: ['Admin', 'Pelatih', 'Panitia'] },
-        { id: 'administrasi', label: 'Administrasi', icon: 'mail', roles: ['Admin', 'Panitia'] },
-        { id: 'laporan', label: 'Laporan', icon: 'file-spreadsheet', roles: ['Admin', 'Pelatih', 'Panitia'] },
-        { id: 'user', label: 'User', icon: 'shield', roles: ['Admin'] }
+      const menus = [
+        { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' }
       ];
 
-      return allMenus.filter(m => m.roles.includes(role));
+      if (role === 'Admin') {
+        menus.push({ id: 'profile', label: 'Profile', icon: 'award' });
+      }
+
+      menus.push({ id: 'data-potensi', label: 'Data Potensi', icon: 'users' });
+      menus.push({ id: 'kursus', label: 'Kursus', icon: 'graduation-cap' });
+
+      if (role === 'Admin' || role === 'Panitia') {
+        menus.push({ id: 'administrasi', label: 'Administrasi', icon: 'mail' });
+      }
+
+      menus.push({ id: 'laporan', label: 'Laporan', icon: 'file-text' });
+
+      if (role === 'Admin') {
+        menus.push({ id: 'user', label: 'User', icon: 'shield' });
+      }
+
+      return menus;
     }
 
-    function renderSidebar() {
+    function renderSidebarMenu() {
       if (!currentUser) return;
       const nav = document.getElementById('sidebar-nav');
-      const menus = getMenuConfigForRole(currentUser.role);
+      const items = getMenuConfigForRole(currentUser.role);
 
-      nav.innerHTML = menus.map(item => {
+      nav.innerHTML = items.map(item => {
         if (item.children) {
-          const isChildActive = item.children.some(c => c.id === currentRoute);
           return `
-            <div class="pt-1 pb-1">
-              <div class="px-3.5 py-2.5 rounded-xl flex items-center justify-between text-xs font-extrabold uppercase tracking-wider ${isChildActive ? 'bg-scout-gold/20 text-scout-gold border border-scout-gold/30' : 'text-scout-khaki'}">
-                <div class="flex items-center gap-2.5">
-                  <i data-lucide="${item.icon}" class="w-4 h-4 text-scout-gold"></i>
-                  <span>${item.label}</span>
-                </div>
-                <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+            <div class="pt-2 pb-1">
+              <div class="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-scout-gold flex items-center gap-2">
+                <i data-lucide="${item.icon}" class="w-3.5 h-3.5"></i>
+                <span>${item.label}</span>
               </div>
-              <div class="mt-1.5 ml-3 pl-3 border-l-2 border-scout-gold/30 space-y-1">
+              <div class="mt-1 space-y-1 pl-2 border-l border-white/15 ml-3">
                 ${item.children.map(sub => {
-                  const active = currentRoute === sub.id;
+                  const isActive = activeRoute === sub.id;
                   return `
-                    <button
-                      type="button"
-                      onclick="navigateTo('${sub.id}')"
-                      class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
-                        active
-                          ? 'bg-scout-forest text-white shadow-md shadow-black/20'
+                    <button type="button" onclick="navigateTo('${sub.id}')"
+                      class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition ${
+                        isActive
+                          ? 'bg-scout-forest text-white shadow-sm'
                           : 'text-scout-sand hover:bg-white/10 hover:text-white'
-                      }"
-                    >
-                      <i data-lucide="${sub.icon}" class="w-4 h-4 ${active ? 'text-scout-gold' : 'text-scout-khaki'}"></i>
+                      }">
+                      <i data-lucide="${sub.icon}" class="w-4 h-4 ${isActive ? 'text-scout-gold' : ''}"></i>
                       <span>${sub.label}</span>
                     </button>
                   `;
@@ -1368,77 +1038,81 @@
           `;
         }
 
-        const active = currentRoute === item.id;
+        const isActive = activeRoute === item.id;
         return `
-          <button
-            type="button"
-            onclick="navigateTo('${item.id}')"
-            class="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs sm:text-sm font-semibold transition ${
-              active
-                ? 'bg-scout-forest text-white shadow-md shadow-black/20 border border-emerald-400/20'
+          <button type="button" onclick="navigateTo('${item.id}')"
+            class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
+              isActive
+                ? 'bg-scout-forest text-white shadow-sm'
                 : 'text-scout-sand hover:bg-white/10 hover:text-white'
-            }"
-          >
-            <i data-lucide="${item.icon}" class="w-4 h-4 ${active ? 'text-scout-gold' : 'text-scout-khaki'}"></i>
+            }">
+            <i data-lucide="${item.icon}" class="w-4 h-4 ${isActive ? 'text-scout-gold' : ''}"></i>
             <span>${item.label}</span>
           </button>
         `;
       }).join('');
-
-      lucide.createIcons({ nodes: [nav] });
     }
 
-    function navigateTo(route) {
-      currentRoute = route;
+    function navigateTo(routeId) {
+      if (!currentUser) return;
+      activeRoute = routeId;
       toggleMobileSidebar(false);
-      renderSidebar();
-      destroyAllCharts();
+      destroyActiveCharts();
+      renderSidebarMenu();
 
-      const pageMeta = {
+      const main = document.getElementById('main-content');
+      const titleEl = document.getElementById('page-title');
+      const subEl = document.getElementById('page-subtitle');
+      const scope = getActiveKwarranScope();
+
+      const metaMap = {
         'dashboard': {
           title: 'Dashboard Utama',
-          subtitle: 'Ringkasan statistik potensi pembina, kegiatan kursus, dan administrasi Pusdiklatcab Tangerang'
+          subtitle: scope.isKwarran
+            ? `Ringkasan statistik & penyelenggaraan kursus Kwartir Ranting ${scope.kwarranName}`
+            : 'Ringkasan statistik potensi pembina, kegiatan kursus, dan administrasi Pusdiklatcab Tangerang'
         },
         'profile': {
           title: 'Profile Pusdiklatcab',
-          subtitle: 'Pengaturan identitas Kapusdiklatcab Tangerang & logo resmi untuk kop laporan'
+          subtitle: 'Pengaturan identitas Kepala Pusdiklatcab dan logo resmi lembaga'
         },
         'data-potensi': {
           title: 'Data Potensi Pembina',
-          subtitle: 'Basis data pembina pramuka berdasarkan jenjang kursus, gender, dan Kwartir Ranting'
+          subtitle: scope.isKwarran
+            ? `Data potensi pembina pramuka wilayah Kwartir Ranting ${scope.kwarranName}`
+            : 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang'
         },
         'kursus': {
           title: 'Manajemen Kursus & Pelatihan',
-          subtitle: 'Pengelolaan jadwal KMD, KML, KPD, KPL, kuota peserta, serta penugasan pelatih/panitia'
+          subtitle: 'Jadwal kegiatan KMD, KML, KPD, KPL dan penugasan pelatih/panitia'
         },
         'administrasi': {
           title: 'Administrasi Persuratan',
-          subtitle: 'Pencatatan dan pengarsipan Surat Masuk serta Surat Keluar Pusdiklatcab Tangerang'
+          subtitle: 'Pencatatan arsip surat masuk, surat keluar, dan disposisi kegiatan'
         },
         'laporan': {
           title: 'Pusat Laporan & Rekapitulasi',
-          subtitle: 'Ekspor data CSV (Excel) dan cetak dokumen laporan berkop resmi Pusdiklatcab'
+          subtitle: 'Ekspor CSV dan cetak dokumen laporan berkop resmi Pusdiklatcab Tangerang'
         },
         'user': {
-          title: 'Manajemen Akun Pengguna',
-          subtitle: 'Kelola hak akses Admin, Pelatih, Panitia, dan Kwartir Ranting'
+          title: 'Manajemen Akun User',
+          subtitle: 'Pengaturan hak akses dan kredensial pengguna sistem'
         },
         'kwarran-daftar-kursus': {
           title: 'Manajemen Kursus — Daftar Kursus',
-          subtitle: `Pendaftaran & daftar penyelenggaraan kursus oleh Kwarran ${getActiveKwarranName()}`
+          subtitle: `Pendaftaran & daftar penyelenggaraan kursus oleh Kwarran ${scope.kwarranName}`
         },
         'kwarran-input-peserta': {
           title: 'Manajemen Kursus — Input Data Peserta',
-          subtitle: `Pendataan peserta kursus untuk Kwarran ${getActiveKwarranName()}`
+          subtitle: `Pengelolaan data peserta kursus Kwartir Ranting ${scope.kwarranName}`
         }
       };
 
-      const meta = pageMeta[route] || { title: 'Dashboard', subtitle: '' };
-      document.getElementById('page-title').textContent = meta.title;
-      document.getElementById('page-subtitle').textContent = meta.subtitle;
+      const info = metaMap[routeId] || metaMap['dashboard'];
+      titleEl.textContent = info.title;
+      subEl.textContent = info.subtitle;
 
-      const main = document.getElementById('main-content');
-      switch (route) {
+      switch (routeId) {
         case 'dashboard':
           renderDashboardView(main);
           break;
@@ -1470,20 +1144,156 @@
           renderDashboardView(main);
       }
 
-      lucide.createIcons({ nodes: [main] });
+      lucide.createIcons();
     }
 
-    function destroyAllCharts() {
-      Object.values(chartsRegistry).forEach(chart => {
-        if (chart && typeof chart.destroy === 'function') {
-          chart.destroy();
+    // =========================================================================
+    // 6. UTILITAS UI, BRANDING LOGO, TOAST, & MODAL
+    // =========================================================================
+    function getLogoHtml() {
+      if (appData.profile && appData.profile.logoUrl) {
+        return `<img src="${appData.profile.logoUrl}" alt="Logo Pusdiklatcab Tangerang" class="w-full h-full object-contain rounded-lg" />`;
+      }
+      return `
+        <svg viewBox="0 0 64 64" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M32 4L56 14V31C56 45.8 45.7 57.5 32 61C18.3 57.5 8 45.8 8 31V14L32 4Z" fill="#3E2723" stroke="#D4AF37" stroke-width="3"/>
+          <path d="M32 10L50 17.5V30.5C50 42.2 42.1 51.6 32 54.6C21.9 51.6 14 42.2 14 30.5V17.5L32 10Z" fill="#2E5A36"/>
+          <path d="M32 15C34.2 21 34.5 26 32 31C29.5 26 29.8 21 32 15Z" fill="#D4AF37"/>
+          <path d="M23 26C27 26.5 29.5 28.5 31 32C26.5 32 24 30 23 26Z" fill="#D4AF37"/>
+          <path d="M41 26C37 26.5 34.5 28.5 33 32C37.5 32 40 30 41 26Z" fill="#D4AF37"/>
+          <rect x="30.5" y="31" width="3" height="16" rx="1.5" fill="#F3E5AB"/>
+          <circle cx="32" cy="36" r="3" fill="#D4AF37"/>
+        </svg>
+      `;
+    }
+
+    function renderBrandLogos() {
+      const logoMarkup = getLogoHtml();
+      ['login-logo-wrapper', 'sidebar-logo-wrapper', 'header-logo-wrapper'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = logoMarkup;
+      });
+      const kapusEl = document.getElementById('sidebar-kapus-name');
+      if (kapusEl && appData.profile) {
+        kapusEl.textContent = appData.profile.namaKapus;
+      }
+    }
+
+    function toggleMobileSidebar(open) {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      if (open) {
+        sidebar.classList.remove('-translate-x-full');
+        backdrop.classList.remove('hidden');
+      } else {
+        sidebar.classList.add('-translate-x-full');
+        backdrop.classList.add('hidden');
+      }
+    }
+
+    function destroyActiveCharts() {
+      Object.values(chartsRegistry).forEach(ch => {
+        if (ch && typeof ch.destroy === 'function') {
+          ch.destroy();
         }
       });
       chartsRegistry = {};
     }
 
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const styles = {
+        success: 'bg-scout-forest text-white border-emerald-400',
+        error: 'bg-red-700 text-white border-red-400',
+        info: 'bg-scout-dark text-white border-scout-gold'
+      };
+      const icons = {
+        success: 'check-circle-2',
+        error: 'alert-circle',
+        info: 'info'
+      };
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold transition-all duration-300 ${styles[type] || styles.info}`;
+      toast.innerHTML = `
+        <i data-lucide="${icons[type] || 'info'}" class="w-4 h-4 shrink-0 text-scout-gold"></i>
+        <span class="flex-1 leading-snug">${escapeHtml(message)}</span>
+      `;
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(16px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3200);
+    }
+
+    function openFormModal(title, bodyHtml) {
+      document.getElementById('form-modal-title').textContent = title;
+      document.getElementById('form-modal-body').innerHTML = bodyHtml;
+      const modal = document.getElementById('form-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function closeFormModal() {
+      const modal = document.getElementById('form-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function openConfirmModal(title, message, onConfirm) {
+      document.getElementById('confirm-title').textContent = title;
+      document.getElementById('confirm-message').textContent = message;
+      const modal = document.getElementById('confirm-modal');
+      const okBtn = document.getElementById('confirm-ok-btn');
+      const cancelBtn = document.getElementById('confirm-cancel-btn');
+
+      const cleanup = () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+      };
+
+      cancelBtn.onclick = cleanup;
+      okBtn.onclick = () => {
+        cleanup();
+        if (typeof onConfirm === 'function') onConfirm();
+      };
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function generateId(prefix = 'id') {
+      return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function formatDateIndo(dateStr) {
+      if (!dateStr) return '-';
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return dateStr;
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      const mIdx = parseInt(parts[1], 10) - 1;
+      return `${parts[2]} ${months[mIdx] || parts[1]} ${parts[0]}`;
+    }
+
     // =========================================================================
-    // 7. VIEW: DASHBOARD (UNTUK SEMUA ROLE, ADAPTIF UNTUK KWARRAN)
+    // 7. VIEW: DASHBOARD (TERFILTER KETAT SESUAI ROLE & WILAYAH KWARRAN)
     // =========================================================================
     function renderDashboardView(container) {
       const scope = getActiveKwarranScope();
@@ -1503,7 +1313,7 @@
       const myKwarranCourses = getScopedKwarranCourses();
       const myKwarranParticipants = getScopedKwarranParticipants();
 
-      // Jadwal kursus terfilter ketat untuk Kwarran aktif (hanya kegiatan di wilayah Kwarran tersebut atau kursus mandiri Kwarran)
+      // Jadwal kursus terfilter ketat untuk Kwarran aktif (hanya kursus wilayah Kwarran tersebut)
       const dashboardScheduleRows = isKwarran
         ? myKwarranCourses.map(kc => {
             const cnt = appData.kwarranParticipants.filter(
@@ -1526,11 +1336,161 @@
           }));
 
       container.innerHTML = `
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <!-- Kartu Upload Logo -->
-          <div class="lg:col-span-5 bg-white rounded-2xl p-6 border border-scout-sand shadow-scout flex flex-col justify-between">
+        <!-- BANNER SAMBUTAN PRAMUKA -->
+        <div class="rounded-3xl bg-gradient-to-r from-scout-dark via-scout-brown to-scout-forestDark text-white p-6 sm:p-7 mb-6 shadow-scout border border-scout-gold/30 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-scout-gold/20 text-scout-gold border border-scout-gold/30 mb-2.5">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              <span>Salam Pramuka!</span>
+            </span>
+            <h3 class="text-xl sm:text-2xl font-extrabold tracking-tight">
+              Selamat Datang, ${escapeHtml(isKwarran ? `Kwarran ${myKwarran}` : currentUser.nama)}
+            </h3>
+            <p class="text-xs sm:text-sm text-scout-sand/90 mt-1.5 max-w-2xl leading-relaxed">
+              ${isKwarran
+                ? `Panel kendali <strong>Kwartir Ranting ${escapeHtml(myKwarran)}</strong>. Kelola penyelenggaraan kursus tingkat ranting, data potensi pembina, dan input data peserta secara terisolasi.`
+                : 'Sistem informasi terpadu pengelolaan data potensi pembina, jadwal kursus pendidikan & pelatihan, serta administrasi persuratan Pusdiklatcab Tangerang.'}
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+            ${isKwarran ? `
+              <button type="button" onclick="navigateTo('kwarran-daftar-kursus')"
+                class="px-4 py-2.5 rounded-xl bg-scout-gold hover:bg-amber-400 text-scout-dark font-extrabold text-xs flex items-center gap-2 shadow-sm transition">
+                <i data-lucide="calendar-plus" class="w-4 h-4"></i>
+                <span>Buat Kursus Baru</span>
+              </button>
+              <button type="button" onclick="navigateTo('kwarran-input-peserta')"
+                class="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-bold text-xs flex items-center gap-2 transition">
+                <i data-lucide="user-plus" class="w-4 h-4 text-scout-gold"></i>
+                <span>Input Data Peserta</span>
+              </button>
+            ` : `
+              <button type="button" onclick="navigateTo('data-potensi')"
+                class="px-4 py-2.5 rounded-xl bg-scout-gold hover:bg-amber-400 text-scout-dark font-extrabold text-xs flex items-center gap-2 shadow-sm transition">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span>Kelola Data Potensi</span>
+              </button>
+              <button type="button" onclick="navigateTo('laporan')"
+                class="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-bold text-xs flex items-center gap-2 transition">
+                <i data-lucide="file-spreadsheet" class="w-4 h-4 text-scout-gold"></i>
+                <span>Unduh Laporan</span>
+              </button>
+            `}
+          </div>
+        </div>
+
+        <!-- 4 KARTU RINGKASAN STATISTIK -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5 mb-6">
+          <div class="bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout flex items-start justify-between">
             <div>
-              <h3 class="text-base font-extrabold text-scout-dark flex items-center gap-2">
+              <p class="text-[11px] font-extrabold uppercase tracking-wider text-scout-medium">
+                ${isKwarran ? `Potensi Kwarran ${escapeHtml(myKwarran)}` : 'Total Data Potensi'}
+              </p>
+              <h4 class="text-2xl sm:text-3xl font-extrabold text-scout-dark mt-1.5">${totalPotensi}</h4>
+              <div class="flex items-center gap-2 mt-2 text-[11px] font-bold">
+                <span class="px-2 py-0.5 rounded bg-blue-50 text-blue-800">Putra: ${totalPutra}</span>
+                <span class="px-2 py-0.5 rounded bg-pink-50 text-pink-800">Putri: ${totalPutri}</span>
+              </div>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-scout-cream border border-scout-sand text-scout-dark flex items-center justify-center shrink-0">
+              <i data-lucide="users" class="w-5 h-5"></i>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout flex items-start justify-between">
+            <div>
+              <p class="text-[11px] font-extrabold uppercase tracking-wider text-scout-medium">
+                ${isKwarran ? 'Kursus Kwarran Anda' : 'Kegiatan Kursus'}
+              </p>
+              <h4 class="text-2xl sm:text-3xl font-extrabold text-scout-dark mt-1.5">
+                ${isKwarran ? myKwarranCourses.length : appData.kursus.length}
+              </h4>
+              <p class="text-[11px] text-gray-500 mt-2 font-medium">
+                ${isKwarran
+                  ? `Total ${myKwarranParticipants.length} peserta kursus terdaftar`
+                  : `Aktif: ${kursusAktif} • Selesai: ${kursusSelesai}`}
+              </p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 text-scout-forest flex items-center justify-center shrink-0">
+              <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout flex items-start justify-between">
+            <div>
+              <p class="text-[11px] font-extrabold uppercase tracking-wider text-scout-medium">
+                ${isKwarran ? 'Peserta Kursus Kwarran' : 'Arsip Persuratan'}
+              </p>
+              <h4 class="text-2xl sm:text-3xl font-extrabold text-scout-dark mt-1.5">
+                ${isKwarran ? myKwarranParticipants.length : (appData.suratMasuk.length + appData.suratKeluar.length)}
+              </h4>
+              <p class="text-[11px] text-gray-500 mt-2 font-medium">
+                ${isKwarran
+                  ? `Tersebar di ${myKwarranCourses.length} jadwal pelatihan`
+                  : `Masuk: ${appData.suratMasuk.length} • Keluar: ${appData.suratKeluar.length}`}
+              </p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center shrink-0">
+              <i data-lucide="${isKwarran ? 'user-check' : 'mail'}" class="w-5 h-5"></i>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout flex items-start justify-between">
+            <div>
+              <p class="text-[11px] font-extrabold uppercase tracking-wider text-scout-medium">Korps Pelatih (KPD/KPL)</p>
+              <h4 class="text-2xl sm:text-3xl font-extrabold text-scout-dark mt-1.5">${totalKpdKpl}</h4>
+              <p class="text-[11px] text-gray-500 mt-2 font-medium">
+                ${isKwarran ? `Kualifikasi Pelatih di ${escapeHtml(myKwarran)}` : 'Kualifikasi Pelatih Dasar & Lanjutan'}
+              </p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-yellow-50 border border-yellow-200 text-amber-700 flex items-center justify-center shrink-0">
+              <i data-lucide="award" class="w-5 h-5"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- VISUALISASI GRAFIK (CHART.JS) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-6">
+          <div class="lg:col-span-5 bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout">
+            <div class="mb-3">
+              <h4 class="font-bold text-sm text-scout-dark">Sebaran Jenjang Kursus Pembina</h4>
+              <p class="text-[11px] text-gray-500">
+                ${isKwarran ? `Klasifikasi jenjang khusus Kwarran ${escapeHtml(myKwarran)}` : 'Klasifikasi Belum Kursus, KMD, KML, KPD, dan KPL'}
+              </p>
+            </div>
+            <div class="h-56 relative">
+              <canvas id="chart-jenjang"></canvas>
+            </div>
+          </div>
+
+          <div class="lg:col-span-3 bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout">
+            <div class="mb-3">
+              <h4 class="font-bold text-sm text-scout-dark">Komposisi Gender</h4>
+              <p class="text-[11px] text-gray-500">
+                ${isKwarran ? `Putra & Putri Kwarran ${escapeHtml(myKwarran)}` : 'Perbandingan Putra & Putri'}
+              </p>
+            </div>
+            <div class="h-56 relative">
+              <canvas id="chart-gender"></canvas>
+            </div>
+          </div>
+
+          <div class="lg:col-span-4 bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout">
+            <div class="mb-3">
+              <h4 class="font-bold text-sm text-scout-dark">
+                ${isKwarran ? `Sebaran Pangkalan Kwarran ${escapeHtml(myKwarran)}` : 'Top Kwarran Berbasis Potensi'}
+              </h4>
+              <p class="text-[11px] text-gray-500">
+                ${isKwarran ? `Distribusi pembina per gugus depan di ${escapeHtml(myKwarran)}` : 'Distribusi pembina per Kwartir Ranting'}
+              </p>
+            </div>
+            <div class="h-56 relative">
+              <canvas id="chart-kwarran"></canvas>
+            </div>
+          </div>
+        </div>
+
         <!-- TABEL JADWAL KURSUS & PENGAJUAN KWARRAN -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
           <div class="lg:col-span-7 bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout">
@@ -1634,6 +1594,221 @@
       `;
 
       initDashboardCharts(filteredPotensi);
+    }
+
+    function initDashboardCharts(dataset) {
+      if (typeof Chart === 'undefined') return;
+      const scope = getActiveKwarranScope();
+
+      // 1. Chart Jenjang Kursus
+      const jenjangCounts = JENJANG_OPTIONS.map(j => dataset.filter(p => p.jenjang === j).length);
+      const ctxJenjang = document.getElementById('chart-jenjang');
+      if (ctxJenjang) {
+        chartsRegistry.jenjang = new Chart(ctxJenjang, {
+          type: 'bar',
+          data: {
+            labels: JENJANG_OPTIONS,
+            datasets: [{
+              label: 'Jumlah Pembina',
+              data: jenjangCounts,
+              backgroundColor: ['#A1887F', '#2E5A36', '#4E342E', '#D4AF37', '#3E2723'],
+              borderRadius: 8
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 } } },
+              x: { ticks: { font: { size: 11, weight: '600' } } }
+            }
+          }
+        });
+      }
+
+      // 2. Chart Gender
+      const putra = dataset.filter(p => p.gender === 'Putra').length;
+      const putri = dataset.filter(p => p.gender === 'Putri').length;
+      const ctxGender = document.getElementById('chart-gender');
+      if (ctxGender) {
+        chartsRegistry.gender = new Chart(ctxGender, {
+          type: 'doughnut',
+          data: {
+            labels: ['Putra', 'Putri'],
+            datasets: [{
+              data: [putra, putri],
+              backgroundColor: ['#3E2723', '#D4AF37'],
+              borderWidth: 2,
+              borderColor: '#FFFFFF'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '62%',
+            plugins: {
+              legend: { position: 'bottom', labels: { font: { size: 11, weight: '600' } } }
+            }
+          }
+        });
+      }
+
+      // 3. Chart Top Kwarran (untuk Cabang) atau Top Pangkalan (untuk Kwarran aktif)
+      const groupCounts = {};
+      dataset.forEach(p => {
+        const labelKey = scope.isKwarran
+          ? (p.pangkalan || `Gudep ${scope.kwarranName}`)
+          : p.kwarran;
+        groupCounts[labelKey] = (groupCounts[labelKey] || 0) + 1;
+      });
+      const sortedGroups = Object.entries(groupCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6);
+
+      const ctxKwarran = document.getElementById('chart-kwarran');
+      if (ctxKwarran) {
+        chartsRegistry.kwarran = new Chart(ctxKwarran, {
+          type: 'bar',
+          data: {
+            labels: sortedGroups.map(x => x[0]),
+            datasets: [{
+              label: 'Pembina',
+              data: sortedGroups.map(x => x[1]),
+              backgroundColor: '#2E5A36',
+              borderRadius: 6
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 } } },
+              y: { ticks: { font: { size: 11, weight: '600' } } }
+            }
+          }
+        });
+      }
+    }
+
+    // =========================================================================
+    // 8. VIEW: PROFILE PUSDIKLATCAB (ADMIN: EDIT KAPUSDIKLATCAB & UPLOAD LOGO)
+    // =========================================================================
+    function renderProfileView(container) {
+      const p = appData.profile;
+      container.innerHTML = `
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Kartu Upload Logo -->
+          <div class="lg:col-span-5 bg-white rounded-2xl p-6 border border-scout-sand shadow-scout flex flex-col justify-between">
+            <div>
+              <h3 class="text-base font-extrabold text-scout-dark flex items-center gap-2">
+                <i data-lucide="image" class="w-5 h-5 text-scout-forest"></i>
+                <span>Logo Resmi Pusdiklatcab Tangerang</span>
+              </h3>
+              <p class="text-xs text-gray-500 mt-1">
+                Logo ini otomatis ditampilkan pada Sidebar, Header, Halaman Login, dan Kop Dokumen Laporan.
+              </p>
+
+              <div class="mt-6 p-6 rounded-2xl bg-scout-cream border-2 border-dashed border-scout-khaki flex flex-col items-center justify-center text-center">
+                <div class="w-28 h-28 rounded-2xl bg-white p-3 shadow-md border border-scout-sand flex items-center justify-center mb-4">
+                  ${getLogoHtml()}
+                </div>
+                <p class="text-xs font-bold text-scout-dark">Pratinjau Logo Aktif</p>
+                <p class="text-[11px] text-gray-500 mt-0.5">Format disarankan: PNG / SVG / JPG (Maks. 1.5 MB)</p>
+
+                <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  <label class="cursor-pointer px-4 py-2.5 rounded-xl bg-scout-dark hover:bg-scout-brown text-white text-xs font-bold inline-flex items-center gap-2 shadow-sm transition">
+                    <i data-lucide="upload" class="w-4 h-4 text-scout-gold"></i>
+                    <span>Unggah Logo Baru</span>
+                    <input type="file" accept="image/*" onchange="handleLogoUpload(event)" class="hidden" />
+                  </label>
+                  ${p.logoUrl ? `
+                    <button type="button" onclick="resetProfileLogo()" class="px-3.5 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold border border-red-200 transition">
+                      Gunakan Default
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-6 p-4 rounded-xl bg-emerald-50/80 border border-emerald-200 text-xs text-emerald-900">
+              <strong>Catatan Sistem:</strong> Perubahan logo tersimpan otomatis di penyimpanan browser dan langsung berlaku di seluruh dokumen cetak.
+            </div>
+          </div>
+
+          <!-- Form Identitas Kapusdiklatcab -->
+          <div class="lg:col-span-7 bg-white rounded-2xl p-6 border border-scout-sand shadow-scout">
+            <h3 class="text-base font-extrabold text-scout-dark flex items-center gap-2">
+              <i data-lucide="award" class="w-5 h-5 text-scout-gold"></i>
+              <span>Identitas Kepala Pusdiklatcab & Sekretariat</span>
+            </h3>
+            <p class="text-xs text-gray-500 mt-1">
+              Perbarui nama Kapusdiklatcab Tangerang yang akan tercantum pada panel navigasi dan pengesahan laporan.
+            </p>
+
+            <form id="profile-form" onsubmit="saveProfileForm(event)" class="mt-6 space-y-4">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
+                  Nama Lengkap Kapusdiklatcab (Beserta Gelar) <span class="text-red-600">*</span>
+                </label>
+                <input type="text" id="prof-nama-kapus" required value="${escapeHtml(p.namaKapus)}"
+                  class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm font-semibold text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
+                    Nomor Tanda Anggota (NTA)
+                  </label>
+                  <input type="text" id="prof-nta" value="${escapeHtml(p.ntaKapus || '')}"
+                    class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm font-medium text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                </div>
+                <div>
+                  <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
+                    Periode Masa Bakti
+                  </label>
+                  <input type="text" id="prof-masa-bakti" value="${escapeHtml(p.masaBakti || '')}"
+                    class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm font-medium text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
+                    Telepon Sekretariat
+                  </label>
+                  <input type="text" id="prof-telepon" value="${escapeHtml(p.telepon || '')}"
+                    class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm font-medium text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                </div>
+                <div>
+                  <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
+                    Email Resmi
+                  </label>
+                  <input type="email" id="prof-email" value="${escapeHtml(p.email || '')}"
+                    class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm font-medium text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
+                  Alamat Sanggar Bakti / Sekretariat Pusdiklatcab
+                </label>
+                <textarea id="prof-alamat" rows="2"
+                  class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm font-medium text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none">${escapeHtml(p.alamat || '')}</textarea>
+              </div>
+
+              <div class="pt-2 flex justify-end">
+                <button type="submit" class="px-6 py-3 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white font-bold text-xs sm:text-sm shadow-md flex items-center gap-2 transition">
+                  <i data-lucide="save" class="w-4 h-4 text-scout-gold"></i>
+                  <span>Simpan Perubahan Profile</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      `;
     }
 
     function handleLogoUpload(event) {
