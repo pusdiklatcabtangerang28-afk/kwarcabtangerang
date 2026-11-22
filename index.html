@@ -390,6 +390,7 @@
     // 1. KONSTANTA & DATA REFERENSI WILAYAH TANGERANG
     // =========================================================================
     const STORAGE_KEY = 'pusdiklatcab_tangerang_v1';
+    const SESSION_STORAGE_KEY = 'pusdiklatcab_tangerang_session_v1';
 
     const KWARRAN_LIST = [
       'Tigaraksa', 'Cikupa', 'Balaraja', 'Pasar Kemis', 'Curug',
@@ -402,6 +403,36 @@
 
     const JENJANG_OPTIONS = ['Belum Kursus', 'KMD', 'KML', 'KPD', 'KPL'];
     const GOLONGAN_OPTIONS = ['Siaga', 'Penggalang', 'Penegak', 'Pandega'];
+
+    // Utilitas normalisasi & resolusi identitas Kwarran secara deterministik
+    function normalizeKwarranName(rawValue) {
+      if (!rawValue || typeof rawValue !== 'string') return '';
+      const cleaned = rawValue
+        .replace(/^(kwartir\s+ranting|kwarran)\s*[:\-]?\s*/i, '')
+        .trim();
+      if (!cleaned) return '';
+      const matched = KWARRAN_LIST.find(k => k.toLowerCase() === cleaned.toLowerCase());
+      return matched || cleaned;
+    }
+
+    function buildKwarranMetadata(rawName) {
+      const normalized = normalizeKwarranName(rawName);
+      if (!normalized) {
+        return { kwarranName: '', kwarran_id: '', kode_kwarran: '', wilayah: '' };
+      }
+      const slug = normalized.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      const codeSuffix = normalized
+        .split(/\s+/)
+        .map(w => w.slice(0, 3).toUpperCase())
+        .join('')
+        .slice(0, 4);
+      return {
+        kwarranName: normalized,
+        kwarran_id: `kwarran_${slug}`,
+        kode_kwarran: `KWR-${codeSuffix}`,
+        wilayah: `Kwartir Ranting ${normalized}`
+      };
+    }
 
     // Default SVG Logo Pusdiklatcab Tangerang (Tunas Kelapa + Perisai Emas)
     const DEFAULT_LOGO_SVG = `
@@ -441,11 +472,12 @@
           logoUrl: '' // kosong berarti gunakan DEFAULT_LOGO_SVG
         },
         users: [
-          { id: 'u1', nama: 'Admin Utama', password: 'admin123', role: 'Admin', kwarranName: '' },
-          { id: 'u2', nama: 'Kak Drs. H. Ahmad Fauzi, M.Pd.', password: 'pelatih123', role: 'Pelatih', kwarranName: '' },
-          { id: 'u3', nama: 'Kak Rina Wulandari, S.Pd.', password: 'panitia123', role: 'Panitia', kwarranName: '' },
-          { id: 'u4', nama: 'Kwarran Tigaraksa', password: 'kwarran123', role: 'Kwarran', kwarranName: 'Tigaraksa' },
-          { id: 'u5', nama: 'Kwarran Cikupa', password: 'kwarran123', role: 'Kwarran', kwarranName: 'Cikupa' }
+          { id: 'u1', nama: 'Admin Utama', password: 'admin123', role: 'Admin', kwarranName: '', kwarran_id: '', kode_kwarran: '', wilayah: '' },
+          { id: 'u2', nama: 'Kak Drs. H. Ahmad Fauzi, M.Pd.', password: 'pelatih123', role: 'Pelatih', kwarranName: '', kwarran_id: '', kode_kwarran: '', wilayah: '' },
+          { id: 'u3', nama: 'Kak Rina Wulandari, S.Pd.', password: 'panitia123', role: 'Panitia', kwarranName: '', kwarran_id: '', kode_kwarran: '', wilayah: '' },
+          { id: 'u4', nama: 'Kwarran Tigaraksa', password: 'kwarran123', role: 'Kwarran', kwarranName: 'Tigaraksa', kwarran_id: 'kwarran_tigaraksa', kode_kwarran: 'KWR-TIG', wilayah: 'Kwartir Ranting Tigaraksa' },
+          { id: 'u5', nama: 'Kwarran Cikupa', password: 'kwarran123', role: 'Kwarran', kwarranName: 'Cikupa', kwarran_id: 'kwarran_cikupa', kode_kwarran: 'KWR-CIK', wilayah: 'Kwartir Ranting Cikupa' },
+          { id: 'u6', nama: 'Kwarran Curug', password: 'kwarran123', role: 'Kwarran', kwarranName: 'Curug', kwarran_id: 'kwarran_curug', kode_kwarran: 'KWR-CRG', wilayah: 'Kwartir Ranting Curug' }
         ],
         potensi: [
           { id: 'p1', nama: 'Kak Drs. H. Ahmad Fauzi, M.Pd.', jenjang: 'KPL', gender: 'Putra', kwarran: 'Tigaraksa', pangkalan: 'SMAN 1 Kabupaten Tangerang' },
@@ -465,7 +497,9 @@
           { id: 'p15', nama: 'Kak Irfan Hakim, S.T.', jenjang: 'KMD', gender: 'Putra', kwarran: 'Rajeg', pangkalan: 'SMAN 14 Kabupaten Tangerang' },
           { id: 'p16', nama: 'Kak Sri Wahyuni, S.Pd.', jenjang: 'KPD', gender: 'Putri', kwarran: 'Ciledug', pangkalan: 'SMAN 3 Kota Tangerang' },
           { id: 'p17', nama: 'Kak Taufik Hidayat, S.Pd.I.', jenjang: 'Belum Kursus', gender: 'Putra', kwarran: 'Sepatan', pangkalan: 'MI Al-Husna Sepatan' },
-          { id: 'p18', nama: 'Kak Melati Puspa Indah, S.Pd.', jenjang: 'KMD', gender: 'Putri', kwarran: 'Periuk', pangkalan: 'SDN Periuk 4' }
+          { id: 'p18', nama: 'Kak Melati Puspa Indah, S.Pd.', jenjang: 'KMD', gender: 'Putri', kwarran: 'Periuk', pangkalan: 'SDN Periuk 4' },
+          { id: 'p19', nama: 'Kak Endang Sulastri, S.Pd.', jenjang: 'KML', gender: 'Putri', kwarran: 'Curug', pangkalan: 'SDN Curug Kulon 01' },
+          { id: 'p20', nama: 'Kak Wahyu Hidayatullah, S.Pd.I.', jenjang: 'Belum Kursus', gender: 'Putra', kwarran: 'Curug', pangkalan: 'SMPN 1 Curug' }
         ],
         kursus: [
           {
@@ -574,6 +608,7 @@
           {
             id: 'kc1',
             kwarran: 'Tigaraksa',
+            kwarran_id: 'kwarran_tigaraksa',
             namaKursus: 'KMD Golongan Siaga & Penggalang Kwarran Tigaraksa',
             hari: 'Jumat - Minggu',
             tanggal: '2026-12-11 s.d. 2026-12-13',
@@ -583,11 +618,22 @@
           {
             id: 'kc2',
             kwarran: 'Cikupa',
+            kwarran_id: 'kwarran_cikupa',
             namaKursus: 'Orientasi Pembina Gugus Depan Kwarran Cikupa',
             hari: 'Sabtu - Minggu',
             tanggal: '2026-12-19 s.d. 2026-12-20',
             lokasi: 'SMPN 1 Cikupa, Tangerang',
             createdAt: '2026-11-19'
+          },
+          {
+            id: 'kc3',
+            kwarran: 'Curug',
+            kwarran_id: 'kwarran_curug',
+            namaKursus: 'KMD Mandiri Pembina Gudep Kwarran Curug',
+            hari: 'Jumat - Minggu',
+            tanggal: '2026-12-18 s.d. 2026-12-20',
+            lokasi: 'Bumi Perkemahan Kitri Bakti & SDN Curug Kulon 01',
+            createdAt: '2026-11-20'
           }
         ],
         kwarranParticipants: [
@@ -595,6 +641,7 @@
             id: 'kp1',
             courseId: 'kc1',
             kwarran: 'Tigaraksa',
+            kwarran_id: 'kwarran_tigaraksa',
             namaGelar: 'Siti Nurhaliza, S.Pd.',
             tempatLahir: 'Tangerang',
             tanggalLahir: '1995-04-12',
@@ -605,6 +652,7 @@
             id: 'kp2',
             courseId: 'kc1',
             kwarran: 'Tigaraksa',
+            kwarran_id: 'kwarran_tigaraksa',
             namaGelar: 'Ahmad Fajar Shodiq, S.Pd.I.',
             tempatLahir: 'Serang',
             tanggalLahir: '1992-08-24',
@@ -615,11 +663,34 @@
             id: 'kp3',
             courseId: 'kc2',
             kwarran: 'Cikupa',
+            kwarran_id: 'kwarran_cikupa',
             namaGelar: 'Rizka Amalia Putri, S.Pd.',
             tempatLahir: 'Tangerang',
             tanggalLahir: '1997-01-15',
             golongan: 'Penegak',
             namaPangkalan: 'SMAN 4 Kabupaten Tangerang'
+          },
+          {
+            id: 'kp4',
+            courseId: 'kc3',
+            kwarran: 'Curug',
+            kwarran_id: 'kwarran_curug',
+            namaGelar: 'Nadia Rahmawati, S.Pd.',
+            tempatLahir: 'Tangerang',
+            tanggalLahir: '1996-06-18',
+            golongan: 'Siaga',
+            namaPangkalan: 'SDN Curug Kulon 01'
+          },
+          {
+            id: 'kp5',
+            courseId: 'kc3',
+            kwarran: 'Curug',
+            kwarran_id: 'kwarran_curug',
+            namaGelar: 'Dimas Prasetyo Nugroho, S.Or.',
+            tempatLahir: 'Jakarta',
+            tanggalLahir: '1993-11-05',
+            golongan: 'Penggalang',
+            namaPangkalan: 'SMPN 1 Curug'
           }
         ]
       };
@@ -656,20 +727,125 @@
       kwarranEditingParticipantId: null
     };
 
+    function resetUiStateForSession(userObj = null) {
+      uiState.potensiSearch = '';
+      uiState.potensiJenjang = 'ALL';
+      uiState.potensiGender = 'ALL';
+      uiState.potensiPage = 1;
+      uiState.kursusSearch = '';
+      uiState.kursusStatus = 'ALL';
+      uiState.adminTab = 'masuk';
+      uiState.suratSearch = '';
+      uiState.suratStatus = 'ALL';
+      uiState.laporanType = 'potensi';
+      uiState.laporanJenjang = 'ALL';
+      uiState.revealedPasswords = {};
+      uiState.kwarranSelectedCourseId = null;
+      uiState.kwarranParticipantSearch = '';
+      uiState.kwarranEditingParticipantId = null;
+
+      if (userObj && userObj.role === 'Kwarran') {
+        const kwName = normalizeKwarranName(userObj.kwarranName || userObj.nama);
+        uiState.potensiKwarran = kwName || 'ALL';
+        uiState.laporanKwarran = kwName || 'ALL';
+      } else {
+        uiState.potensiKwarran = 'ALL';
+        uiState.laporanKwarran = 'ALL';
+      }
+    }
+
+    function migrateAndNormalizeAppData(mergedData, defaults) {
+      let changed = false;
+
+      // 1. Pastikan seluruh user Kwarran memiliki kwarranName, kwarran_id, kode_kwarran, wilayah
+      mergedData.users = (mergedData.users || []).map(u => {
+        if (u.role === 'Kwarran') {
+          const meta = buildKwarranMetadata(u.kwarranName || u.nama);
+          if (
+            u.kwarranName !== meta.kwarranName ||
+            u.kwarran_id !== meta.kwarran_id ||
+            u.kode_kwarran !== meta.kode_kwarran ||
+            u.wilayah !== meta.wilayah
+          ) {
+            changed = true;
+            return { ...u, ...meta };
+          }
+        }
+        return u;
+      });
+
+      // 2. Pastikan seed user bawaan (termasuk Kwarran Curug) tersedia bila belum ada
+      defaults.users.forEach(defUser => {
+        const exists = mergedData.users.some(u =>
+          u.nama.toLowerCase() === defUser.nama.toLowerCase() ||
+          (defUser.role === 'Kwarran' && u.role === 'Kwarran' &&
+            normalizeKwarranName(u.kwarranName || u.nama).toLowerCase() === defUser.kwarranName.toLowerCase())
+        );
+        if (!exists) {
+          mergedData.users.push({ ...defUser });
+          changed = true;
+        }
+      });
+
+      // 3. Sinkronkan seed potensi, kwarranCourses, dan kwarranParticipants milik Curug jika belum ada
+      defaults.potensi.forEach(defPot => {
+        if (!mergedData.potensi.some(p => p.id === defPot.id)) {
+          mergedData.potensi.push({ ...defPot });
+          changed = true;
+        }
+      });
+
+      mergedData.kwarranCourses = (mergedData.kwarranCourses || []).map(c => {
+        const meta = buildKwarranMetadata(c.kwarran);
+        if (c.kwarran !== meta.kwarranName || c.kwarran_id !== meta.kwarran_id) {
+          changed = true;
+          return { ...c, kwarran: meta.kwarranName, kwarran_id: meta.kwarran_id };
+        }
+        return c;
+      });
+      defaults.kwarranCourses.forEach(defCourse => {
+        if (!mergedData.kwarranCourses.some(c => c.id === defCourse.id)) {
+          mergedData.kwarranCourses.push({ ...defCourse });
+          changed = true;
+        }
+      });
+
+      mergedData.kwarranParticipants = (mergedData.kwarranParticipants || []).map(p => {
+        const meta = buildKwarranMetadata(p.kwarran);
+        if (p.kwarran !== meta.kwarranName || p.kwarran_id !== meta.kwarran_id) {
+          changed = true;
+          return { ...p, kwarran: meta.kwarranName, kwarran_id: meta.kwarran_id };
+        }
+        return p;
+      });
+      defaults.kwarranParticipants.forEach(defPart => {
+        if (!mergedData.kwarranParticipants.some(p => p.id === defPart.id)) {
+          mergedData.kwarranParticipants.push({ ...defPart });
+          changed = true;
+        }
+      });
+
+      return { data: mergedData, changed };
+    }
+
     function loadAppData() {
+      const defaults = getInitialData();
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
-          const defaults = getInitialData();
-          return { ...defaults, ...parsed };
+          const merged = { ...defaults, ...parsed };
+          const { data: migrated, changed } = migrateAndNormalizeAppData(merged, defaults);
+          if (changed) {
+            saveAppData(migrated);
+          }
+          return migrated;
         }
       } catch (e) {
         console.error('Gagal membaca localStorage:', e);
       }
-      const initial = getInitialData();
-      saveAppData(initial);
-      return initial;
+      saveAppData(defaults);
+      return defaults;
     }
 
     function saveAppData(dataObj = appData) {
@@ -842,9 +1018,20 @@
       const inputPass = document.getElementById('login-password').value;
       const errorBox = document.getElementById('login-error');
 
-      const matchedUser = appData.users.find(
-        u => u.nama.toLowerCase() === inputName.toLowerCase() && u.password === inputPass
-      );
+      // Pastikan data terbaru (termasuk akun hasil migrasi) dimuat sebelum autentikasi
+      appData = loadAppData();
+
+      const matchedUser = appData.users.find(u => {
+        if (u.password !== inputPass) return false;
+        if (u.nama.toLowerCase() === inputName.toLowerCase()) return true;
+        // Dukung pencocokan fleksibel untuk akun Kwarran (mis. "Curug" atau "Kwarran Curug")
+        if (u.role === 'Kwarran') {
+          const userKw = normalizeKwarranName(u.kwarranName || u.nama).toLowerCase();
+          const inputKw = normalizeKwarranName(inputName).toLowerCase();
+          return Boolean(userKw && inputKw && userKw === inputKw);
+        }
+        return false;
+      });
 
       if (!matchedUser) {
         errorBox.classList.remove('hidden');
@@ -854,12 +1041,44 @@
       }
 
       errorBox.classList.add('hidden');
-      currentUser = matchedUser;
+      establishUserSession(matchedUser, true);
+    });
 
-      // Inisialisasi kursus terpilih untuk role Kwarran
+    function establishUserSession(userRecord, showWelcomeToast = false) {
+      // Bentuk objek sesi dengan identitas Kwarran tervalidasi
+      if (userRecord.role === 'Kwarran') {
+        const meta = buildKwarranMetadata(userRecord.kwarranName || userRecord.nama);
+        currentUser = {
+          ...userRecord,
+          kwarranName: meta.kwarranName,
+          kwarran_id: meta.kwarran_id,
+          kode_kwarran: userRecord.kode_kwarran || meta.kode_kwarran,
+          wilayah: meta.wilayah
+        };
+      } else {
+        currentUser = { ...userRecord };
+      }
+
+      // Reset seluruh state filter/pilihan dari sesi sebelumnya agar tidak terjadi kebocoran data
+      resetUiStateForSession(currentUser);
+
+      // Simpan sesi aktif terisolasi ke localStorage
+      try {
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+          userId: currentUser.id,
+          role: currentUser.role,
+          kwarranName: currentUser.kwarranName || '',
+          kwarran_id: currentUser.kwarran_id || '',
+          kode_kwarran: currentUser.kode_kwarran || '',
+          wilayah: currentUser.wilayah || ''
+        }));
+      } catch (e) {
+        console.warn('Gagal menyimpan sesi ke localStorage:', e);
+      }
+
+      // Inisialisasi kursus terpilih khusus milik Kwarran yang sedang login
       if (currentUser.role === 'Kwarran') {
-        const myKwarran = getActiveKwarranName();
-        const myCourses = appData.kwarranCourses.filter(c => c.kwarran.toLowerCase() === myKwarran.toLowerCase());
+        const myCourses = getScopedKwarranCourses();
         uiState.kwarranSelectedCourseId = myCourses.length ? myCourses[0].id : null;
       }
 
@@ -869,25 +1088,109 @@
       updateUserHeaderUI();
       renderSidebar();
       navigateTo('dashboard');
-      showToast(`Selamat datang, ${currentUser.nama} (${currentUser.role})!`, 'success');
-    });
+
+      if (showWelcomeToast) {
+        const roleLabel = currentUser.role === 'Kwarran'
+          ? `Kwarran ${currentUser.kwarranName}`
+          : currentUser.role;
+        showToast(`Selamat datang, ${currentUser.nama} (${roleLabel})!`, 'success');
+      }
+    }
+
+    function restorePersistedSession() {
+      try {
+        const rawSession = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (!rawSession) return false;
+        const parsedSession = JSON.parse(rawSession);
+        if (!parsedSession || !parsedSession.userId) return false;
+
+        const userFound = appData.users.find(u => u.id === parsedSession.userId);
+        if (!userFound) {
+          localStorage.removeItem(SESSION_STORAGE_KEY);
+          return false;
+        }
+        establishUserSession(userFound, false);
+        return true;
+      } catch (e) {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        return false;
+      }
+    }
 
     function handleLogout() {
       currentUser = null;
+      currentRoute = 'dashboard';
+      resetUiStateForSession(null);
       destroyAllCharts();
+      try {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch (e) {
+        console.warn('Gagal menghapus sesi dari localStorage:', e);
+      }
       document.getElementById('app-shell').classList.add('hidden');
       document.getElementById('login-view').classList.remove('hidden');
+      document.getElementById('login-username').value = '';
       document.getElementById('login-password').value = '';
       showToast('Anda telah keluar dari sistem PUSDIKLATCAB Tangerang.', 'info');
     }
 
-    function getActiveKwarranName() {
-      if (!currentUser || currentUser.role !== 'Kwarran') return '';
-      if (currentUser.kwarranName && currentUser.kwarranName.trim()) {
-        return currentUser.kwarranName.trim();
+    // Helper terpusat scope & isolasi data Kwarran (Zero Data Leakage)
+    function getActiveKwarranScope() {
+      if (!currentUser || currentUser.role !== 'Kwarran') {
+        return {
+          isKwarran: false,
+          kwarranName: '',
+          kwarran_id: '',
+          kode_kwarran: '',
+          wilayah: ''
+        };
       }
-      // Fallback ekstrak dari nama akun, misal "Kwarran Tigaraksa" -> "Tigaraksa"
-      return currentUser.nama.replace(/^kwarran\s+/i, '').trim() || 'Tigaraksa';
+      const meta = buildKwarranMetadata(currentUser.kwarranName || currentUser.nama);
+      return {
+        isKwarran: true,
+        kwarranName: meta.kwarranName,
+        kwarran_id: currentUser.kwarran_id || meta.kwarran_id,
+        kode_kwarran: currentUser.kode_kwarran || meta.kode_kwarran,
+        wilayah: currentUser.wilayah || meta.wilayah
+      };
+    }
+
+    function isSameKwarran(entityKwarran, scopeKwarran) {
+      const a = normalizeKwarranName(entityKwarran).toLowerCase();
+      const b = normalizeKwarranName(scopeKwarran).toLowerCase();
+      return Boolean(a && b && a === b);
+    }
+
+    function getActiveKwarranName() {
+      return getActiveKwarranScope().kwarranName;
+    }
+
+    function getScopedPotensiList() {
+      const scope = getActiveKwarranScope();
+      if (!scope.isKwarran) return appData.potensi;
+      return appData.potensi.filter(p => isSameKwarran(p.kwarran, scope.kwarranName));
+    }
+
+    function getScopedKwarranCourses() {
+      const scope = getActiveKwarranScope();
+      if (!scope.isKwarran) return appData.kwarranCourses;
+      return appData.kwarranCourses.filter(c =>
+        isSameKwarran(c.kwarran, scope.kwarranName) ||
+        (c.kwarran_id && scope.kwarran_id && c.kwarran_id === scope.kwarran_id)
+      );
+    }
+
+    function getScopedKwarranParticipants(courseId = null) {
+      const scope = getActiveKwarranScope();
+      const allowedCourseIds = new Set(getScopedKwarranCourses().map(c => c.id));
+      return appData.kwarranParticipants.filter(p => {
+        if (courseId && p.courseId !== courseId) return false;
+        if (!scope.isKwarran) return true;
+        const ownerMatch =
+          isSameKwarran(p.kwarran, scope.kwarranName) ||
+          (p.kwarran_id && scope.kwarran_id && p.kwarran_id === scope.kwarran_id);
+        return ownerMatch && allowedCourseIds.has(p.courseId);
+      });
     }
 
     function updateUserHeaderUI() {
@@ -1112,12 +1415,11 @@
     // 7. VIEW: DASHBOARD (UNTUK SEMUA ROLE, ADAPTIF UNTUK KWARRAN)
     // =========================================================================
     function renderDashboardView(container) {
-      const isKwarran = currentUser.role === 'Kwarran';
-      const myKwarran = getActiveKwarranName();
+      const scope = getActiveKwarranScope();
+      const isKwarran = scope.isKwarran;
+      const myKwarran = scope.kwarranName;
 
-      const filteredPotensi = isKwarran
-        ? appData.potensi.filter(p => p.kwarran.toLowerCase() === myKwarran.toLowerCase())
-        : appData.potensi;
+      const filteredPotensi = getScopedPotensiList();
 
       const totalPotensi = filteredPotensi.length;
       const totalPutra = filteredPotensi.filter(p => p.gender === 'Putra').length;
@@ -1127,12 +1429,8 @@
       const kursusAktif = appData.kursus.filter(k => k.status !== 'Selesai').length;
       const kursusSelesai = appData.kursus.filter(k => k.status === 'Selesai').length;
 
-      const myKwarranCourses = isKwarran
-        ? appData.kwarranCourses.filter(c => c.kwarran.toLowerCase() === myKwarran.toLowerCase())
-        : appData.kwarranCourses;
-      const myKwarranParticipants = isKwarran
-        ? appData.kwarranParticipants.filter(p => p.kwarran.toLowerCase() === myKwarran.toLowerCase())
-        : appData.kwarranParticipants;
+      const myKwarranCourses = getScopedKwarranCourses();
+      const myKwarranParticipants = getScopedKwarranParticipants();
 
       container.innerHTML = `
         <!-- Banner Sambutan Pramuka -->
@@ -1263,8 +1561,12 @@
           </div>
 
           <div class="lg:col-span-4 bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout">
-            <h4 class="font-bold text-sm text-scout-dark mb-1">Top Kwarran Data Potensi</h4>
-            <p class="text-xs text-gray-500 mb-4">Distribusi pembina per Kwartir Ranting</p>
+            <h4 class="font-bold text-sm text-scout-dark mb-1">
+              ${isKwarran ? `Sebaran Pangkalan Kwarran ${escapeHtml(myKwarran)}` : 'Top Kwarran Data Potensi'}
+            </h4>
+            <p class="text-xs text-gray-500 mb-4">
+              ${isKwarran ? `Distribusi pembina per gugus depan di ${escapeHtml(myKwarran)}` : 'Distribusi pembina per Kwartir Ranting'}
+            </p>
             <div class="h-64 relative">
               <canvas id="chart-kwarran"></canvas>
             </div>
@@ -1325,8 +1627,10 @@
               ` : ''}
             </div>
             <div class="space-y-3">
-              ${(isKwarran ? myKwarranCourses : appData.kwarranCourses).slice(0, 4).map(kc => {
-                const countPeserta = appData.kwarranParticipants.filter(p => p.courseId === kc.id).length;
+              ${myKwarranCourses.slice(0, 4).map(kc => {
+                const countPeserta = appData.kwarranParticipants.filter(
+                  p => p.courseId === kc.id && isSameKwarran(p.kwarran, kc.kwarran)
+                ).length;
                 return `
                   <div class="p-3.5 rounded-xl bg-scout-cream/60 border border-scout-sand/80 flex items-start justify-between gap-3">
                     <div>
@@ -1411,12 +1715,14 @@
         });
       }
 
-      // 3. Chart Kwarran (Top 6 Kwarran)
-      const kwarranMap = {};
-      appData.potensi.forEach(p => {
-        kwarranMap[p.kwarran] = (kwarranMap[p.kwarran] || 0) + 1;
+      // 3. Chart Kwarran (Top 6 Kwarran untuk Pusat, atau Top Pangkalan milik Kwarran untuk akun Kwarran)
+      const isKwarran = currentUser && currentUser.role === 'Kwarran';
+      const groupMap = {};
+      dataset.forEach(p => {
+        const key = isKwarran ? (p.pangkalan || `Gudep ${p.kwarran}`) : p.kwarran;
+        groupMap[key] = (groupMap[key] || 0) + 1;
       });
-      const sortedKwarran = Object.entries(kwarranMap)
+      const sortedGroup = Object.entries(groupMap)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 6);
 
@@ -1425,10 +1731,10 @@
         chartsRegistry.kwarran = new Chart(ctxKwarran, {
           type: 'bar',
           data: {
-            labels: sortedKwarran.map(item => item[0]),
+            labels: sortedGroup.map(item => item[0]),
             datasets: [{
               label: 'Pembina',
-              data: sortedKwarran.map(item => item[1]),
+              data: sortedGroup.map(item => item[1]),
               backgroundColor: '#2E5A36',
               borderRadius: 6
             }]
@@ -1608,13 +1914,14 @@
     // 9. VIEW: DATA POTENSI (SEMUA ROLE; KWARRAN OTOMATIS TERFILTER KWARRAN-NYA)
     // =========================================================================
     function renderDataPotensiView(container) {
-      const isKwarran = currentUser.role === 'Kwarran';
-      const lockedKwarran = isKwarran ? getActiveKwarranName() : null;
+      const scope = getActiveKwarranScope();
+      const isKwarran = scope.isKwarran;
+      const lockedKwarran = isKwarran ? scope.kwarranName : null;
 
-      // Filter dataset
-      let list = appData.potensi.filter(item => {
-        if (lockedKwarran && item.kwarran.toLowerCase() !== lockedKwarran.toLowerCase()) return false;
-        if (!lockedKwarran && uiState.potensiKwarran !== 'ALL' && item.kwarran !== uiState.potensiKwarran) return false;
+      // Filter dataset secara eksklusif sesuai scope sesi aktif
+      const scopeBase = getScopedPotensiList();
+      let list = scopeBase.filter(item => {
+        if (!lockedKwarran && uiState.potensiKwarran !== 'ALL' && !isSameKwarran(item.kwarran, uiState.potensiKwarran)) return false;
         if (uiState.potensiJenjang !== 'ALL' && item.jenjang !== uiState.potensiJenjang) return false;
         if (uiState.potensiGender !== 'ALL' && item.gender !== uiState.potensiGender) return false;
         if (uiState.potensiSearch) {
@@ -1627,11 +1934,6 @@
         }
         return true;
       });
-
-      // Rekap ringkas sebelum filter jenjang/gender (sesuai scope user)
-      const scopeBase = lockedKwarran
-        ? appData.potensi.filter(p => p.kwarran.toLowerCase() === lockedKwarran.toLowerCase())
-        : appData.potensi;
 
       const totalPages = Math.max(1, Math.ceil(list.length / uiState.potensiPerPage));
       if (uiState.potensiPage > totalPages) uiState.potensiPage = totalPages;
@@ -1862,18 +2164,29 @@
 
     function savePotensiForm(e, id) {
       e.preventDefault();
+      const scope = getActiveKwarranScope();
+      const resolvedKwarran = scope.isKwarran
+        ? scope.kwarranName
+        : normalizeKwarranName(document.getElementById('pot-kwarran').value);
+
       const payload = {
         id: id || generateId('pot'),
         nama: document.getElementById('pot-nama').value.trim(),
         jenjang: document.getElementById('pot-jenjang').value,
         gender: document.getElementById('pot-gender').value,
-        kwarran: document.getElementById('pot-kwarran').value.trim(),
+        kwarran: resolvedKwarran,
         pangkalan: document.getElementById('pot-pangkalan').value.trim()
       };
 
       if (id) {
         const idx = appData.potensi.findIndex(p => p.id === id);
-        if (idx !== -1) appData.potensi[idx] = payload;
+        if (idx !== -1) {
+          if (scope.isKwarran && !isSameKwarran(appData.potensi[idx].kwarran, scope.kwarranName)) {
+            showToast('Akses ditolak: Data milik Kwarran lain.', 'error');
+            return;
+          }
+          appData.potensi[idx] = payload;
+        }
         showToast('Data potensi pembina berhasil diperbarui.', 'success');
       } else {
         appData.potensi.unshift(payload);
@@ -1887,8 +2200,13 @@
     }
 
     function deletePotensi(id) {
+      const scope = getActiveKwarranScope();
       const target = appData.potensi.find(p => p.id === id);
       if (!target) return;
+      if (scope.isKwarran && !isSameKwarran(target.kwarran, scope.kwarranName)) {
+        showToast('Akses ditolak: Anda tidak dapat menghapus data Kwarran lain.', 'error');
+        return;
+      }
       openConfirmModal(
         'Hapus Data Potensi?',
         `Apakah Anda yakin ingin menghapus data pembina "${target.nama}" dari Kwarran ${target.kwarran}?`,
@@ -2401,8 +2719,9 @@
     // 12. VIEW: LAPORAN (EKSPOR CSV & CETAK KOP RESMI PUSDIKLATCAB)
     // =========================================================================
     function renderLaporanView(container) {
-      const isKwarran = currentUser.role === 'Kwarran';
-      const myKwarran = getActiveKwarranName();
+      const scope = getActiveKwarranScope();
+      const isKwarran = scope.isKwarran;
+      const myKwarran = scope.kwarranName;
 
       if (isKwarran) {
         uiState.laporanKwarran = myKwarran;
@@ -2413,9 +2732,11 @@
       let tableHtml = '';
 
       if (uiState.laporanType === 'potensi') {
-        reportTitle = 'LAPORAN REKAPITULASI DATA POTENSI PEMBINA PRAMUKA';
-        const rows = appData.potensi.filter(p => {
-          if (uiState.laporanKwarran !== 'ALL' && p.kwarran.toLowerCase() !== uiState.laporanKwarran.toLowerCase()) return false;
+        reportTitle = isKwarran
+          ? `LAPORAN DATA POTENSI PEMBINA PRAMUKA — KWARRAN ${myKwarran.toUpperCase()}`
+          : 'LAPORAN REKAPITULASI DATA POTENSI PEMBINA PRAMUKA';
+        const rows = getScopedPotensiList().filter(p => {
+          if (!isKwarran && uiState.laporanKwarran !== 'ALL' && !isSameKwarran(p.kwarran, uiState.laporanKwarran)) return false;
           if (uiState.laporanJenjang !== 'ALL' && p.jenjang !== uiState.laporanJenjang) return false;
           return true;
         });
@@ -2447,40 +2768,45 @@
           </table>
         `;
       } else if (uiState.laporanType === 'kursus') {
-        reportTitle = 'LAPORAN PELAKSANAAN KURSUS & PESERTA PELATIHAN';
-        const kwCourses = isKwarran
-          ? appData.kwarranCourses.filter(c => c.kwarran.toLowerCase() === myKwarran.toLowerCase())
-          : appData.kwarranCourses;
+        reportTitle = isKwarran
+          ? `LAPORAN PELAKSANAAN KURSUS & PESERTA — KWARRAN ${myKwarran.toUpperCase()}`
+          : 'LAPORAN PELAKSANAAN KURSUS & PESERTA PELATIHAN';
+        const kwCourses = getScopedKwarranCourses();
+        const kwParticipants = getScopedKwarranParticipants();
 
         tableHtml = `
-          <h4 class="font-bold text-xs uppercase text-scout-dark mb-2">A. Kursus Tingkat Cabang (Pusdiklatcab Tangerang)</h4>
-          <table class="w-full text-left border-collapse border border-gray-300 text-xs mb-6">
-            <thead>
-              <tr class="bg-scout-dark text-white">
-                <th class="border border-gray-300 py-2 px-3 w-10">No</th>
-                <th class="border border-gray-300 py-2 px-3">Nama Kegiatan Kursus</th>
-                <th class="border border-gray-300 py-2 px-3">Tanggal</th>
-                <th class="border border-gray-300 py-2 px-3">Lokasi</th>
-                <th class="border border-gray-300 py-2 px-3">Peserta</th>
-                <th class="border border-gray-300 py-2 px-3">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${appData.kursus.map((k, i) => `
-                <tr>
-                  <td class="border border-gray-300 py-2 px-3 text-center">${i + 1}</td>
-                  <td class="border border-gray-300 py-2 px-3 font-semibold">${escapeHtml(k.nama)} (${escapeHtml(k.angkatan)})</td>
-                  <td class="border border-gray-300 py-2 px-3">${escapeHtml(k.tanggal)}</td>
-                  <td class="border border-gray-300 py-2 px-3">${escapeHtml(k.lokasi)}</td>
-                  <td class="border border-gray-300 py-2 px-3 text-center">${k.terdaftar}/${k.kuota}</td>
-                  <td class="border border-gray-300 py-2 px-3">${escapeHtml(k.status)}</td>
+          ${!isKwarran ? `
+            <h4 class="font-bold text-xs uppercase text-scout-dark mb-2">A. Kursus Tingkat Cabang (Pusdiklatcab Tangerang)</h4>
+            <table class="w-full text-left border-collapse border border-gray-300 text-xs mb-6">
+              <thead>
+                <tr class="bg-scout-dark text-white">
+                  <th class="border border-gray-300 py-2 px-3 w-10">No</th>
+                  <th class="border border-gray-300 py-2 px-3">Nama Kegiatan Kursus</th>
+                  <th class="border border-gray-300 py-2 px-3">Tanggal</th>
+                  <th class="border border-gray-300 py-2 px-3">Lokasi</th>
+                  <th class="border border-gray-300 py-2 px-3">Peserta</th>
+                  <th class="border border-gray-300 py-2 px-3">Status</th>
                 </tr>
-              `).join('')}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                ${appData.kursus.map((k, i) => `
+                  <tr>
+                    <td class="border border-gray-300 py-2 px-3 text-center">${i + 1}</td>
+                    <td class="border border-gray-300 py-2 px-3 font-semibold">${escapeHtml(k.nama)} (${escapeHtml(k.angkatan)})</td>
+                    <td class="border border-gray-300 py-2 px-3">${escapeHtml(k.tanggal)}</td>
+                    <td class="border border-gray-300 py-2 px-3">${escapeHtml(k.lokasi)}</td>
+                    <td class="border border-gray-300 py-2 px-3 text-center">${k.terdaftar}/${k.kuota}</td>
+                    <td class="border border-gray-300 py-2 px-3">${escapeHtml(k.status)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : ''}
 
-          <h4 class="font-bold text-xs uppercase text-scout-dark mb-2">B. Penyelenggaraan Kursus Mandiri Kwartir Ranting</h4>
-          <table class="w-full text-left border-collapse border border-gray-300 text-xs">
+          <h4 class="font-bold text-xs uppercase text-scout-dark mb-2">
+            ${isKwarran ? `A. Jadwal Penyelenggaraan Kursus Kwarran ${escapeHtml(myKwarran)}` : 'B. Penyelenggaraan Kursus Mandiri Kwartir Ranting'}
+          </h4>
+          <table class="w-full text-left border-collapse border border-gray-300 text-xs mb-6">
             <thead>
               <tr class="bg-scout-forest text-white">
                 <th class="border border-gray-300 py-2 px-3 w-10">No</th>
@@ -2493,7 +2819,7 @@
             </thead>
             <tbody>
               ${kwCourses.map((kc, i) => {
-                const cnt = appData.kwarranParticipants.filter(p => p.courseId === kc.id).length;
+                const cnt = kwParticipants.filter(p => p.courseId === kc.id).length;
                 return `
                   <tr>
                     <td class="border border-gray-300 py-2 px-3 text-center">${i + 1}</td>
@@ -2507,6 +2833,34 @@
               }).join('') || '<tr><td colspan="6" class="py-4 text-center text-gray-500">Belum ada data kursus Kwarran.</td></tr>'}
             </tbody>
           </table>
+
+          ${isKwarran ? `
+            <h4 class="font-bold text-xs uppercase text-scout-dark mb-2">
+              B. Daftar Peserta Kursus Terdaftar — Kwarran ${escapeHtml(myKwarran)}
+            </h4>
+            <table class="w-full text-left border-collapse border border-gray-300 text-xs">
+              <thead>
+                <tr class="bg-scout-dark text-white">
+                  <th class="border border-gray-300 py-2 px-3 w-10">No</th>
+                  <th class="border border-gray-300 py-2 px-3">Nama Lengkap + Gelar</th>
+                  <th class="border border-gray-300 py-2 px-3">Tempat, Tgl Lahir</th>
+                  <th class="border border-gray-300 py-2 px-3">Golongan</th>
+                  <th class="border border-gray-300 py-2 px-3">Nama Pangkalan</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${kwParticipants.map((pt, i) => `
+                  <tr>
+                    <td class="border border-gray-300 py-2 px-3 text-center">${i + 1}</td>
+                    <td class="border border-gray-300 py-2 px-3 font-semibold">${escapeHtml(pt.namaGelar)}</td>
+                    <td class="border border-gray-300 py-2 px-3">${escapeHtml(pt.tempatLahir)}, ${formatDateIndo(pt.tanggalLahir)}</td>
+                    <td class="border border-gray-300 py-2 px-3">${escapeHtml(pt.golongan)}</td>
+                    <td class="border border-gray-300 py-2 px-3">${escapeHtml(pt.namaPangkalan)}</td>
+                  </tr>
+                `).join('') || '<tr><td colspan="5" class="py-4 text-center text-gray-500">Belum ada peserta terdaftar pada Kwarran ini.</td></tr>'}
+              </tbody>
+            </table>
+          ` : ''}
         `;
       } else {
         reportTitle = 'LAPORAN ADMINISTRASI SURAT MASUK & SURAT KELUAR';
@@ -2653,14 +3007,20 @@
     }
 
     function exportLaporanCSV() {
+      const scope = getActiveKwarranScope();
+      const isKwarran = scope.isKwarran;
       let csvRows = [];
-      let filename = 'Laporan_Pusdiklatcab_Tangerang.csv';
+      let filename = isKwarran
+        ? `Laporan_Kwarran_${scope.kwarranName}_Tangerang.csv`
+        : 'Laporan_Pusdiklatcab_Tangerang.csv';
 
       if (uiState.laporanType === 'potensi') {
-        filename = 'Laporan_Data_Potensi_Tangerang.csv';
+        filename = isKwarran
+          ? `Laporan_Data_Potensi_Kwarran_${scope.kwarranName}.csv`
+          : 'Laporan_Data_Potensi_Tangerang.csv';
         csvRows.push(['No', 'Nama Lengkap Pembina', 'Jenjang Kursus', 'Jenis Kelamin', 'Asal Kwarran', 'Pangkalan']);
-        const rows = appData.potensi.filter(p => {
-          if (uiState.laporanKwarran !== 'ALL' && p.kwarran.toLowerCase() !== uiState.laporanKwarran.toLowerCase()) return false;
+        const rows = getScopedPotensiList().filter(p => {
+          if (!isKwarran && uiState.laporanKwarran !== 'ALL' && !isSameKwarran(p.kwarran, uiState.laporanKwarran)) return false;
           if (uiState.laporanJenjang !== 'ALL' && p.jenjang !== uiState.laporanJenjang) return false;
           return true;
         });
@@ -2668,11 +3028,30 @@
           csvRows.push([idx + 1, `"${r.nama}"`, r.jenjang, r.gender, r.kwarran, `"${r.pangkalan || '-'}"`]);
         });
       } else if (uiState.laporanType === 'kursus') {
-        filename = 'Laporan_Kursus_Pusdiklatcab_Tangerang.csv';
-        csvRows.push(['No', 'Nama Kursus', 'Angkatan', 'Tanggal', 'Lokasi', 'Terdaftar', 'Kuota', 'Status']);
-        appData.kursus.forEach((k, idx) => {
-          csvRows.push([idx + 1, `"${k.nama}"`, `"${k.angkatan}"`, `"${k.tanggal}"`, `"${k.lokasi}"`, k.terdaftar, k.kuota, k.status]);
-        });
+        if (isKwarran) {
+          filename = `Laporan_Kursus_Peserta_Kwarran_${scope.kwarranName}.csv`;
+          csvRows.push(['No', 'Kwarran', 'Nama Kursus', 'Nama Peserta + Gelar', 'Tempat Lahir', 'Tanggal Lahir', 'Golongan', 'Nama Pangkalan']);
+          const coursesMap = Object.fromEntries(getScopedKwarranCourses().map(c => [c.id, c]));
+          getScopedKwarranParticipants().forEach((pt, idx) => {
+            const crs = coursesMap[pt.courseId];
+            csvRows.push([
+              idx + 1,
+              pt.kwarran,
+              `"${crs ? (crs.namaKursus || crs.hari) : '-'}"`,
+              `"${pt.namaGelar}"`,
+              `"${pt.tempatLahir}"`,
+              pt.tanggalLahir,
+              pt.golongan,
+              `"${pt.namaPangkalan}"`
+            ]);
+          });
+        } else {
+          filename = 'Laporan_Kursus_Pusdiklatcab_Tangerang.csv';
+          csvRows.push(['No', 'Nama Kursus', 'Angkatan', 'Tanggal', 'Lokasi', 'Terdaftar', 'Kuota', 'Status']);
+          appData.kursus.forEach((k, idx) => {
+            csvRows.push([idx + 1, `"${k.nama}"`, `"${k.angkatan}"`, `"${k.tanggal}"`, `"${k.lokasi}"`, k.terdaftar, k.kuota, k.status]);
+          });
+        }
       } else {
         filename = 'Laporan_Administrasi_Surat_Tangerang.csv';
         csvRows.push(['Jenis', 'Nomor Surat', 'Tanggal', 'Asal / Tujuan', 'Perihal', 'Status / PJ']);
@@ -2805,6 +3184,7 @@
     function openUserModal(id = null) {
       const u = id ? appData.users.find(item => item.id === id) : null;
       const initialRole = u ? u.role : 'Pelatih';
+      const selectedKwarran = u ? normalizeKwarranName(u.kwarranName || u.nama) : KWARRAN_LIST[0];
 
       openFormModal(
         u ? 'Edit Akun Pengguna' : 'Tambah Akun Pengguna Baru',
@@ -2813,7 +3193,8 @@
             <div>
               <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nama Pengguna / Login <span class="text-red-600">*</span></label>
               <input type="text" id="usr-nama" required value="${u ? escapeHtml(u.nama) : ''}"
-                placeholder="Contoh: Kwarran Balaraja atau Kak Hendra"
+                oninput="syncKwarranSelectFromInput(this.value)"
+                placeholder="Contoh: Kwarran Curug atau Kak Hendra"
                 class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
             </div>
 
@@ -2826,7 +3207,7 @@
 
             <div>
               <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Role / Hak Akses <span class="text-red-600">*</span></label>
-              <select id="usr-role" onchange="document.getElementById('usr-kwarran-wrap').classList.toggle('hidden', this.value !== 'Kwarran')"
+              <select id="usr-role" onchange="handleUserRoleSelectChange(this.value)"
                 class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white focus:ring-2 focus:ring-scout-forest focus:outline-none">
                 <option value="Admin" ${initialRole === 'Admin' ? 'selected' : ''}>Admin (Akses Penuh)</option>
                 <option value="Pelatih" ${initialRole === 'Pelatih' ? 'selected' : ''}>Pelatih</option>
@@ -2838,7 +3219,7 @@
             <div id="usr-kwarran-wrap" class="${initialRole === 'Kwarran' ? '' : 'hidden'}">
               <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Wilayah Kwartir Ranting Terkait</label>
               <select id="usr-kwarran-name" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
-                ${KWARRAN_LIST.map(kw => `<option value="${kw}" ${u && u.kwarranName === kw ? 'selected' : ''}>Kwarran ${kw}</option>`).join('')}
+                ${KWARRAN_LIST.map(kw => `<option value="${kw}" ${selectedKwarran === kw ? 'selected' : ''}>Kwarran ${kw}</option>`).join('')}
               </select>
             </div>
 
@@ -2853,23 +3234,47 @@
       );
     }
 
+    function syncKwarranSelectFromInput(rawName) {
+      const roleEl = document.getElementById('usr-role');
+      const kwSelect = document.getElementById('usr-kwarran-name');
+      if (!roleEl || !kwSelect || roleEl.value !== 'Kwarran') return;
+      const detected = normalizeKwarranName(rawName);
+      if (detected && KWARRAN_LIST.includes(detected)) {
+        kwSelect.value = detected;
+      }
+    }
+
+    function handleUserRoleSelectChange(roleVal) {
+      const wrap = document.getElementById('usr-kwarran-wrap');
+      if (wrap) wrap.classList.toggle('hidden', roleVal !== 'Kwarran');
+      if (roleVal === 'Kwarran') {
+        const namaInput = document.getElementById('usr-nama');
+        if (namaInput) syncKwarranSelectFromInput(namaInput.value);
+      }
+    }
+
     function saveUserForm(e, id) {
       e.preventDefault();
       const role = document.getElementById('usr-role').value;
+      const namaVal = document.getElementById('usr-nama').value.trim();
+      const kwSelectVal = document.getElementById('usr-kwarran-name').value;
+      const kwMeta = role === 'Kwarran'
+        ? buildKwarranMetadata(kwSelectVal || namaVal)
+        : { kwarranName: '', kwarran_id: '', kode_kwarran: '', wilayah: '' };
+
       const payload = {
         id: id || generateId('usr'),
-        nama: document.getElementById('usr-nama').value.trim(),
+        nama: namaVal,
         password: document.getElementById('usr-password').value,
         role: role,
-        kwarranName: role === 'Kwarran' ? document.getElementById('usr-kwarran-name').value : ''
+        ...kwMeta
       };
 
       if (id) {
         const idx = appData.users.findIndex(item => item.id === id);
         if (idx !== -1) appData.users[idx] = payload;
         if (currentUser && currentUser.id === id) {
-          currentUser = payload;
-          updateUserHeaderUI();
+          establishUserSession(payload, false);
         }
         showToast('Akun user berhasil diperbarui.', 'success');
       } else {
@@ -2910,10 +3315,9 @@
     //     - Sub-Menu 2: Input Data Peserta (Edit & Hapus dengan konfirmasi)
     // =========================================================================
     function renderKwarranDaftarKursusView(container) {
-      const myKwarran = getActiveKwarranName();
-      const myCourses = appData.kwarranCourses.filter(
-        c => c.kwarran.toLowerCase() === myKwarran.toLowerCase()
-      );
+      const scope = getActiveKwarranScope();
+      const myKwarran = scope.kwarranName;
+      const myCourses = getScopedKwarranCourses();
 
       container.innerHTML = `
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -2992,7 +3396,7 @@
             </div>
 
             ${myCourses.map(course => {
-              const pesertaCount = appData.kwarranParticipants.filter(p => p.courseId === course.id).length;
+              const pesertaCount = getScopedKwarranParticipants(course.id).length;
               return `
                 <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout hover:border-scout-khaki transition">
                   <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -3053,7 +3457,8 @@
 
     function saveKwarranCourse(e) {
       e.preventDefault();
-      const myKwarran = getActiveKwarranName();
+      const scope = getActiveKwarranScope();
+      const myKwarran = scope.kwarranName;
       const namaInput = document.getElementById('kc-nama').value.trim();
       const hari = document.getElementById('kc-hari').value.trim();
       const tanggal = document.getElementById('kc-tanggal').value.trim();
@@ -3062,6 +3467,7 @@
       const newCourse = {
         id: generateId('kc'),
         kwarran: myKwarran,
+        kwarran_id: scope.kwarran_id,
         namaKursus: namaInput || `Kursus Kepramukaan Kwarran ${myKwarran} (${hari})`,
         hari,
         tanggal,
@@ -3081,13 +3487,18 @@
     }
 
     function selectCourseAndGoPeserta(courseId) {
-      uiState.kwarranSelectedCourseId = courseId;
+      const ownedCourse = getScopedKwarranCourses().find(c => c.id === courseId);
+      if (!ownedCourse) {
+        showToast('Akses ditolak: Kursus bukan milik Kwartir Ranting Anda.', 'error');
+        return;
+      }
+      uiState.kwarranSelectedCourseId = ownedCourse.id;
       uiState.kwarranEditingParticipantId = null;
       navigateTo('kwarran-input-peserta');
     }
 
     function deleteKwarranCourse(courseId) {
-      const target = appData.kwarranCourses.find(c => c.id === courseId);
+      const target = getScopedKwarranCourses().find(c => c.id === courseId);
       if (!target) return;
       openConfirmModal(
         'Hapus Data Kursus Kwarran?',
@@ -3107,10 +3518,9 @@
     }
 
     function renderKwarranInputPesertaView(container) {
-      const myKwarran = getActiveKwarranName();
-      const myCourses = appData.kwarranCourses.filter(
-        c => c.kwarran.toLowerCase() === myKwarran.toLowerCase()
-      );
+      const scope = getActiveKwarranScope();
+      const myKwarran = scope.kwarranName;
+      const myCourses = getScopedKwarranCourses();
 
       if (myCourses.length === 0) {
         container.innerHTML = `
@@ -3132,16 +3542,16 @@
         return;
       }
 
-      // Pastikan ada kursus aktif terpilih
+      // Pastikan ada kursus aktif terpilih milik Kwarran yang sedang login
       let selectedCourse = myCourses.find(c => c.id === uiState.kwarranSelectedCourseId);
       if (!selectedCourse) {
         selectedCourse = myCourses[0];
         uiState.kwarranSelectedCourseId = selectedCourse.id;
       }
 
-      // Filter peserta pada kursus terpilih
-      const courseParticipants = appData.kwarranParticipants.filter(p => {
-        if (p.courseId !== selectedCourse.id) return false;
+      // Filter peserta secara ketat hanya pada kursus terpilih milik Kwarran aktif
+      const scopedCourseParticipants = getScopedKwarranParticipants(selectedCourse.id);
+      const courseParticipants = scopedCourseParticipants.filter(p => {
         if (uiState.kwarranParticipantSearch) {
           const q = uiState.kwarranParticipantSearch.toLowerCase();
           return (
@@ -3154,7 +3564,7 @@
       });
 
       const editingParticipant = uiState.kwarranEditingParticipantId
-        ? appData.kwarranParticipants.find(p => p.id === uiState.kwarranEditingParticipantId)
+        ? scopedCourseParticipants.find(p => p.id === uiState.kwarranEditingParticipantId)
         : null;
 
       container.innerHTML = `
@@ -3374,14 +3784,19 @@
 
     function saveKwarranParticipant(e) {
       e.preventDefault();
-      const myKwarran = getActiveKwarranName();
-      const courseId = uiState.kwarranSelectedCourseId;
-      if (!courseId) return;
+      const scope = getActiveKwarranScope();
+      const myKwarran = scope.kwarranName;
+      const ownedCourse = getScopedKwarranCourses().find(c => c.id === uiState.kwarranSelectedCourseId);
+      if (!ownedCourse) {
+        showToast('Akses ditolak: Pilih kursus milik Kwarran Anda terlebih dahulu.', 'error');
+        return;
+      }
 
       const payload = {
         id: uiState.kwarranEditingParticipantId || generateId('kp'),
-        courseId,
+        courseId: ownedCourse.id,
         kwarran: myKwarran,
+        kwarran_id: scope.kwarran_id,
         namaGelar: document.getElementById('kp-nama').value.trim(),
         tempatLahir: document.getElementById('kp-tempat-lahir').value.trim(),
         tanggalLahir: document.getElementById('kp-tanggal-lahir').value,
@@ -3390,7 +3805,9 @@
       };
 
       if (uiState.kwarranEditingParticipantId) {
-        const idx = appData.kwarranParticipants.findIndex(p => p.id === uiState.kwarranEditingParticipantId);
+        const idx = appData.kwarranParticipants.findIndex(
+          p => p.id === uiState.kwarranEditingParticipantId && isSameKwarran(p.kwarran, myKwarran)
+        );
         if (idx !== -1) appData.kwarranParticipants[idx] = payload;
         uiState.kwarranEditingParticipantId = null;
         showToast('Data peserta kursus berhasil diperbarui!', 'success');
@@ -3405,6 +3822,11 @@
     }
 
     function editKwarranParticipant(participantId) {
+      const target = getScopedKwarranParticipants().find(p => p.id === participantId);
+      if (!target) {
+        showToast('Akses ditolak: Data peserta bukan milik Kwarran Anda.', 'error');
+        return;
+      }
       uiState.kwarranEditingParticipantId = participantId;
       renderKwarranInputPesertaView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -3412,7 +3834,7 @@
     }
 
     function deleteKwarranParticipant(participantId) {
-      const target = appData.kwarranParticipants.find(p => p.id === participantId);
+      const target = getScopedKwarranParticipants().find(p => p.id === participantId);
       if (!target) return;
 
       openConfirmModal(
@@ -3481,6 +3903,7 @@
     // =========================================================================
     window.addEventListener('DOMContentLoaded', () => {
       renderBrandLogos();
+      restorePersistedSession();
       lucide.createIcons();
     });
   </script>
