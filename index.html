@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistem Aplikasi Web Modular</title>
+  <!-- Menghubungkan ke file CSS -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- =========================================================
+       BAGIAN 1: NAVIGASI UTAMA (Muncul setelah Login / Beranda)
+       ========================================================= -->
+  <nav id="navbar" class="navbar hidden">
+    <div class="nav-brand" id="app-title">NAMA APLIKASI</div>
+    <div class="nav-menu">
+      <button onclick="bukaHalaman('view-dashboard')">Dashboard</button>
+      <button onclick="bukaHalaman('view-input')">Input Data</button>
+      <button onclick="bukaHalaman('view-laporan')">Laporan</button>
+      <!-- TAMBAHKAN TOMBOL MENU BARU DI BAWAH INI -->
+      
+      <button onclick="prosesLogout()" class="btn-danger">Keluar</button>
+    </div>
+  </nav>
+
+  <!-- =========================================================
+       BAGIAN 2: HALAMAN-HALAMAN APLIKASI (VIEWS)
+       ========================================================= -->
+  <main class="container">
+
+    <!-- HALAMAN 1: LOGIN / AKSES AWAL -->
+    <section id="view-login" class="view-section">
+      <div class="card login-box">
+        <h2>Login Sistem</h2>
+        <p>Masukkan kode akses atau kredensial Anda</p>
+        <input type="text" id="input-kode" placeholder="Masukkan Kode / Username">
+        <button onclick="prosesLogin()" class="btn-primary">Masuk</button>
+      </div>
+    </section>
+
+    <!-- HALAMAN 2: DASHBOARD -->
+    <section id="view-dashboard" class="view-section hidden">
+      <h2>Dashboard Utama</h2>
+      <div class="card">
+        <p>Selamat datang! Total Data Tersimpan: <strong id="stat-total">0</strong></p>
+      </div>
+      <!-- AREA WIDGET DASHBOARD BARU -->
+    </section>
+
+    <!-- HALAMAN 3: FORM INPUT DATA -->
+    <section id="view-input" class="view-section hidden">
+      <h2>Form Input Data</h2>
+      <div class="card">
+        <label>Nama / Keterangan:</label>
+        <input type="text" id="input-nama" placeholder="Ketik nama...">
+        
+        <label>Kategori / Kelas:</label>
+        <input type="text" id="input-kategori" placeholder="Ketik kategori...">
+        
+        <!-- TAMBAHKAN KOLOM INPUT BARU DI SINI -->
+
+        <button onclick="prosesSimpanData()" class="btn-primary">Simpan Data</button>
+      </div>
+    </section>
+
+    <!-- HALAMAN 4: DATA & LAPORAN -->
+    <section id="view-laporan" class="view-section hidden">
+      <div class="header-laporan">
+        <h2>Rekapitulasi Data</h2>
+        <button onclick="window.print()" class="btn-secondary no-print">Cetak / PDF</button>
+      </div>
+      <div class="card">
+        <table id="tabel-data">
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>Nama / Keterangan</th>
+              <th>Kategori</th>
+              <th class="no-print">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-data">
+            <!-- Data akan diisi otomatis oleh JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =======================================================
+         TEMPAT MENAMBAHKAN HALAMAN (SECTION) BARU DI BAWAH INI
+         ======================================================= -->
+
+  </main>
+
+  <!-- Menghubungkan ke file JavaScript -->
+  <script src="app.js"></script>
+</body>
+</html>
