@@ -268,6 +268,40 @@
               <span>Masuk ke Sistem</span>
             </button>
           </form>
+
+          <!-- Akses Cepat 1-Klik Demo Login per Role & Kwarran -->
+          <div class="mt-6 pt-5 border-t border-scout-sand/80">
+            <p class="text-[11px] font-bold uppercase tracking-wider text-scout-medium mb-2.5">
+              Akses Cepat Akun Demo (1-Klik Masuk):
+            </p>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <button type="button" onclick="quickDemoLogin('Admin Utama')"
+                class="px-3 py-2 rounded-xl bg-white hover:bg-scout-dark hover:text-white text-scout-dark border border-scout-sand text-xs font-bold flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="shield" class="w-3.5 h-3.5 text-scout-gold"></i>
+                <span>Admin</span>
+              </button>
+              <button type="button" onclick="quickDemoLogin('Kak Drs. H. Ahmad Fauzi, M.Pd.')"
+                class="px-3 py-2 rounded-xl bg-white hover:bg-scout-forest hover:text-white text-scout-forest border border-scout-sand text-xs font-bold flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="award" class="w-3.5 h-3.5"></i>
+                <span>Pelatih</span>
+              </button>
+              <button type="button" onclick="quickDemoLogin('Kak Rina Wulandari, S.Pd.')"
+                class="px-3 py-2 rounded-xl bg-white hover:bg-amber-800 hover:text-white text-amber-900 border border-scout-sand text-xs font-bold flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i>
+                <span>Panitia</span>
+              </button>
+              <button type="button" onclick="quickDemoLogin('Kwarran Tigaraksa')"
+                class="px-3 py-2 rounded-xl bg-white hover:bg-teal-800 hover:text-white text-teal-900 border border-scout-sand text-xs font-bold flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
+                <span>Kwarran Tigaraksa</span>
+              </button>
+              <button type="button" onclick="quickDemoLogin('Kwarran Curug')"
+                class="col-span-2 sm:col-span-2 px-3 py-2 rounded-xl bg-scout-forest/10 hover:bg-scout-forest hover:text-white text-scout-forest border border-scout-forest/30 text-xs font-extrabold flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="compass" class="w-3.5 h-3.5"></i>
+                <span>Kwarran Curug</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -411,14 +445,33 @@
         .replace(/^(kwartir\s+ranting|kwarran)\s*[:\-]?\s*/i, '')
         .trim();
       if (!cleaned) return '';
-      const matched = KWARRAN_LIST.find(k => k.toLowerCase() === cleaned.toLowerCase());
-      return matched || cleaned;
+      const exact = KWARRAN_LIST.find(k => k.toLowerCase() === cleaned.toLowerCase());
+      if (exact) return exact;
+      // Pencocokan nama wilayah di dalam string (prioritaskan nama terpanjang seperti "Sepatan Timur" sebelum "Sepatan")
+      const sortedByLen = [...KWARRAN_LIST].sort((a, b) => b.length - a.length);
+      const contained = sortedByLen.find(k =>
+        new RegExp(`(^|[^a-z0-9])${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`, 'i').test(cleaned)
+      );
+      return contained || cleaned;
+    }
+
+    function resolveExplicitUserKwarran(userObj) {
+      if (!userObj || userObj.role !== 'Kwarran') return '';
+      // Prioritas 1: deteksi wilayah eksplisit dari nama akun (contoh: "Kwarran Curug" -> "Curug")
+      const fromName = normalizeKwarranName(userObj.nama);
+      if (fromName && KWARRAN_LIST.some(k => k.toLowerCase() === fromName.toLowerCase())) {
+        return fromName;
+      }
+      // Prioritas 2: properti eksplisit user.kwarran atau user.kwarranName
+      const fromProp = normalizeKwarranName(userObj.kwarran || userObj.kwarranName);
+      if (fromProp) return fromProp;
+      return fromName || '';
     }
 
     function buildKwarranMetadata(rawName) {
       const normalized = normalizeKwarranName(rawName);
       if (!normalized) {
-        return { kwarranName: '', kwarran_id: '', kode_kwarran: '', wilayah: '' };
+        return { kwarran: '', kwarranName: '', kwarran_id: '', kode_kwarran: '', wilayah: '' };
       }
       const slug = normalized.toLowerCase().replace(/[^a-z0-9]+/g, '_');
       const codeSuffix = normalized
@@ -427,6 +480,7 @@
         .join('')
         .slice(0, 4);
       return {
+        kwarran: normalized,
         kwarranName: normalized,
         kwarran_id: `kwarran_${slug}`,
         kode_kwarran: `KWR-${codeSuffix}`,
@@ -745,7 +799,7 @@
       uiState.kwarranEditingParticipantId = null;
 
       if (userObj && userObj.role === 'Kwarran') {
-        const kwName = normalizeKwarranName(userObj.kwarranName || userObj.nama);
+        const kwName = resolveExplicitUserKwarran(userObj);
         uiState.potensiKwarran = kwName || 'ALL';
         uiState.laporanKwarran = kwName || 'ALL';
       } else {
@@ -757,11 +811,13 @@
     function migrateAndNormalizeAppData(mergedData, defaults) {
       let changed = false;
 
-      // 1. Pastikan seluruh user Kwarran memiliki kwarranName, kwarran_id, kode_kwarran, wilayah
+      // 1. Pastikan seluruh user Kwarran memetakan wilayahnya dari nama akun / properti eksplisit (tanpa fallback statis ke Tigaraksa)
       mergedData.users = (mergedData.users || []).map(u => {
         if (u.role === 'Kwarran') {
-          const meta = buildKwarranMetadata(u.kwarranName || u.nama);
+          const explicitRegion = resolveExplicitUserKwarran(u);
+          const meta = buildKwarranMetadata(explicitRegion);
           if (
+            u.kwarran !== meta.kwarran ||
             u.kwarranName !== meta.kwarranName ||
             u.kwarran_id !== meta.kwarran_id ||
             u.kode_kwarran !== meta.kode_kwarran ||
@@ -1012,6 +1068,19 @@
       lucide.createIcons();
     }
 
+    function quickDemoLogin(accountName) {
+      appData = loadAppData();
+      const targetUser = appData.users.find(u => u.nama.toLowerCase() === accountName.toLowerCase());
+      if (!targetUser) {
+        showToast(`Akun "${accountName}" tidak ditemukan.`, 'error');
+        return;
+      }
+      document.getElementById('login-username').value = targetUser.nama;
+      document.getElementById('login-password').value = targetUser.password;
+      document.getElementById('login-error').classList.add('hidden');
+      establishUserSession(targetUser, true);
+    }
+
     document.getElementById('login-form').addEventListener('submit', function (e) {
       e.preventDefault();
       const inputName = document.getElementById('login-username').value.trim();
@@ -1045,14 +1114,18 @@
     });
 
     function establishUserSession(userRecord, showWelcomeToast = false) {
-      // Bentuk objek sesi dengan identitas Kwarran tervalidasi
+      // Bentuk objek sesi dengan identitas Kwarran tervalidasi dari nama akun / properti eksplisit
       if (userRecord.role === 'Kwarran') {
-        const meta = buildKwarranMetadata(userRecord.kwarranName || userRecord.nama);
+        const explicitRegion = resolveExplicitUserKwarran(userRecord);
+        const meta = buildKwarranMetadata(explicitRegion);
         currentUser = {
           ...userRecord,
+          kwarran: meta.kwarran,
           kwarranName: meta.kwarranName,
           kwarran_id: meta.kwarran_id,
-          kode_kwarran: userRecord.kode_kwarran || meta.kode_kwarran,
+          kode_kwarran: userRecord.kode_kwarran && userRecord.kwarran === meta.kwarran
+            ? userRecord.kode_kwarran
+            : meta.kode_kwarran,
           wilayah: meta.wilayah
         };
       } else {
@@ -1067,6 +1140,7 @@
         localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
           userId: currentUser.id,
           role: currentUser.role,
+          kwarran: currentUser.kwarran || '',
           kwarranName: currentUser.kwarranName || '',
           kwarran_id: currentUser.kwarran_id || '',
           kode_kwarran: currentUser.kode_kwarran || '',
@@ -1139,19 +1213,22 @@
       if (!currentUser || currentUser.role !== 'Kwarran') {
         return {
           isKwarran: false,
+          kwarran: '',
           kwarranName: '',
           kwarran_id: '',
           kode_kwarran: '',
           wilayah: ''
         };
       }
-      const meta = buildKwarranMetadata(currentUser.kwarranName || currentUser.nama);
+      const explicitRegion = resolveExplicitUserKwarran(currentUser);
+      const meta = buildKwarranMetadata(explicitRegion);
       return {
         isKwarran: true,
+        kwarran: meta.kwarran,
         kwarranName: meta.kwarranName,
-        kwarran_id: currentUser.kwarran_id || meta.kwarran_id,
-        kode_kwarran: currentUser.kode_kwarran || meta.kode_kwarran,
-        wilayah: currentUser.wilayah || meta.wilayah
+        kwarran_id: meta.kwarran_id,
+        kode_kwarran: meta.kode_kwarran,
+        wilayah: meta.wilayah
       };
     }
 
@@ -1174,10 +1251,7 @@
     function getScopedKwarranCourses() {
       const scope = getActiveKwarranScope();
       if (!scope.isKwarran) return appData.kwarranCourses;
-      return appData.kwarranCourses.filter(c =>
-        isSameKwarran(c.kwarran, scope.kwarranName) ||
-        (c.kwarran_id && scope.kwarran_id && c.kwarran_id === scope.kwarran_id)
-      );
+      return appData.kwarranCourses.filter(c => isSameKwarran(c.kwarran, scope.kwarranName));
     }
 
     function getScopedKwarranParticipants(courseId = null) {
@@ -1186,10 +1260,7 @@
       return appData.kwarranParticipants.filter(p => {
         if (courseId && p.courseId !== courseId) return false;
         if (!scope.isKwarran) return true;
-        const ownerMatch =
-          isSameKwarran(p.kwarran, scope.kwarranName) ||
-          (p.kwarran_id && scope.kwarran_id && p.kwarran_id === scope.kwarran_id);
-        return ownerMatch && allowedCourseIds.has(p.courseId);
+        return isSameKwarran(p.kwarran, scope.kwarranName) && allowedCourseIds.has(p.courseId);
       });
     }
 
@@ -1432,160 +1503,55 @@
       const myKwarranCourses = getScopedKwarranCourses();
       const myKwarranParticipants = getScopedKwarranParticipants();
 
+      // Jadwal kursus terfilter ketat untuk Kwarran aktif (hanya kegiatan di wilayah Kwarran tersebut atau kursus mandiri Kwarran)
+      const dashboardScheduleRows = isKwarran
+        ? myKwarranCourses.map(kc => {
+            const cnt = appData.kwarranParticipants.filter(
+              p => p.courseId === kc.id && isSameKwarran(p.kwarran, myKwarran)
+            ).length;
+            return {
+              nama: kc.namaKursus || `Kursus Kwarran ${kc.kwarran}`,
+              lokasi: kc.lokasi,
+              tanggal: `${kc.hari}, ${kc.tanggal}`,
+              pesertaLabel: `${cnt} Peserta`,
+              status: 'Aktif Kwarran'
+            };
+          })
+        : appData.kursus.slice(0, 4).map(k => ({
+            nama: k.nama,
+            lokasi: k.lokasi,
+            tanggal: k.tanggal,
+            pesertaLabel: `${k.terdaftar}/${k.kuota}`,
+            status: k.status
+          }));
+
       container.innerHTML = `
-        <!-- Banner Sambutan Pramuka -->
-        <div class="rounded-2xl bg-gradient-to-r from-scout-dark via-scout-brown to-scout-forest p-6 text-white shadow-scout mb-6 relative overflow-hidden">
-          <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Kartu Upload Logo -->
+          <div class="lg:col-span-5 bg-white rounded-2xl p-6 border border-scout-sand shadow-scout flex flex-col justify-between">
             <div>
-              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-scout-gold/40 text-scout-gold text-xs font-bold mb-2">
-                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-                <span>Salam Pramuka!</span>
-              </div>
-              <h3 class="text-xl sm:text-2xl font-extrabold tracking-tight">
-                Selamat Datang, ${escapeHtml(currentUser.nama)}
-              </h3>
-              <p class="text-xs sm:text-sm text-scout-sand mt-1 max-w-2xl">
-                ${isKwarran
-                  ? `Panel kendali Kwartir Ranting <strong>${escapeHtml(myKwarran)}</strong>. Kelola penyelenggaraan kursus tingkat ranting dan input data peserta pembina secara terintegrasi.`
-                  : `Kapusdiklatcab Tangerang: <strong>${escapeHtml(appData.profile.namaKapus)}</strong> (${escapeHtml(appData.profile.masaBakti)}).`}
-              </p>
-            </div>
-            ${isKwarran ? `
-              <div class="flex flex-wrap gap-2.5 shrink-0">
-                <button type="button" onclick="navigateTo('kwarran-daftar-kursus')" class="px-4 py-2.5 rounded-xl bg-scout-gold hover:bg-amber-400 text-scout-dark font-bold text-xs flex items-center gap-2 shadow-md transition">
-                  <i data-lucide="calendar-plus" class="w-4 h-4"></i>
-                  <span>Buat Kursus Baru</span>
-                </button>
-                <button type="button" onclick="navigateTo('kwarran-input-peserta')" class="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs flex items-center gap-2 border border-white/20 transition">
-                  <i data-lucide="user-plus" class="w-4 h-4"></i>
-                  <span>Input Data Peserta</span>
-                </button>
-              </div>
-            ` : `
-              <div class="flex flex-wrap gap-2.5 shrink-0">
-                <button type="button" onclick="navigateTo('data-potensi')" class="px-4 py-2.5 rounded-xl bg-scout-gold hover:bg-amber-400 text-scout-dark font-bold text-xs flex items-center gap-2 shadow-md transition">
-                  <i data-lucide="users" class="w-4 h-4"></i>
-                  <span>Kelola Data Potensi</span>
-                </button>
-              </div>
-            `}
-          </div>
-        </div>
-
-        <!-- 4 SUMMARY CARDS -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5 mb-6">
-          <div class="bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold uppercase tracking-wider text-scout-medium">
-                ${isKwarran ? `Potensi Kwarran ${escapeHtml(myKwarran)}` : 'Total Data Potensi'}
-              </span>
-              <div class="w-10 h-10 rounded-xl bg-scout-dark/10 text-scout-dark flex items-center justify-center">
-                <i data-lucide="users" class="w-5 h-5"></i>
-              </div>
-            </div>
-            <p class="text-3xl font-extrabold text-scout-dark mt-3">${totalPotensi}</p>
-            <div class="mt-2 flex items-center gap-3 text-xs font-semibold">
-              <span class="text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">Putra: ${totalPutra}</span>
-              <span class="text-pink-700 bg-pink-50 px-2 py-0.5 rounded-md">Putri: ${totalPutri}</span>
-            </div>
-          </div>
-
-          <div class="bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold uppercase tracking-wider text-scout-medium">
-                ${isKwarran ? 'Kursus Kwarran Anda' : 'Kursus Pusdiklatcab'}
-              </span>
-              <div class="w-10 h-10 rounded-xl bg-scout-forest/15 text-scout-forest flex items-center justify-center">
-                <i data-lucide="graduation-cap" class="w-5 h-5"></i>
-              </div>
-            </div>
-            <p class="text-3xl font-extrabold text-scout-forest mt-3">
-              ${isKwarran ? myKwarranCourses.length : appData.kursus.length}
-            </p>
-            <p class="text-xs text-gray-500 mt-2 font-medium">
-              ${isKwarran
-                ? `Total ${myKwarranParticipants.length} peserta kursus terdaftar`
-                : `Aktif/Akan Datang: <strong>${kursusAktif}</strong> • Selesai: <strong>${kursusSelesai}</strong>`}
-            </p>
-          </div>
-
-          <div class="bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold uppercase tracking-wider text-scout-medium">
-                ${isKwarran ? 'Peserta Kursus Kwarran' : 'Administrasi Surat'}
-              </span>
-              <div class="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-800 flex items-center justify-center">
-                <i data-lucide="${isKwarran ? 'user-check' : 'mail'}" class="w-5 h-5"></i>
-              </div>
-            </div>
-            <p class="text-3xl font-extrabold text-amber-900 mt-3">
-              ${isKwarran ? myKwarranParticipants.length : (appData.suratMasuk.length + appData.suratKeluar.length)}
-            </p>
-            <p class="text-xs text-gray-500 mt-2 font-medium">
-              ${isKwarran
-                ? `Tersebar di ${myKwarranCourses.length} jadwal pelatihan`
-                : `Surat Masuk: <strong>${appData.suratMasuk.length}</strong> • Keluar: <strong>${appData.suratKeluar.length}</strong>`}
-            </p>
-          </div>
-
-          <div class="bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold uppercase tracking-wider text-scout-medium">Korps Pelatih (KPD/KPL)</span>
-              <div class="w-10 h-10 rounded-xl bg-scout-gold/25 text-scout-brown flex items-center justify-center">
-                <i data-lucide="award" class="w-5 h-5"></i>
-              </div>
-            </div>
-            <p class="text-3xl font-extrabold text-scout-brown mt-3">${totalKpdKpl}</p>
-            <p class="text-xs text-gray-500 mt-2 font-medium">
-              Kualifikasi Pelatih Dasar & Lanjutan
-            </p>
-          </div>
-        </div>
-
-        <!-- GRAFIK VISUALISASI DATA POTENSI -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-6">
-          <div class="lg:col-span-5 bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout">
-            <h4 class="font-bold text-sm text-scout-dark mb-1">Sebaran Jenjang Kursus Pembina</h4>
-            <p class="text-xs text-gray-500 mb-4">Klasifikasi Belum Kursus, KMD, KML, KPD, dan KPL</p>
-            <div class="h-64 relative">
-              <canvas id="chart-jenjang"></canvas>
-            </div>
-          </div>
-
-          <div class="lg:col-span-3 bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout">
-            <h4 class="font-bold text-sm text-scout-dark mb-1">Komposisi Gender</h4>
-            <p class="text-xs text-gray-500 mb-4">Perbandingan Putra & Putri</p>
-            <div class="h-64 relative">
-              <canvas id="chart-gender"></canvas>
-            </div>
-          </div>
-
-          <div class="lg:col-span-4 bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout">
-            <h4 class="font-bold text-sm text-scout-dark mb-1">
-              ${isKwarran ? `Sebaran Pangkalan Kwarran ${escapeHtml(myKwarran)}` : 'Top Kwarran Data Potensi'}
-            </h4>
-            <p class="text-xs text-gray-500 mb-4">
-              ${isKwarran ? `Distribusi pembina per gugus depan di ${escapeHtml(myKwarran)}` : 'Distribusi pembina per Kwartir Ranting'}
-            </p>
-            <div class="h-64 relative">
-              <canvas id="chart-kwarran"></canvas>
-            </div>
-          </div>
-        </div>
-
+              <h3 class="text-base font-extrabold text-scout-dark flex items-center gap-2">
         <!-- TABEL JADWAL KURSUS & PENGAJUAN KWARRAN -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
           <div class="lg:col-span-7 bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout">
             <div class="flex items-center justify-between mb-4">
               <div>
-                <h4 class="font-bold text-sm sm:text-base text-scout-dark">Jadwal Kursus & Pelatihan Pusdiklatcab</h4>
-                <p class="text-xs text-gray-500">Agenda kegiatan pendidikan & pelatihan terkini</p>
+                <h4 class="font-bold text-sm sm:text-base text-scout-dark">
+                  ${isKwarran ? `Jadwal Kursus Wilayah Kwarran ${escapeHtml(myKwarran)}` : 'Jadwal Kursus & Pelatihan Pusdiklatcab'}
+                </h4>
+                <p class="text-xs text-gray-500">
+                  ${isKwarran ? `Agenda pelatihan yang terdaftar di Kwartir Ranting ${escapeHtml(myKwarran)}` : 'Agenda kegiatan pendidikan & pelatihan terkini'}
+                </p>
               </div>
               ${!isKwarran ? `
                 <button type="button" onclick="navigateTo('kursus')" class="text-xs font-bold text-scout-forest hover:underline">
                   Lihat Semua &rarr;
                 </button>
-              ` : ''}
+              ` : `
+                <button type="button" onclick="navigateTo('kwarran-daftar-kursus')" class="text-xs font-bold text-scout-forest hover:underline">
+                  Daftar Kursus &rarr;
+                </button>
+              `}
             </div>
             <div class="overflow-x-auto">
               <table class="w-full text-left border-collapse">
@@ -1598,17 +1564,23 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 text-xs">
-                  ${appData.kursus.slice(0, 4).map(k => `
+                  ${dashboardScheduleRows.map(k => `
                     <tr class="hover:bg-scout-cream/40">
                       <td class="py-3 px-3">
                         <p class="font-bold text-scout-dark">${escapeHtml(k.nama)}</p>
                         <p class="text-[11px] text-gray-500">${escapeHtml(k.lokasi)}</p>
                       </td>
                       <td class="py-3 px-3 whitespace-nowrap text-gray-700 font-medium">${escapeHtml(k.tanggal)}</td>
-                      <td class="py-3 px-3 whitespace-nowrap font-bold text-scout-brown">${k.terdaftar}/${k.kuota}</td>
+                      <td class="py-3 px-3 whitespace-nowrap font-bold text-scout-brown">${escapeHtml(k.pesertaLabel)}</td>
                       <td class="py-3 px-3 whitespace-nowrap">${renderStatusBadge(k.status)}</td>
                     </tr>
-                  `).join('')}
+                  `).join('') || `
+                    <tr>
+                      <td colspan="4" class="py-6 text-center text-gray-500">
+                        Belum ada jadwal kursus terdaftar untuk Kwarran ${escapeHtml(myKwarran)}.
+                      </td>
+                    </tr>
+                  `}
                 </tbody>
               </table>
             </div>
@@ -1617,8 +1589,12 @@
           <div class="lg:col-span-5 bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout">
             <div class="flex items-center justify-between mb-4">
               <div>
-                <h4 class="font-bold text-sm sm:text-base text-scout-dark">Penyelenggaraan Kursus Kwarran</h4>
-                <p class="text-xs text-gray-500">Daftar kursus mandiri tingkat Kwartir Ranting</p>
+                <h4 class="font-bold text-sm sm:text-base text-scout-dark">
+                  ${isKwarran ? `Penyelenggaraan Kursus Kwarran ${escapeHtml(myKwarran)}` : 'Penyelenggaraan Kursus Kwarran'}
+                </h4>
+                <p class="text-xs text-gray-500">
+                  ${isKwarran ? `Daftar kursus mandiri khusus Kwarran ${escapeHtml(myKwarran)}` : 'Daftar kursus mandiri tingkat Kwartir Ranting'}
+                </p>
               </div>
               ${isKwarran ? `
                 <button type="button" onclick="navigateTo('kwarran-daftar-kursus')" class="text-xs font-bold text-scout-forest hover:underline">
@@ -1658,215 +1634,6 @@
       `;
 
       initDashboardCharts(filteredPotensi);
-    }
-
-    function initDashboardCharts(dataset) {
-      // 1. Chart Jenjang Kursus
-      const jenjangCounts = JENJANG_OPTIONS.map(j => dataset.filter(p => p.jenjang === j).length);
-      const ctxJenjang = document.getElementById('chart-jenjang');
-      if (ctxJenjang) {
-        chartsRegistry.jenjang = new Chart(ctxJenjang, {
-          type: 'bar',
-          data: {
-            labels: JENJANG_OPTIONS,
-            datasets: [{
-              label: 'Jumlah Pembina',
-              data: jenjangCounts,
-              backgroundColor: ['#A1887F', '#2E5A36', '#4E342E', '#D4AF37', '#1E3F24'],
-              borderRadius: 8
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-              y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } } },
-              x: { ticks: { font: { size: 11, weight: 'bold' } } }
-            }
-          }
-        });
-      }
-
-      // 2. Chart Gender
-      const putra = dataset.filter(p => p.gender === 'Putra').length;
-      const putri = dataset.filter(p => p.gender === 'Putri').length;
-      const ctxGender = document.getElementById('chart-gender');
-      if (ctxGender) {
-        chartsRegistry.gender = new Chart(ctxGender, {
-          type: 'doughnut',
-          data: {
-            labels: ['Putra', 'Putri'],
-            datasets: [{
-              data: [putra, putri],
-              backgroundColor: ['#3E2723', '#D4AF37'],
-              borderWidth: 2,
-              borderColor: '#FFFFFF'
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '62%',
-            plugins: {
-              legend: { position: 'bottom', labels: { font: { size: 12, weight: '600' } } }
-            }
-          }
-        });
-      }
-
-      // 3. Chart Kwarran (Top 6 Kwarran untuk Pusat, atau Top Pangkalan milik Kwarran untuk akun Kwarran)
-      const isKwarran = currentUser && currentUser.role === 'Kwarran';
-      const groupMap = {};
-      dataset.forEach(p => {
-        const key = isKwarran ? (p.pangkalan || `Gudep ${p.kwarran}`) : p.kwarran;
-        groupMap[key] = (groupMap[key] || 0) + 1;
-      });
-      const sortedGroup = Object.entries(groupMap)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 6);
-
-      const ctxKwarran = document.getElementById('chart-kwarran');
-      if (ctxKwarran) {
-        chartsRegistry.kwarran = new Chart(ctxKwarran, {
-          type: 'bar',
-          data: {
-            labels: sortedGroup.map(item => item[0]),
-            datasets: [{
-              label: 'Pembina',
-              data: sortedGroup.map(item => item[1]),
-              backgroundColor: '#2E5A36',
-              borderRadius: 6
-            }]
-          },
-          options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-              x: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } } },
-              y: { ticks: { font: { size: 11, weight: '600' } } }
-            }
-          }
-        });
-      }
-    }
-
-    // =========================================================================
-    // 8. VIEW: PROFILE (ADMIN) - KAPUSDIKLATCAB & UPLOAD LOGO
-    // =========================================================================
-    function renderProfileView(container) {
-      const p = appData.profile;
-      container.innerHTML = `
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <!-- Kartu Upload Logo -->
-          <div class="lg:col-span-5 bg-white rounded-2xl p-6 border border-scout-sand shadow-scout flex flex-col justify-between">
-            <div>
-              <h3 class="text-base font-extrabold text-scout-dark flex items-center gap-2">
-                <i data-lucide="image" class="w-5 h-5 text-scout-forest"></i>
-                <span>Logo Resmi Pusdiklatcab Tangerang</span>
-              </h3>
-              <p class="text-xs text-gray-500 mt-1">
-                Logo yang diunggah akan otomatis tampil pada Header, Sidebar, Halaman Login, dan Kop Dokumen Laporan.
-              </p>
-
-              <div class="mt-6 flex flex-col items-center justify-center p-6 rounded-2xl bg-scout-cream border-2 border-dashed border-scout-khaki">
-                <div id="profile-logo-preview" class="w-32 h-32 rounded-2xl bg-white p-3 shadow-md border border-scout-sand flex items-center justify-center">
-                  ${getLogoHtml()}
-                </div>
-                <p class="text-xs font-bold text-scout-brown mt-3">Pratinjau Logo Aktif</p>
-                <p class="text-[11px] text-gray-500">Format: PNG, JPG, SVG (Maks. 1.5 MB)</p>
-              </div>
-            </div>
-
-            <div class="mt-6 space-y-2.5">
-              <label class="w-full cursor-pointer py-3 px-4 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition">
-                <i data-lucide="upload" class="w-4 h-4 text-scout-gold"></i>
-                <span>Unggah Logo Baru</span>
-                <input type="file" id="logo-upload-input" accept="image/*" class="hidden" onchange="handleLogoUpload(event)" />
-              </label>
-
-              ${p.logoUrl ? `
-                <button type="button" onclick="resetProfileLogo()" class="w-full py-2.5 px-4 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs flex items-center justify-center gap-2 transition">
-                  <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-                  <span>Kembalikan Logo Default Pramuka</span>
-                </button>
-              ` : ''}
-            </div>
-          </div>
-
-          <!-- Form Identitas Kapusdiklatcab -->
-          <div class="lg:col-span-7 bg-white rounded-2xl p-6 border border-scout-sand shadow-scout">
-            <h3 class="text-base font-extrabold text-scout-dark flex items-center gap-2">
-              <i data-lucide="award" class="w-5 h-5 text-scout-gold"></i>
-              <span>Identitas Kepala Pusdiklatcab & Sekretariat</span>
-            </h3>
-            <p class="text-xs text-gray-500 mt-1 mb-5">
-              Perbarui nama Kapusdiklatcab Tangerang yang akan dicantumkan sebagai penanda tangan resmi pada laporan.
-            </p>
-
-            <form id="profile-form" onsubmit="saveProfileForm(event)" class="space-y-4">
-              <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
-                  Nama Lengkap Kapusdiklatcab (Beserta Gelar) <span class="text-red-600">*</span>
-                </label>
-                <input type="text" id="prof-nama-kapus" required value="${escapeHtml(p.namaKapus)}"
-                  class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm font-semibold text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
-              </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
-                    Nomor Tanda Anggota (NTA)
-                  </label>
-                  <input type="text" id="prof-nta" value="${escapeHtml(p.ntaKapus)}"
-                    class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
-                </div>
-                <div>
-                  <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
-                    Masa Bakti
-                  </label>
-                  <input type="text" id="prof-masa-bakti" value="${escapeHtml(p.masaBakti)}"
-                    class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
-                </div>
-              </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
-                    Telepon Sekretariat
-                  </label>
-                  <input type="text" id="prof-telepon" value="${escapeHtml(p.telepon)}"
-                    class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
-                </div>
-                <div>
-                  <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
-                    Email Resmi
-                  </label>
-                  <input type="email" id="prof-email" value="${escapeHtml(p.email)}"
-                    class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
-                </div>
-              </div>
-
-              <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
-                  Alamat Sekretariat Pusdiklatcab Tangerang
-                </label>
-                <textarea id="prof-alamat" rows="3"
-                  class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none">${escapeHtml(p.alamat)}</textarea>
-              </div>
-
-              <div class="pt-2 flex justify-end">
-                <button type="submit" class="px-6 py-3 rounded-xl bg-scout-dark hover:bg-scout-brown text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition">
-                  <i data-lucide="save" class="w-4 h-4 text-scout-gold"></i>
-                  <span>Simpan Perubahan Profil</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      `;
     }
 
     function handleLogoUpload(event) {
@@ -3881,6 +3648,7 @@
       const map = {
         'Akan Datang': 'bg-blue-50 text-blue-800 border-blue-200',
         'Berlangsung': 'bg-emerald-100 text-emerald-900 border-emerald-300',
+        'Aktif Kwarran': 'bg-emerald-100 text-emerald-900 border-emerald-300',
         'Selesai': 'bg-gray-100 text-gray-700 border-gray-300',
         'Menunggu Disposisi': 'bg-amber-50 text-amber-800 border-amber-200',
         'Ditindaklanjuti': 'bg-emerald-50 text-emerald-800 border-emerald-200'
