@@ -96,6 +96,10 @@
         margin: 0 !important;
         width: 100% !important;
       }
+      #print-area.ijazah-frame {
+        border: 6px double #3E2723 !important;
+        padding: 24px !important;
+      }
       table {
         width: 100% !important;
         border-collapse: collapse !important;
@@ -403,6 +407,7 @@
 
     const JENJANG_OPTIONS = ['Belum Kursus', 'KMD', 'KML', 'KPD', 'KPL'];
     const GOLONGAN_OPTIONS = ['Siaga', 'Penggalang', 'Penegak', 'Pandega'];
+    const KUALIFIKASI_OPTIONS = ['Sangat Memuaskan', 'Memuaskan', 'Baik', 'Cukup'];
 
     // Utilitas normalisasi & resolusi identitas Kwarran secara deterministik
     function normalizeKwarranName(rawValue) {
@@ -413,7 +418,6 @@
       if (!cleaned) return '';
       const exact = KWARRAN_LIST.find(k => k.toLowerCase() === cleaned.toLowerCase());
       if (exact) return exact;
-      // Pencocokan nama wilayah di dalam string (prioritaskan nama terpanjang seperti "Sepatan Timur" sebelum "Sepatan")
       const sortedByLen = [...KWARRAN_LIST].sort((a, b) => b.length - a.length);
       const contained = sortedByLen.find(k =>
         new RegExp(`(^|[^a-z0-9])${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`, 'i').test(cleaned)
@@ -423,12 +427,10 @@
 
     function resolveExplicitUserKwarran(userObj) {
       if (!userObj || userObj.role !== 'Kwarran') return '';
-      // Prioritas 1: deteksi wilayah eksplisit dari nama akun (contoh: "Kwarran Curug" -> "Curug")
       const fromName = normalizeKwarranName(userObj.nama);
       if (fromName && KWARRAN_LIST.some(k => k.toLowerCase() === fromName.toLowerCase())) {
         return fromName;
       }
-      // Prioritas 2: properti eksplisit user.kwarran atau user.kwarranName
       const fromProp = normalizeKwarranName(userObj.kwarran || userObj.kwarranName);
       if (fromProp && KWARRAN_LIST.some(k => k.toLowerCase() === fromProp.toLowerCase())) {
         return fromProp;
@@ -460,6 +462,14 @@
       const nb = normalizeKwarranName(b);
       if (!na || !nb) return false;
       return na.toLowerCase() === nb.toLowerCase();
+    }
+
+    function inferJenjangFromName(namaKursus) {
+      const upper = (namaKursus || '').toUpperCase();
+      if (upper.includes('KPL')) return 'KPL';
+      if (upper.includes('KPD')) return 'KPD';
+      if (upper.includes('KML')) return 'KML';
+      return 'KMD';
     }
 
     // =========================================================================
@@ -540,40 +550,56 @@
           {
             id: 'krs_1',
             nama: 'Kursus Pembina Pramuka Mahir Tingkat Dasar (KMD)',
+            jenjang: 'KMD',
             angkatan: 'Angkatan XLI / 2026',
+            hari: 'Senin - Sabtu',
             tanggal: '2026-11-27 s.d. 2026-12-02',
             lokasi: 'Bumi Perkemahan Kitri Bakti, Curug',
             kuota: 60,
             terdaftar: 54,
             status: 'Akan Datang',
             pelatih: 'Kak Drs. H. Ahmad Fauzi, M.Pd.',
-            panitia: 'Kak Rina Wulandari, S.Pd.'
+            panitia: 'Kak Rina Wulandari, S.Pd.',
+            sourceType: 'cabang',
+            sourceKwarran: '',
+            sourceCourseId: ''
           },
           {
             id: 'krs_2',
             nama: 'Kursus Pembina Pramuka Mahir Tingkat Lanjutan (KML) Golongan Penggalang',
+            jenjang: 'KML',
             angkatan: 'Angkatan XXVIII / 2026',
+            hari: 'Jumat - Rabu',
             tanggal: '2026-11-20 s.d. 2026-11-25',
             lokasi: 'Sanggar Bakti Kwarcab Tangerang, Tigaraksa',
             kuota: 45,
             terdaftar: 45,
             status: 'Berlangsung',
             pelatih: 'Kak Hj. Nurhayati, S.Pd., M.M.',
-            panitia: 'Kak Rina Wulandari, S.Pd.'
+            panitia: 'Kak Rina Wulandari, S.Pd.',
+            sourceType: 'cabang',
+            sourceKwarran: '',
+            sourceCourseId: ''
           },
           {
             id: 'krs_3',
             nama: 'Kursus Pelatih Pembina Pramuka Tingkat Dasar (KPD)',
+            jenjang: 'KPD',
             angkatan: 'Angkatan IX / 2026',
+            hari: 'Kamis - Rabu',
             tanggal: '2026-09-10 s.d. 2026-09-16',
             lokasi: 'Bumi Perkemahan Kitri Bakti, Curug',
             kuota: 40,
             terdaftar: 38,
             status: 'Selesai',
             pelatih: 'Kak Agus Salim, M.Pd.',
-            panitia: 'Kak Rina Wulandari, S.Pd.'
+            panitia: 'Kak Rina Wulandari, S.Pd.',
+            sourceType: 'cabang',
+            sourceKwarran: '',
+            sourceCourseId: ''
           }
         ],
+        courseDetails: {},
         suratMasuk: [
           {
             id: 'sm_1',
@@ -674,6 +700,7 @@
       data.users = Array.isArray(data.users) && data.users.length ? data.users : seed.users;
       data.potensi = Array.isArray(data.potensi) ? data.potensi : seed.potensi;
       data.kursus = Array.isArray(data.kursus) ? data.kursus : seed.kursus;
+      data.courseDetails = (data.courseDetails && typeof data.courseDetails === 'object') ? data.courseDetails : {};
       data.suratMasuk = Array.isArray(data.suratMasuk) ? data.suratMasuk : seed.suratMasuk;
       data.suratKeluar = Array.isArray(data.suratKeluar) ? data.suratKeluar : seed.suratKeluar;
       data.kwarranCourses = Array.isArray(data.kwarranCourses) ? data.kwarranCourses : seed.kwarranCourses;
@@ -734,7 +761,77 @@
         };
       });
 
+      data.kursus = data.kursus.map(k => ({
+        ...k,
+        jenjang: k.jenjang || inferJenjangFromName(k.nama),
+        hari: k.hari || 'Sesuai Jadwal',
+        sourceType: k.sourceType || (k.sourceCourseId ? 'kwarran' : 'cabang'),
+        sourceKwarran: k.sourceKwarran || '',
+        sourceCourseId: k.sourceCourseId || ''
+      }));
+
       return data;
+    }
+
+    // =========================================================================
+    // SINKRONISASI OTOMATIS PENDAFTARAN KURSUS & PESERTA (KWARRAN -> ADMIN)
+    // =========================================================================
+    function syncKwarranCoursesToAdmin(targetData = appData) {
+      if (!targetData || !Array.isArray(targetData.kwarranCourses)) return;
+      if (!Array.isArray(targetData.kursus)) targetData.kursus = [];
+
+      const validKwCourseIds = new Set(targetData.kwarranCourses.map(kc => kc.id));
+
+      // Hapus entri sinkronisasi yang kursus sumbernya sudah dihapus oleh Kwarran
+      targetData.kursus = targetData.kursus.filter(
+        k => !(k.sourceType === 'kwarran' && k.sourceCourseId && !validKwCourseIds.has(k.sourceCourseId))
+      );
+
+      targetData.kwarranCourses.forEach(kc => {
+        const participantCount = (targetData.kwarranParticipants || []).filter(
+          p => p.courseId === kc.id
+        ).length;
+        const linkedAdminId = `krs_sync_${kc.id}`;
+        const existingIdx = targetData.kursus.findIndex(
+          k => k.id === linkedAdminId || k.sourceCourseId === kc.id
+        );
+
+        const defaultName = kc.namaKursus || `Kursus Kepramukaan Kwarran ${kc.kwarran}`;
+        if (existingIdx !== -1) {
+          const prev = targetData.kursus[existingIdx];
+          targetData.kursus[existingIdx] = {
+            ...prev,
+            nama: prev._adminEditedName ? prev.nama : defaultName,
+            jenjang: prev.jenjang || inferJenjangFromName(defaultName),
+            hari: kc.hari || prev.hari || 'Sesuai Jadwal',
+            tanggal: kc.tanggal || prev.tanggal,
+            lokasi: kc.lokasi || prev.lokasi,
+            terdaftar: participantCount,
+            kuota: Math.max(prev.kuota || 40, participantCount),
+            sourceType: 'kwarran',
+            sourceKwarran: kc.kwarran,
+            sourceCourseId: kc.id
+          };
+        } else {
+          targetData.kursus.unshift({
+            id: linkedAdminId,
+            nama: defaultName,
+            jenjang: inferJenjangFromName(defaultName),
+            angkatan: `Usulan Kwarran ${kc.kwarran} / 2026`,
+            hari: kc.hari || 'Sesuai Jadwal',
+            tanggal: kc.tanggal,
+            lokasi: kc.lokasi,
+            kuota: Math.max(40, participantCount),
+            terdaftar: participantCount,
+            status: 'Akan Datang',
+            pelatih: 'Tim Pelatih Pusdiklatcab Tangerang',
+            panitia: `Panitia Pelaksana Kwarran ${kc.kwarran}`,
+            sourceType: 'kwarran',
+            sourceKwarran: kc.kwarran,
+            sourceCourseId: kc.id
+          });
+        }
+      });
     }
 
     function loadAppData() {
@@ -742,10 +839,13 @@
         const raw = localStorage.getItem(STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : null;
         const normalized = migrateAndNormalizeAppData(parsed);
+        syncKwarranCoursesToAdmin(normalized);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
         return normalized;
       } catch (err) {
-        return migrateAndNormalizeAppData(null);
+        const fallback = migrateAndNormalizeAppData(null);
+        syncKwarranCoursesToAdmin(fallback);
+        return fallback;
       }
     }
 
@@ -763,6 +863,16 @@
       potensiPerPage: 8,
       kursusSearch: '',
       kursusStatus: 'ALL',
+      kursusOriginFilter: 'ALL',
+      selectedAdminCourseId: null,
+      adminCourseDetailTab: 'edit',
+      adminAttendanceRoleTab: 'peserta',
+      adminPrintDocType: 'pakta',
+      adminPrintTargetRole: 'Peserta',
+      adminPrintTargetId: '',
+      adminPrintNomorSurat: '001/28.04-Pusdiklatcab/2026',
+      adminPrintKualifikasi: 'Sangat Memuaskan',
+      adminPrintGolonganShb: 'Penggalang',
       adminTab: 'masuk',
       suratSearch: '',
       laporanType: 'potensi',
@@ -776,6 +886,7 @@
 
     function saveAppData() {
       try {
+        syncKwarranCoursesToAdmin(appData);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
       } catch (err) {
         showToast('Gagal menyimpan data ke penyimpanan browser.', 'error');
@@ -837,6 +948,13 @@
       uiState.potensiPage = 1;
       uiState.kursusSearch = '';
       uiState.kursusStatus = 'ALL';
+      uiState.kursusOriginFilter = 'ALL';
+      uiState.selectedAdminCourseId = null;
+      uiState.adminCourseDetailTab = 'edit';
+      uiState.adminAttendanceRoleTab = 'peserta';
+      uiState.adminPrintDocType = 'pakta';
+      uiState.adminPrintTargetRole = 'Peserta';
+      uiState.adminPrintTargetId = '';
       uiState.adminTab = 'masuk';
       uiState.suratSearch = '';
       uiState.laporanType = 'potensi';
@@ -870,14 +988,11 @@
             role: currentUser.role,
             kwarranName: currentUser.kwarranName || ''
           }));
-        } catch (err) {
-          // Abaikan jika sessionStorage dibatasi
-        }
+        } catch (err) {}
       }
 
       resetUiStateForSession();
 
-      // Perbarui header & sidebar user info
       document.getElementById('sidebar-user-name').textContent = currentUser.nama;
       document.getElementById('sidebar-user-avatar').textContent = (currentUser.nama || 'U').charAt(0).toUpperCase();
       document.getElementById('sidebar-user-role').textContent = currentUser.role === 'Kwarran'
@@ -906,9 +1021,7 @@
         if (found) {
           establishUserSession(found, false);
         }
-      } catch (err) {
-        // Tetap di halaman login
-      }
+      } catch (err) {}
     }
 
     document.getElementById('login-form').addEventListener('submit', function (e) {
@@ -990,7 +1103,7 @@
       }
 
       menus.push({ id: 'data-potensi', label: 'Data Potensi', icon: 'users' });
-      menus.push({ id: 'kursus', label: 'Kursus', icon: 'graduation-cap' });
+      menus.push({ id: 'kursus', label: 'Kursus & Pelatihan', icon: 'graduation-cap' });
 
       if (role === 'Admin' || role === 'Panitia') {
         menus.push({ id: 'administrasi', label: 'Administrasi', icon: 'mail' });
@@ -1038,7 +1151,7 @@
           `;
         }
 
-        const isActive = activeRoute === item.id;
+        const isActive = activeRoute === item.id || (item.id === 'kursus' && activeRoute === 'kursus-detail');
         return `
           <button type="button" onclick="navigateTo('${item.id}')"
             class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
@@ -1055,6 +1168,10 @@
 
     function navigateTo(routeId) {
       if (!currentUser) return;
+      if (routeId === 'kursus') {
+        syncKwarranCoursesToAdmin(appData);
+        uiState.selectedAdminCourseId = null;
+      }
       activeRoute = routeId;
       toggleMobileSidebar(false);
       destroyActiveCharts();
@@ -1084,7 +1201,11 @@
         },
         'kursus': {
           title: 'Manajemen Kursus & Pelatihan',
-          subtitle: 'Jadwal kegiatan KMD, KML, KPD, KPL dan penugasan pelatih/panitia'
+          subtitle: 'Jadwal kegiatan KMD, KML, KPD, KPL Cabang maupun Usulan Kwartir Ranting'
+        },
+        'kursus-detail': {
+          title: 'Detail Manajemen Kursus',
+          subtitle: 'Pengelolaan Surat Tugas, Absensi (Peserta/Panitia/Pelatih), Rundown & Cetak Dokumen Resmi'
         },
         'administrasi': {
           title: 'Administrasi Persuratan',
@@ -1124,6 +1245,9 @@
           break;
         case 'kursus':
           renderKursusView(main);
+          break;
+        case 'kursus-detail':
+          renderAdminCourseDetailView(main);
           break;
         case 'administrasi':
           renderAdministrasiView(main);
@@ -1296,6 +1420,7 @@
     // 7. VIEW: DASHBOARD (TERFILTER KETAT SESUAI ROLE & WILAYAH KWARRAN)
     // =========================================================================
     function renderDashboardView(container) {
+      syncKwarranCoursesToAdmin(appData);
       const scope = getActiveKwarranScope();
       const isKwarran = scope.isKwarran;
       const myKwarran = scope.kwarranName;
@@ -1313,7 +1438,6 @@
       const myKwarranCourses = getScopedKwarranCourses();
       const myKwarranParticipants = getScopedKwarranParticipants();
 
-      // Jadwal kursus terfilter ketat untuk Kwarran aktif (hanya kursus wilayah Kwarran tersebut)
       const dashboardScheduleRows = isKwarran
         ? myKwarranCourses.map(kc => {
             const cnt = appData.kwarranParticipants.filter(
@@ -1327,12 +1451,14 @@
               status: 'Aktif Kwarran'
             };
           })
-        : appData.kursus.slice(0, 4).map(k => ({
+        : appData.kursus.slice(0, 5).map(k => ({
             nama: k.nama,
             lokasi: k.lokasi,
             tanggal: k.tanggal,
             pesertaLabel: `${k.terdaftar}/${k.kuota}`,
-            status: k.status
+            status: k.status,
+            sourceType: k.sourceType,
+            sourceKwarran: k.sourceKwarran
           }));
 
       container.innerHTML = `
@@ -1500,7 +1626,7 @@
                   ${isKwarran ? `Jadwal Kursus Wilayah Kwarran ${escapeHtml(myKwarran)}` : 'Jadwal Kursus & Pelatihan Pusdiklatcab'}
                 </h4>
                 <p class="text-xs text-gray-500">
-                  ${isKwarran ? `Agenda pelatihan yang terdaftar di Kwartir Ranting ${escapeHtml(myKwarran)}` : 'Agenda kegiatan pendidikan & pelatihan terkini'}
+                  ${isKwarran ? `Agenda pelatihan yang terdaftar di Kwartir Ranting ${escapeHtml(myKwarran)}` : 'Agenda kegiatan cabang & usulan Kwartir Ranting'}
                 </p>
               </div>
               ${!isKwarran ? `
@@ -1527,6 +1653,7 @@
                   ${dashboardScheduleRows.map(k => `
                     <tr class="hover:bg-scout-cream/40">
                       <td class="py-3 px-3">
+                        ${k.sourceType === 'kwarran' ? `<span class="inline-block px-2 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-bold mb-1">Usulan Kwarran ${escapeHtml(k.sourceKwarran)}</span>` : ''}
                         <p class="font-bold text-scout-dark">${escapeHtml(k.nama)}</p>
                         <p class="text-[11px] text-gray-500">${escapeHtml(k.lokasi)}</p>
                       </td>
@@ -1560,7 +1687,11 @@
                 <button type="button" onclick="navigateTo('kwarran-daftar-kursus')" class="text-xs font-bold text-scout-forest hover:underline">
                   Kelola &rarr;
                 </button>
-              ` : ''}
+              ` : `
+                <button type="button" onclick="navigateTo('kursus')" class="text-xs font-bold text-scout-forest hover:underline">
+                  Kelola Detail &rarr;
+                </button>
+              `}
             </div>
             <div class="space-y-3">
               ${myKwarranCourses.slice(0, 4).map(kc => {
@@ -1860,7 +1991,6 @@
       const isKwarran = scope.isKwarran;
       const lockedKwarran = isKwarran ? scope.kwarranName : null;
 
-      // Filter dataset secara eksklusif sesuai scope sesi aktif
       const scopeBase = getScopedPotensiList();
       let list = scopeBase.filter(item => {
         if (!lockedKwarran && uiState.potensiKwarran !== 'ALL' && !isSameKwarran(item.kwarran, uiState.potensiKwarran)) return false;
@@ -2163,28 +2293,46 @@
     }
 
     // =========================================================================
-    // 10. VIEW: KURSUS (ADMIN, PELATIH, PANITIA)
+    // 10. VIEW: KURSUS (ADMIN, PELATIH, PANITIA) + SINKRONISASI KWARRAN
     // =========================================================================
     function renderKursusView(container) {
+      syncKwarranCoursesToAdmin(appData);
+      const isAdmin = currentUser && currentUser.role === 'Admin';
+
       const list = appData.kursus.filter(k => {
         if (uiState.kursusStatus !== 'ALL' && k.status !== uiState.kursusStatus) return false;
+        if (uiState.kursusOriginFilter === 'cabang' && k.sourceType === 'kwarran') return false;
+        if (uiState.kursusOriginFilter === 'kwarran' && k.sourceType !== 'kwarran') return false;
         if (uiState.kursusSearch) {
           const q = uiState.kursusSearch.toLowerCase();
-          return k.nama.toLowerCase().includes(q) || k.lokasi.toLowerCase().includes(q) || k.angkatan.toLowerCase().includes(q);
+          return (
+            k.nama.toLowerCase().includes(q) ||
+            k.lokasi.toLowerCase().includes(q) ||
+            k.angkatan.toLowerCase().includes(q) ||
+            (k.sourceKwarran || '').toLowerCase().includes(q)
+          );
         }
         return true;
       });
 
+      const usulanCount = appData.kursus.filter(k => k.sourceType === 'kwarran').length;
+
       container.innerHTML = `
-        <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div class="flex flex-col sm:flex-row gap-3 flex-1">
             <div class="relative flex-1 max-w-md">
               <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3"></i>
               <input type="text" value="${escapeHtml(uiState.kursusSearch)}"
                 oninput="uiState.kursusSearch = this.value; renderKursusView(document.getElementById('main-content')); lucide.createIcons();"
-                placeholder="Cari nama kursus, angkatan, atau lokasi..."
+                placeholder="Cari nama kursus, Kwarran, angkatan, atau lokasi..."
                 class="w-full pl-9 pr-3 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
             </div>
+            <select onchange="uiState.kursusOriginFilter = this.value; renderKursusView(document.getElementById('main-content')); lucide.createIcons();"
+              class="px-3.5 py-2 rounded-xl border border-scout-sand text-xs font-semibold text-scout-dark bg-scout-cream/30">
+              <option value="ALL" ${uiState.kursusOriginFilter === 'ALL' ? 'selected' : ''}>Semua Penyelenggara (${appData.kursus.length})</option>
+              <option value="cabang" ${uiState.kursusOriginFilter === 'cabang' ? 'selected' : ''}>Kursus Cabang (${appData.kursus.length - usulanCount})</option>
+              <option value="kwarran" ${uiState.kursusOriginFilter === 'kwarran' ? 'selected' : ''}>Usulan Kwarran (${usulanCount})</option>
+            </select>
             <select onchange="uiState.kursusStatus = this.value; renderKursusView(document.getElementById('main-content')); lucide.createIcons();"
               class="px-3.5 py-2 rounded-xl border border-scout-sand text-xs font-semibold text-scout-dark bg-scout-cream/30">
               <option value="ALL">Semua Status Kegiatan</option>
@@ -2203,13 +2351,27 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
           ${list.map(k => {
             const pct = Math.min(100, Math.round((k.terdaftar / Math.max(1, k.kuota)) * 100));
+            const isKwarranOrigin = k.sourceType === 'kwarran';
             return `
-              <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout flex flex-col justify-between">
+              <div onclick="${isAdmin ? `openAdminCourseDetail('${k.id}')` : ''}"
+                class="bg-white rounded-2xl p-5 border ${isKwarranOrigin ? 'border-teal-300/90' : 'border-scout-sand'} shadow-scout flex flex-col justify-between ${isAdmin ? 'cursor-pointer hover:border-scout-forest hover:shadow-lg transition' : ''}">
                 <div>
-                  <div class="flex items-start justify-between gap-3 mb-2">
-                    <span class="px-2.5 py-1 rounded-lg bg-scout-cream border border-scout-sand text-[11px] font-bold text-scout-brown">
-                      ${escapeHtml(k.angkatan)}
-                    </span>
+                  <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                      ${isKwarranOrigin ? `
+                        <span class="px-2.5 py-1 rounded-lg bg-teal-800 text-white text-[11px] font-extrabold inline-flex items-center gap-1">
+                          <i data-lucide="git-merge" class="w-3 h-3 text-scout-gold"></i>
+                          <span>Usulan Kwarran ${escapeHtml(k.sourceKwarran)}</span>
+                        </span>
+                      ` : `
+                        <span class="px-2.5 py-1 rounded-lg bg-scout-dark text-scout-gold text-[11px] font-bold">
+                          Pusdiklatcab Cabang
+                        </span>
+                      `}
+                      <span class="px-2.5 py-1 rounded-lg bg-scout-cream border border-scout-sand text-[11px] font-bold text-scout-brown">
+                        ${escapeHtml(k.angkatan)}
+                      </span>
+                    </div>
                     ${renderStatusBadge(k.status)}
                   </div>
                   <h4 class="text-base font-extrabold text-scout-dark leading-snug">${escapeHtml(k.nama)}</h4>
@@ -2217,7 +2379,7 @@
                   <div class="mt-4 space-y-2 text-xs text-gray-600">
                     <div class="flex items-center gap-2">
                       <i data-lucide="calendar" class="w-4 h-4 text-scout-forest shrink-0"></i>
-                      <span class="font-semibold text-scout-dark">${escapeHtml(k.tanggal)}</span>
+                      <span class="font-semibold text-scout-dark">${escapeHtml(k.hari && k.hari !== 'Sesuai Jadwal' ? `${k.hari}, ` : '')}${escapeHtml(k.tanggal)}</span>
                     </div>
                     <div class="flex items-center gap-2">
                       <i data-lucide="map-pin" class="w-4 h-4 text-scout-forest shrink-0"></i>
@@ -2236,24 +2398,36 @@
 
                 <div class="mt-5 pt-4 border-t border-gray-100">
                   <div class="flex items-center justify-between text-xs mb-1.5">
-                    <span class="font-semibold text-gray-600">Keterisian Kuota Peserta</span>
+                    <span class="font-semibold text-gray-600">
+                      ${isKwarranOrigin ? 'Peserta Tersinkronisasi dari Kwarran' : 'Keterisian Kuota Peserta'}
+                    </span>
                     <span class="font-extrabold text-scout-dark">${k.terdaftar} / ${k.kuota} Orang (${pct}%)</span>
                   </div>
                   <div class="w-full h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
-                    <div class="h-full bg-scout-forest rounded-full" style="width: ${pct}%"></div>
+                    <div class="h-full ${isKwarranOrigin ? 'bg-teal-700' : 'bg-scout-forest'} rounded-full" style="width: ${pct}%"></div>
                   </div>
 
-                  <div class="flex items-center justify-end gap-2">
-                    <button type="button" onclick="openKursusModal('${k.id}')"
-                      class="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold flex items-center gap-1.5 transition">
-                      <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                      <span>Edit Kursus</span>
-                    </button>
-                    <button type="button" onclick="deleteKursus('${k.id}')"
-                      class="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-1.5 transition">
-                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                      <span>Hapus</span>
-                    </button>
+                  <div class="flex flex-wrap items-center justify-between gap-2" onclick="event.stopPropagation()">
+                    ${isAdmin ? `
+                      <button type="button" onclick="openAdminCourseDetail('${k.id}')"
+                        class="px-3.5 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-extrabold flex items-center gap-1.5 shadow-xs transition">
+                        <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-scout-gold"></i>
+                        <span>Kelola Detail Kursus</span>
+                      </button>
+                    ` : '<div></div>'}
+
+                    <div class="flex items-center gap-1.5">
+                      <button type="button" onclick="openKursusModal('${k.id}')"
+                        class="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold flex items-center gap-1.5 transition">
+                        <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                        <span>Edit</span>
+                      </button>
+                      <button type="button" onclick="deleteKursus('${k.id}')"
+                        class="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-1.5 transition">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        <span>Hapus</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2276,7 +2450,13 @@
                 class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Jenjang Kursus</label>
+                <select id="krs-jenjang" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
+                  ${['KMD', 'KML', 'KPD', 'KPL', 'Orientasi'].map(j => `<option value="${j}" ${k && k.jenjang === j ? 'selected' : ''}>${j}</option>`).join('')}
+                </select>
+              </div>
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Angkatan / Tahun <span class="text-red-600">*</span></label>
                 <input type="text" id="krs-angkatan" required value="${k ? escapeHtml(k.angkatan) : 'Angkatan XLIII / 2026'}"
@@ -2292,7 +2472,13 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Hari Pelaksanaan</label>
+                <input type="text" id="krs-hari" value="${k ? escapeHtml(k.hari || '') : 'Jumat - Minggu'}"
+                  placeholder="Contoh: Jumat - Minggu"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+              </div>
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Pelaksanaan <span class="text-red-600">*</span></label>
                 <input type="text" id="krs-tanggal" required value="${k ? escapeHtml(k.tanggal) : ''}"
@@ -2302,7 +2488,7 @@
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Lokasi Kegiatan <span class="text-red-600">*</span></label>
                 <input type="text" id="krs-lokasi" required value="${k ? escapeHtml(k.lokasi) : ''}"
-                  placeholder="Contoh: Bumi Perkemahan Kitri Bakti, Curug"
+                  placeholder="Contoh: Buper Kitri Bakti"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
               </div>
             </div>
@@ -2344,18 +2530,45 @@
 
     function saveKursusForm(e, id) {
       e.preventDefault();
+      const prev = id ? appData.kursus.find(item => item.id === id) : null;
+      const newNama = document.getElementById('krs-nama').value.trim();
+      const newHari = document.getElementById('krs-hari').value.trim() || 'Sesuai Jadwal';
+      const newTanggal = document.getElementById('krs-tanggal').value.trim();
+      const newLokasi = document.getElementById('krs-lokasi').value.trim();
+
       const payload = {
+        ...(prev || {}),
         id: id || generateId('krs'),
-        nama: document.getElementById('krs-nama').value.trim(),
+        nama: newNama,
+        jenjang: document.getElementById('krs-jenjang').value,
         angkatan: document.getElementById('krs-angkatan').value.trim(),
         status: document.getElementById('krs-status').value,
-        tanggal: document.getElementById('krs-tanggal').value.trim(),
-        lokasi: document.getElementById('krs-lokasi').value.trim(),
+        hari: newHari,
+        tanggal: newTanggal,
+        lokasi: newLokasi,
         kuota: parseInt(document.getElementById('krs-kuota').value, 10) || 50,
         terdaftar: parseInt(document.getElementById('krs-terdaftar').value, 10) || 0,
         pelatih: document.getElementById('krs-pelatih').value.trim(),
-        panitia: document.getElementById('krs-panitia').value.trim()
+        panitia: document.getElementById('krs-panitia').value.trim(),
+        sourceType: prev ? (prev.sourceType || 'cabang') : 'cabang',
+        sourceKwarran: prev ? (prev.sourceKwarran || '') : '',
+        sourceCourseId: prev ? (prev.sourceCourseId || '') : '',
+        _adminEditedName: prev && prev.sourceType === 'kwarran' ? true : (prev ? prev._adminEditedName : false)
       };
+
+      // Sinkronkan kembali ke kursus Kwarran bila kursus berasal dari usulan Kwarran
+      if (payload.sourceType === 'kwarran' && payload.sourceCourseId) {
+        const kwIdx = appData.kwarranCourses.findIndex(kc => kc.id === payload.sourceCourseId);
+        if (kwIdx !== -1) {
+          appData.kwarranCourses[kwIdx] = {
+            ...appData.kwarranCourses[kwIdx],
+            namaKursus: newNama,
+            hari: newHari,
+            tanggal: newTanggal,
+            lokasi: newLokasi
+          };
+        }
+      }
 
       if (id) {
         const idx = appData.kursus.findIndex(item => item.id === id);
@@ -2378,13 +2591,1320 @@
         'Hapus Jadwal Kursus?',
         `Yakin menghapus kegiatan "${k.nama}" (${k.angkatan})?`,
         () => {
+          if (k.sourceType === 'kwarran' && k.sourceCourseId) {
+            appData.kwarranCourses = appData.kwarranCourses.filter(kc => kc.id !== k.sourceCourseId);
+            appData.kwarranParticipants = appData.kwarranParticipants.filter(pt => pt.courseId !== k.sourceCourseId);
+          }
           appData.kursus = appData.kursus.filter(item => item.id !== id);
+          delete appData.courseDetails[id];
           saveAppData();
           renderKursusView(document.getElementById('main-content'));
           lucide.createIcons();
           showToast('Jadwal kursus telah dihapus.', 'info');
         }
       );
+    }
+
+    // =========================================================================
+    // 10B. HALAMAN DETAIL PENGELOLAAN KURSUS PADA ROLE ADMIN
+    //      (Edit Kursus, Surat Tugas & Lampiran, Absensi 3 Peran, Rundown, Cetak Resmi)
+    // =========================================================================
+    function getCourseParticipantsForAdmin(course) {
+      if (!course) return [];
+      if (course.sourceType === 'kwarran' && course.sourceCourseId) {
+        return appData.kwarranParticipants
+          .filter(p => p.courseId === course.sourceCourseId)
+          .map(p => ({
+            id: p.id,
+            nama: p.namaGelar,
+            tempatLahir: p.tempatLahir,
+            tanggalLahir: p.tanggalLahir,
+            golongan: p.golongan,
+            pangkalan: p.namaPangkalan,
+            kwarran: p.kwarran,
+            source: 'kwarran'
+          }));
+      }
+      const detail = ensureCourseDetailRecord(course);
+      return detail.manualParticipants || [];
+    }
+
+    function ensureCourseDetailRecord(course) {
+      if (!appData.courseDetails[course.id]) {
+        const initialPelatih = (course.pelatih || 'Kak Drs. H. Ahmad Fauzi, M.Pd.')
+          .split(',')
+          .map((n, i) => ({
+            id: `plt_${course.id}_${i + 1}`,
+            nama: n.trim(),
+            jabatan: i === 0 ? 'Pemimpin Kursus (Pinsus)' : 'Pelatih Pendamping',
+            statusHadir: 'Hadir',
+            catatan: ''
+          }))
+          .filter(x => x.nama);
+
+        const initialPanitia = (course.panitia || 'Kak Rina Wulandari, S.Pd.')
+          .split(',')
+          .map((n, i) => ({
+            id: `pnt_${course.id}_${i + 1}`,
+            nama: n.trim(),
+            jabatan: i === 0 ? 'Ketua Panitia Pelaksana' : 'Sekretaris / Anggota Panitia',
+            statusHadir: 'Hadir',
+            catatan: ''
+          }))
+          .filter(x => x.nama);
+
+        appData.courseDetails[course.id] = {
+          suratTugas: {
+            nomor: `ST-${Math.floor(100 + Math.random() * 899)}/28.04-Pusdiklatcab/2026`,
+            tanggal: new Date().toISOString().split('T')[0],
+            penandatangan: appData.profile.namaKapus,
+            perihal: `Penugasan Tim Pelatih & Panitia Pelaksana ${course.nama}`,
+            personel: [...initialPelatih.map(p => `${p.nama} (${p.jabatan})`), ...initialPanitia.map(p => `${p.nama} (${p.jabatan})`)].join('\n'),
+            attachments: []
+          },
+          manualParticipants: course.sourceType === 'kwarran' ? [] : [
+            {
+              id: `mp_${course.id}_1`,
+              nama: 'Kak Hendra Setiawan, S.Pd.',
+              tempatLahir: 'Tangerang',
+              tanggalLahir: '1993-04-12',
+              golongan: 'Penggalang',
+              pangkalan: 'SMPN 1 Tigaraksa',
+              kwarran: 'Tigaraksa',
+              source: 'cabang'
+            },
+            {
+              id: `mp_${course.id}_2`,
+              nama: 'Kak Dewi Anggraini, S.Pd.SD.',
+              tempatLahir: 'Tangerang',
+              tanggalLahir: '1995-09-18',
+              golongan: 'Siaga',
+              pangkalan: 'SDN Curug 01',
+              kwarran: 'Curug',
+              source: 'cabang'
+            }
+          ],
+          attendanceStatus: {},
+          panitiaList: initialPanitia,
+          pelatihList: initialPelatih,
+          rundown: [
+            {
+              id: `rnd_${course.id}_1`,
+              sesi: 'Hari Ke-1 / Sesi 1',
+              waktu: '08.00 - 09.30 WIB',
+              materi: 'Upacara Pembukaan, Orientasi Kursus & Kontrak Belajar',
+              narasumber: initialPelatih[0] ? initialPelatih[0].nama : 'Pinsus Pusdiklatcab',
+              keterangan: 'Pakaian Seragam Pramuka Lengkap'
+            },
+            {
+              id: `rnd_${course.id}_2`,
+              sesi: 'Hari Ke-1 / Sesi 2',
+              waktu: '09.45 - 11.45 WIB',
+              materi: 'Fundamental Gerakan Pramuka, Prinsip Dasar & Metode Kepramukaan',
+              narasumber: initialPelatih[0] ? initialPelatih[0].nama : 'Tim Pelatih',
+              keterangan: 'Diskusi Kelompok & Simulasi'
+            }
+          ],
+          rundownFiles: []
+        };
+      }
+      const det = appData.courseDetails[course.id];
+      det.suratTugas = Object.assign({ nomor: '', tanggal: '', penandatangan: appData.profile.namaKapus, perihal: '', personel: '', attachments: [] }, det.suratTugas || {});
+      if (!Array.isArray(det.suratTugas.attachments)) det.suratTugas.attachments = [];
+      if (!Array.isArray(det.manualParticipants)) det.manualParticipants = [];
+      if (!det.attendanceStatus || typeof det.attendanceStatus !== 'object') det.attendanceStatus = {};
+      if (!Array.isArray(det.panitiaList)) det.panitiaList = [];
+      if (!Array.isArray(det.pelatihList)) det.pelatihList = [];
+      if (!Array.isArray(det.rundown)) det.rundown = [];
+      if (!Array.isArray(det.rundownFiles)) det.rundownFiles = [];
+      return det;
+    }
+
+    function openAdminCourseDetail(courseId, tab = 'edit') {
+      syncKwarranCoursesToAdmin(appData);
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) {
+        showToast('Data kursus tidak ditemukan.', 'error');
+        return;
+      }
+      ensureCourseDetailRecord(course);
+      uiState.selectedAdminCourseId = courseId;
+      uiState.adminCourseDetailTab = tab;
+      navigateTo('kursus-detail');
+    }
+
+    function switchAdminCourseDetailTab(tab) {
+      uiState.adminCourseDetailTab = tab;
+      renderAdminCourseDetailView(document.getElementById('main-content'));
+      lucide.createIcons();
+    }
+
+    function renderAdminCourseDetailView(container) {
+      syncKwarranCoursesToAdmin(appData);
+      const course = appData.kursus.find(c => c.id === uiState.selectedAdminCourseId);
+      if (!course) {
+        navigateTo('kursus');
+        return;
+      }
+
+      const detail = ensureCourseDetailRecord(course);
+      const pesertaList = getCourseParticipantsForAdmin(course);
+      const isKwarranOrigin = course.sourceType === 'kwarran';
+      const activeTab = uiState.adminCourseDetailTab || 'edit';
+
+      const tabs = [
+        { id: 'edit', label: '1. Edit Data Kursus', icon: 'pencil-ruler' },
+        { id: 'surat-tugas', label: '2. Surat Tugas & Lampiran', icon: 'file-badge' },
+        { id: 'absensi', label: '3. Absensi (Peserta, Panitia, Pelatih)', icon: 'clipboard-check' },
+        { id: 'rundown', label: '4. Jadwal / Rundown Acara', icon: 'calendar-clock' },
+        { id: 'cetak-resmi', label: '5. Pusat Cetak Dokumen Resmi', icon: 'printer' }
+      ];
+
+      container.innerHTML = `
+        <!-- HEADER NAVIGASI DETAIL KURSUS -->
+        <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout mb-6 no-print">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-scout-sand/70">
+            <div class="flex items-start gap-3.5">
+              <button type="button" onclick="navigateTo('kursus')"
+                class="px-3.5 py-2 rounded-xl bg-scout-cream hover:bg-scout-sand/60 text-scout-dark border border-scout-sand text-xs font-extrabold flex items-center gap-1.5 shrink-0 transition">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                <span>Kembali</span>
+              </button>
+              <div>
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                  ${isKwarranOrigin ? `
+                    <span class="px-2.5 py-0.5 rounded-md bg-teal-800 text-white text-[11px] font-extrabold">
+                      Usulan Kwarran ${escapeHtml(course.sourceKwarran)}
+                    </span>
+                  ` : `
+                    <span class="px-2.5 py-0.5 rounded-md bg-scout-dark text-scout-gold text-[11px] font-bold">
+                      Kursus Cabang Pusdiklatcab
+                    </span>
+                  `}
+                  <span class="px-2.5 py-0.5 rounded-md bg-scout-cream border border-scout-sand text-[11px] font-bold text-scout-brown">
+                    ${escapeHtml(course.jenjang || 'KMD')} • ${escapeHtml(course.angkatan)}
+                  </span>
+                  ${renderStatusBadge(course.status)}
+                </div>
+                <h3 class="text-base sm:text-xl font-extrabold text-scout-dark">${escapeHtml(course.nama)}</h3>
+                <p class="text-xs text-gray-500 mt-0.5">
+                  ${escapeHtml(course.hari || '')} (${escapeHtml(course.tanggal)}) • ${escapeHtml(course.lokasi)} • <strong>${pesertaList.length} Peserta</strong>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5 TAB UTAMA DETAIL MANAJEMEN KURSUS -->
+          <div class="mt-4 flex flex-wrap gap-2">
+            ${tabs.map(t => {
+              const isAct = activeTab === t.id;
+              return `
+                <button type="button" onclick="switchAdminCourseDetailTab('${t.id}')"
+                  class="px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 border transition ${
+                    isAct
+                      ? 'bg-scout-dark text-white border-scout-dark shadow-sm'
+                      : 'bg-scout-cream/50 text-scout-brown border-scout-sand hover:bg-scout-cream'
+                  }">
+                  <i data-lucide="${t.icon}" class="w-4 h-4 ${isAct ? 'text-scout-gold' : 'text-scout-forest'}"></i>
+                  <span>${t.label}</span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- AREA KONTEN TAB TERPILIH -->
+        <div id="admin-course-detail-panel">
+          ${activeTab === 'edit' ? renderAdminCourseTabEdit(course) : ''}
+          ${activeTab === 'surat-tugas' ? renderAdminCourseTabSuratTugas(course, detail) : ''}
+          ${activeTab === 'absensi' ? renderAdminCourseTabAbsensi(course, detail, pesertaList) : ''}
+          ${activeTab === 'rundown' ? renderAdminCourseTabRundown(course, detail) : ''}
+          ${activeTab === 'cetak-resmi' ? renderAdminCourseTabCetakResmi(course, detail, pesertaList) : ''}
+        </div>
+      `;
+    }
+
+    // --- TAB 1: EDIT DATA KURSUS ---
+    function renderAdminCourseTabEdit(course) {
+      return `
+        <div class="bg-white rounded-2xl p-6 border border-scout-sand shadow-scout max-w-4xl">
+          <div class="pb-4 border-b border-scout-sand/70 mb-5">
+            <h4 class="text-base font-extrabold text-scout-dark">Edit Data Pelaksanaan Kursus</h4>
+            <p class="text-xs text-gray-500 mt-0.5">
+              ${course.sourceType === 'kwarran'
+                ? `Perubahan jadwal/lokasi/nama akan otomatis tersinkronisasi dengan pendaftaran Kwarran ${escapeHtml(course.sourceKwarran)}.`
+                : 'Perbarui detail informasi kegiatan kursus tingkat cabang.'}
+            </p>
+          </div>
+
+          <form onsubmit="saveAdminDetailCourseEdit(event, '${course.id}')" class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nama Kursus / Kegiatan <span class="text-red-600">*</span></label>
+              <input type="text" id="det-krs-nama" required value="${escapeHtml(course.nama)}"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm font-semibold text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Jenjang Kursus</label>
+                <select id="det-krs-jenjang" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
+                  ${['KMD', 'KML', 'KPD', 'KPL', 'Orientasi'].map(j => `<option value="${j}" ${course.jenjang === j ? 'selected' : ''}>${j}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Angkatan / Tahun</label>
+                <input type="text" id="det-krs-angkatan" required value="${escapeHtml(course.angkatan)}"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Status Kegiatan</label>
+                <select id="det-krs-status" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
+                  <option value="Akan Datang" ${course.status === 'Akan Datang' ? 'selected' : ''}>Akan Datang</option>
+                  <option value="Berlangsung" ${course.status === 'Berlangsung' ? 'selected' : ''}>Berlangsung</option>
+                  <option value="Selesai" ${course.status === 'Selesai' ? 'selected' : ''}>Selesai</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Hari Pelaksanaan</label>
+                <input type="text" id="det-krs-hari" required value="${escapeHtml(course.hari || '')}"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Mulai & Selesai</label>
+                <input type="text" id="det-krs-tanggal" required value="${escapeHtml(course.tanggal)}"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Kuota Maksimal Peserta</label>
+                <input type="number" id="det-krs-kuota" required min="1" value="${course.kuota}"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Lokasi / Tempat Pelaksanaan</label>
+              <input type="text" id="det-krs-lokasi" required value="${escapeHtml(course.lokasi)}"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Pemimpin Kursus / Tim Pelatih</label>
+                <input type="text" id="det-krs-pelatih" value="${escapeHtml(course.pelatih)}"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Penanggung Jawab Panitia</label>
+                <input type="text" id="det-krs-panitia" value="${escapeHtml(course.panitia)}"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+              </div>
+            </div>
+
+            <div class="pt-3 flex justify-end border-t border-gray-100">
+              <button type="submit" class="px-6 py-2.5 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition">
+                <i data-lucide="save" class="w-4 h-4 text-scout-gold"></i>
+                <span>Simpan Perubahan Data Kursus</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      `;
+    }
+
+    function saveAdminDetailCourseEdit(e, courseId) {
+      e.preventDefault();
+      const idx = appData.kursus.findIndex(c => c.id === courseId);
+      if (idx === -1) return;
+      const prev = appData.kursus[idx];
+
+      const updated = {
+        ...prev,
+        nama: document.getElementById('det-krs-nama').value.trim(),
+        jenjang: document.getElementById('det-krs-jenjang').value,
+        angkatan: document.getElementById('det-krs-angkatan').value.trim(),
+        status: document.getElementById('det-krs-status').value,
+        hari: document.getElementById('det-krs-hari').value.trim(),
+        tanggal: document.getElementById('det-krs-tanggal').value.trim(),
+        kuota: parseInt(document.getElementById('det-krs-kuota').value, 10) || 40,
+        lokasi: document.getElementById('det-krs-lokasi').value.trim(),
+        pelatih: document.getElementById('det-krs-pelatih').value.trim(),
+        panitia: document.getElementById('det-krs-panitia').value.trim(),
+        _adminEditedName: prev.sourceType === 'kwarran' ? true : prev._adminEditedName
+      };
+
+      appData.kursus[idx] = updated;
+
+      if (updated.sourceType === 'kwarran' && updated.sourceCourseId) {
+        const kwIdx = appData.kwarranCourses.findIndex(kc => kc.id === updated.sourceCourseId);
+        if (kwIdx !== -1) {
+          appData.kwarranCourses[kwIdx] = {
+            ...appData.kwarranCourses[kwIdx],
+            namaKursus: updated.nama,
+            hari: updated.hari,
+            tanggal: updated.tanggal,
+            lokasi: updated.lokasi
+          };
+        }
+      }
+
+      saveAppData();
+      renderAdminCourseDetailView(document.getElementById('main-content'));
+      lucide.createIcons();
+      showToast('Detail data kursus berhasil diperbarui dan disinkronkan!', 'success');
+    }
+
+    // --- TAB 2: SURAT TUGAS & UPLOAD LAMPIRAN ---
+    function renderAdminCourseTabSuratTugas(course, detail) {
+      const st = detail.suratTugas;
+      return `
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-7 bg-white rounded-2xl p-6 border border-scout-sand shadow-scout no-print">
+            <div class="pb-4 border-b border-scout-sand/70 mb-5 flex items-center justify-between">
+              <div>
+                <h4 class="text-base font-extrabold text-scout-dark">Form Surat Tugas Pelatih & Panitia</h4>
+                <p class="text-xs text-gray-500">Isi detail surat tugas dan unggah berkas lampiran pendukung</p>
+              </div>
+              <button type="button" onclick="window.print()"
+                class="px-3.5 py-2 rounded-xl bg-scout-dark text-white text-xs font-bold flex items-center gap-1.5">
+                <i data-lucide="printer" class="w-3.5 h-3.5 text-scout-gold"></i>
+                <span>Cetak ST</span>
+              </button>
+            </div>
+
+            <form onsubmit="saveAdminCourseSuratTugas(event, '${course.id}')" class="space-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nomor Surat Tugas <span class="text-red-600">*</span></label>
+                  <input type="text" id="st-nomor" required value="${escapeHtml(st.nomor)}"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm font-semibold" />
+                </div>
+                <div>
+                  <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Surat Tugas <span class="text-red-600">*</span></label>
+                  <input type="date" id="st-tanggal" required value="${escapeHtml(st.tanggal)}"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Pejabat Penandatangan / Kapusdiklatcab</label>
+                <input type="text" id="st-penandatangan" required value="${escapeHtml(st.penandatangan || appData.profile.namaKapus)}"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Dasar / Perihal Penugasan</label>
+                <input type="text" id="st-perihal" value="${escapeHtml(st.perihal)}"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Daftar Personel yang Ditugaskan (Pelatih / Panitia)</label>
+                <textarea id="st-personel" rows="4" placeholder="Tulis satu nama/jabatan per baris..."
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-xs leading-relaxed">${escapeHtml(st.personel)}</textarea>
+              </div>
+
+              <div class="p-4 rounded-xl bg-scout-cream/70 border border-dashed border-scout-khaki">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <p class="text-xs font-bold text-scout-dark">Upload Lampiran Surat Tugas / SK (PDF / Gambar / Doc)</p>
+                    <p class="text-[11px] text-gray-500">Maksimal ukuran file 2 MB per lampiran</p>
+                  </div>
+                  <label class="cursor-pointer px-3.5 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-bold inline-flex items-center gap-1.5 self-start">
+                    <i data-lucide="upload" class="w-3.5 h-3.5 text-scout-gold"></i>
+                    <span>Pilih File Lampiran</span>
+                    <input type="file" onchange="uploadCourseStAttachment(event, '${course.id}')" class="hidden" />
+                  </label>
+                </div>
+
+                <div class="mt-3 space-y-2">
+                  ${st.attachments.map(att => `
+                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-white border border-scout-sand text-xs">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <i data-lucide="file-check-2" class="w-4 h-4 text-scout-forest shrink-0"></i>
+                        <span class="font-bold text-scout-dark truncate">${escapeHtml(att.name)}</span>
+                        <span class="text-[10px] text-gray-400 shrink-0">(${escapeHtml(att.sizeLabel || 'File')})</span>
+                      </div>
+                      <div class="flex items-center gap-1.5 shrink-0">
+                        <a href="${att.dataUrl}" download="${escapeHtml(att.name)}"
+                          class="px-2.5 py-1 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[11px] hover:bg-emerald-100">
+                          Unduh
+                        </a>
+                        <button type="button" onclick="deleteCourseStAttachment('${course.id}', '${att.id}')"
+                          class="p-1 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100">
+                          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                      </div>
+                    </div>
+                  `).join('') || '<p class="text-[11px] text-gray-500 italic">Belum ada berkas lampiran yang diunggah.</p>'}
+                </div>
+              </div>
+
+              <div class="pt-2 flex justify-end">
+                <button type="submit" class="px-5 py-2.5 rounded-xl bg-scout-dark hover:bg-scout-brown text-white font-bold text-xs flex items-center gap-2">
+                  <i data-lucide="save" class="w-4 h-4 text-scout-gold"></i>
+                  <span>Simpan Surat Tugas</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- PRATINJAU SURAT TUGAS SIAP CETAK -->
+          <div id="print-area" class="lg:col-span-5 bg-white rounded-2xl p-6 border border-scout-sand shadow-scout text-xs">
+            <div class="flex items-center gap-3 pb-3 border-b-2 border-scout-dark">
+              <div class="w-12 h-12 shrink-0">${getLogoHtml()}</div>
+              <div class="text-center flex-1">
+                <p class="text-[10px] font-bold uppercase text-scout-brown">Gerakan Pramuka Kwartir Cabang Tangerang</p>
+                <h5 class="font-serif font-black text-sm text-scout-dark">PUSDIKLATCAB TANGERANG</h5>
+                <p class="text-[9px] text-gray-500">${escapeHtml(appData.profile.alamat)}</p>
+              </div>
+            </div>
+
+            <div class="text-center my-4">
+              <h5 class="font-extrabold underline uppercase text-sm text-scout-dark">SURAT TUGAS</h5>
+              <p class="text-[11px] text-gray-600 mt-0.5">Nomor: ${escapeHtml(st.nomor || '-')}</p>
+            </div>
+
+            <p class="leading-relaxed text-gray-800 mb-3">
+              Kepala Pusat Pendidikan dan Pelatihan Cabang (Pusdiklatcab) Tangerang menugaskan kepada nama-nama personel berikut untuk bertugas sebagai Tim Pelatih dan Panitia Pelaksana pada kegiatan <strong>${escapeHtml(course.nama)}</strong>:
+            </p>
+
+            <div class="p-3 rounded-xl bg-scout-cream/60 border border-scout-sand mb-3 space-y-1">
+              <p><strong>Hari / Tanggal:</strong> ${escapeHtml(course.hari || '-')}, ${escapeHtml(course.tanggal)}</p>
+              <p><strong>Tempat:</strong> ${escapeHtml(course.lokasi)}</p>
+            </div>
+
+            <div class="mb-4">
+              <p class="font-bold text-scout-dark mb-1">Personel yang Ditugaskan:</p>
+              <ol class="list-decimal pl-5 space-y-1 text-gray-800">
+                ${(st.personel || '').split('\n').filter(Boolean).map(line => `<li>${escapeHtml(line)}</li>`).join('') || '<li>Belum ada personel diinput</li>'}
+              </ol>
+            </div>
+
+            <div class="mt-6 flex justify-end">
+              <div class="text-center w-52">
+                <p>Tangerang, ${formatDateIndo(st.tanggal)}</p>
+                <p class="font-bold mt-0.5">Kepala Pusdiklatcab Tangerang,</p>
+                <div class="h-12 flex items-center justify-center text-[9px] italic text-gray-400">[Tertanda]</div>
+                <p class="font-extrabold underline">${escapeHtml(st.penandatangan || appData.profile.namaKapus)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function saveAdminCourseSuratTugas(e, courseId) {
+      e.preventDefault();
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      detail.suratTugas.nomor = document.getElementById('st-nomor').value.trim();
+      detail.suratTugas.tanggal = document.getElementById('st-tanggal').value;
+      detail.suratTugas.penandatangan = document.getElementById('st-penandatangan').value.trim();
+      detail.suratTugas.perihal = document.getElementById('st-perihal').value.trim();
+      detail.suratTugas.personel = document.getElementById('st-personel').value.trim();
+      saveAppData();
+      renderAdminCourseDetailView(document.getElementById('main-content'));
+      lucide.createIcons();
+      showToast('Data Surat Tugas berhasil disimpan!', 'success');
+    }
+
+    function uploadCourseStAttachment(e, courseId) {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) {
+        showToast('Ukuran lampiran maksimal 2 MB.', 'error');
+        return;
+      }
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        detail.suratTugas.attachments.push({
+          id: generateId('att'),
+          name: file.name,
+          sizeLabel: `${Math.max(1, Math.round(file.size / 1024))} KB`,
+          dataUrl: ev.target.result
+        });
+        saveAppData();
+        renderAdminCourseDetailView(document.getElementById('main-content'));
+        lucide.createIcons();
+        showToast(`Lampiran "${file.name}" berhasil diunggah!`, 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function deleteCourseStAttachment(courseId, attId) {
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      detail.suratTugas.attachments = detail.suratTugas.attachments.filter(a => a.id !== attId);
+      saveAppData();
+      renderAdminCourseDetailView(document.getElementById('main-content'));
+      lucide.createIcons();
+      showToast('Lampiran surat tugas dihapus.', 'info');
+    }
+
+    // --- TAB 3: ABSENSI (PESERTA, PANITIA, PELATIH) ---
+    function renderAdminCourseTabAbsensi(course, detail, pesertaList) {
+      const subTab = uiState.adminAttendanceRoleTab || 'peserta';
+      const statusOptions = ['Hadir', 'Izin', 'Sakit', 'Alpa'];
+
+      let rowsHtml = '';
+      if (subTab === 'peserta') {
+        rowsHtml = pesertaList.map((p, idx) => {
+          const curStatus = detail.attendanceStatus[p.id] || 'Hadir';
+          return `
+            <tr class="hover:bg-scout-cream/40">
+              <td class="py-3 px-4 font-semibold text-gray-500">${idx + 1}</td>
+              <td class="py-3 px-4 font-bold text-scout-dark">${escapeHtml(p.nama)}</td>
+              <td class="py-3 px-4 text-gray-600">${escapeHtml(p.pangkalan || '-')} (Kwarran ${escapeHtml(p.kwarran || '-')})</td>
+              <td class="py-3 px-4">${renderGolonganBadge(p.golongan || 'Penggalang')}</td>
+              <td class="py-3 px-4">
+                <div class="flex flex-wrap gap-1.5 no-print">
+                  ${statusOptions.map(st => `
+                    <button type="button" onclick="setCoursePersonAttendance('${course.id}', 'peserta', '${p.id}', '${st}')"
+                      class="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                        curStatus === st ? getAttendanceBtnActiveClass(st) : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                      }">
+                      ${st}
+                    </button>
+                  `).join('')}
+                </div>
+                <span class="hidden print:inline font-bold">${curStatus}</span>
+              </td>
+            </tr>
+          `;
+        }).join('') || `<tr><td colspan="5" class="py-8 text-center text-gray-500">Belum ada peserta terdaftar pada kursus ini.</td></tr>`;
+      } else {
+        const staffList = subTab === 'panitia' ? detail.panitiaList : detail.pelatihList;
+        rowsHtml = staffList.map((stf, idx) => {
+          const curStatus = stf.statusHadir || 'Hadir';
+          return `
+            <tr class="hover:bg-scout-cream/40">
+              <td class="py-3 px-4 font-semibold text-gray-500">${idx + 1}</td>
+              <td class="py-3 px-4 font-bold text-scout-dark">${escapeHtml(stf.nama)}</td>
+              <td class="py-3 px-4 text-gray-600">${escapeHtml(stf.jabatan || '-')}</td>
+              <td class="py-3 px-4">
+                <div class="flex flex-wrap gap-1.5 no-print">
+                  ${statusOptions.map(st => `
+                    <button type="button" onclick="setCoursePersonAttendance('${course.id}', '${subTab}', '${stf.id}', '${st}')"
+                      class="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                        curStatus === st ? getAttendanceBtnActiveClass(st) : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                      }">
+                      ${st}
+                    </button>
+                  `).join('')}
+                </div>
+                <span class="hidden print:inline font-bold">${curStatus}</span>
+              </td>
+              <td class="py-3 px-4 text-right no-print">
+                <button type="button" onclick="deleteCourseStaff('${course.id}', '${subTab}', '${stf.id}')"
+                  class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('') || `<tr><td colspan="5" class="py-8 text-center text-gray-500">Belum ada personel ${subTab} ditambahkan.</td></tr>`;
+      }
+
+      return `
+        <div id="print-area" class="bg-white rounded-2xl border border-scout-sand shadow-scout overflow-hidden">
+          <!-- Sub-Tab Absensi: Peserta, Panitia, Pelatih -->
+          <div class="p-5 border-b border-scout-sand/70 flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
+            <div class="inline-flex flex-wrap p-1.5 rounded-2xl bg-scout-cream border border-scout-sand gap-1">
+              <button type="button" onclick="uiState.adminAttendanceRoleTab = 'peserta'; renderAdminCourseDetailView(document.getElementById('main-content')); lucide.createIcons();"
+                class="px-4 py-2 rounded-xl text-xs font-extrabold transition ${subTab === 'peserta' ? 'bg-scout-dark text-white' : 'text-scout-brown hover:bg-white/70'}">
+                Absensi Peserta (${pesertaList.length})
+              </button>
+              <button type="button" onclick="uiState.adminAttendanceRoleTab = 'panitia'; renderAdminCourseDetailView(document.getElementById('main-content')); lucide.createIcons();"
+                class="px-4 py-2 rounded-xl text-xs font-extrabold transition ${subTab === 'panitia' ? 'bg-scout-dark text-white' : 'text-scout-brown hover:bg-white/70'}">
+                Absensi Panitia (${detail.panitiaList.length})
+              </button>
+              <button type="button" onclick="uiState.adminAttendanceRoleTab = 'pelatih'; renderAdminCourseDetailView(document.getElementById('main-content')); lucide.createIcons();"
+                class="px-4 py-2 rounded-xl text-xs font-extrabold transition ${subTab === 'pelatih' ? 'bg-scout-dark text-white' : 'text-scout-brown hover:bg-white/70'}">
+                Absensi Pelatih (${detail.pelatihList.length})
+              </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              ${subTab !== 'peserta' ? `
+                <button type="button" onclick="openAddCourseStaffModal('${course.id}', '${subTab}')"
+                  class="px-3.5 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-bold flex items-center gap-1.5">
+                  <i data-lucide="user-plus" class="w-3.5 h-3.5 text-scout-gold"></i>
+                  <span>Tambah ${subTab === 'panitia' ? 'Panitia' : 'Pelatih'}</span>
+                </button>
+              ` : ''}
+              <button type="button" onclick="window.print()"
+                class="px-3.5 py-2 rounded-xl bg-scout-dark hover:bg-scout-brown text-white text-xs font-bold flex items-center gap-1.5">
+                <i data-lucide="printer" class="w-3.5 h-3.5 text-scout-gold"></i>
+                <span>Cetak Daftar Hadir</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="p-4 bg-scout-cream/40 border-b border-scout-sand/50">
+            <h4 class="font-extrabold text-sm text-scout-dark uppercase">
+              Daftar Hadir ${subTab === 'peserta' ? 'Peserta Kursus' : (subTab === 'panitia' ? 'Panitia Pelaksana' : 'Tim Pelatih')} — ${escapeHtml(course.nama)}
+            </h4>
+            <p class="text-xs text-gray-500">Pelaksanaan: ${escapeHtml(course.hari || '')} (${escapeHtml(course.tanggal)}) • Lokasi: ${escapeHtml(course.lokasi)}</p>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-scout-cream text-scout-brown text-[11px] font-extrabold uppercase border-b border-scout-sand">
+                  <th class="py-3 px-4 w-12">No</th>
+                  <th class="py-3 px-4">Nama Lengkap</th>
+                  <th class="py-3 px-4">${subTab === 'peserta' ? 'Pangkalan / Kwarran' : 'Jabatan / Tugas'}</th>
+                  ${subTab === 'peserta' ? '<th class="py-3 px-4">Golongan</th>' : ''}
+                  <th class="py-3 px-4">Status Kehadiran</th>
+                  ${subTab !== 'peserta' ? '<th class="py-3 px-4 text-right no-print">Aksi</th>' : ''}
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 text-xs">
+                ${rowsHtml}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function getAttendanceBtnActiveClass(status) {
+      if (status === 'Hadir') return 'bg-scout-forest text-white border-scout-forest';
+      if (status === 'Izin') return 'bg-blue-600 text-white border-blue-600';
+      if (status === 'Sakit') return 'bg-amber-600 text-white border-amber-600';
+      return 'bg-red-600 text-white border-red-600';
+    }
+
+    function setCoursePersonAttendance(courseId, category, personId, status) {
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      if (category === 'peserta') {
+        detail.attendanceStatus[personId] = status;
+      } else {
+        const list = category === 'panitia' ? detail.panitiaList : detail.pelatihList;
+        const item = list.find(x => x.id === personId);
+        if (item) item.statusHadir = status;
+      }
+      saveAppData();
+      renderAdminCourseDetailView(document.getElementById('main-content'));
+      lucide.createIcons();
+    }
+
+    function openAddCourseStaffModal(courseId, category) {
+      const label = category === 'panitia' ? 'Panitia Pelaksana' : 'Tim Pelatih';
+      openFormModal(
+        `Tambah Personel ${label}`,
+        `
+          <form onsubmit="saveCourseStaffModal(event, '${courseId}', '${category}')" class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nama Lengkap & Gelar <span class="text-red-600">*</span></label>
+              <input type="text" id="stf-nama" required placeholder="Contoh: Kak H. Mulyadi, S.Pd."
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Jabatan / Penugasan <span class="text-red-600">*</span></label>
+              <input type="text" id="stf-jabatan" required
+                placeholder="${category === 'panitia' ? 'Contoh: Sekretaris / Seksi Konsumsi' : 'Contoh: Pelatih Materi Fundamental'}"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+            </div>
+            <div class="pt-3 flex justify-end gap-2 border-t border-gray-100">
+              <button type="button" onclick="closeFormModal()" class="px-4 py-2 rounded-xl bg-gray-100 text-xs font-bold text-gray-700">Batal</button>
+              <button type="submit" class="px-5 py-2 rounded-xl bg-scout-forest text-white text-xs font-bold">Simpan Personel</button>
+            </div>
+          </form>
+        `
+      );
+    }
+
+    function saveCourseStaffModal(e, courseId, category) {
+      e.preventDefault();
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      const entry = {
+        id: generateId(category === 'panitia' ? 'pnt' : 'plt'),
+        nama: document.getElementById('stf-nama').value.trim(),
+        jabatan: document.getElementById('stf-jabatan').value.trim(),
+        statusHadir: 'Hadir',
+        catatan: ''
+      };
+      if (category === 'panitia') {
+        detail.panitiaList.push(entry);
+      } else {
+        detail.pelatihList.push(entry);
+      }
+      saveAppData();
+      closeFormModal();
+      renderAdminCourseDetailView(document.getElementById('main-content'));
+      lucide.createIcons();
+      showToast('Personel berhasil ditambahkan ke daftar hadir.', 'success');
+    }
+
+    function deleteCourseStaff(courseId, category, staffId) {
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      if (category === 'panitia') {
+        detail.panitiaList = detail.panitiaList.filter(x => x.id !== staffId);
+      } else {
+        detail.pelatihList = detail.pelatihList.filter(x => x.id !== staffId);
+      }
+      saveAppData();
+      renderAdminCourseDetailView(document.getElementById('main-content'));
+      lucide.createIcons();
+      showToast('Personel dihapus dari daftar.', 'info');
+    }
+
+    // --- TAB 4: JADWAL / RUNDOWN ACARA + UPLOAD FILE ---
+    function renderAdminCourseTabRundown(course, detail) {
+      return `
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Form Tambah Sesi & Upload File Jadwal -->
+          <div class="lg:col-span-4 space-y-5 no-print">
+            <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout">
+              <h4 class="text-sm font-extrabold text-scout-dark mb-3 flex items-center gap-2">
+                <i data-lucide="plus-circle" class="w-4 h-4 text-scout-forest"></i>
+                <span>Tambah Sesi Jadwal / Rundown</span>
+              </h4>
+              <form onsubmit="addCourseRundownItem(event, '${course.id}')" class="space-y-3">
+                <div>
+                  <label class="block text-[11px] font-bold uppercase text-scout-brown mb-1">Hari / Sesi Ke- *</label>
+                  <input type="text" id="rnd-sesi" required placeholder="Contoh: Hari Ke-1 / Sesi 3"
+                    class="w-full px-3 py-2 rounded-xl border border-scout-sand text-xs" />
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold uppercase text-scout-brown mb-1">Waktu / Jam *</label>
+                  <input type="text" id="rnd-waktu" required placeholder="Contoh: 13.00 - 15.00 WIB"
+                    class="w-full px-3 py-2 rounded-xl border border-scout-sand text-xs" />
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold uppercase text-scout-brown mb-1">Materi / Kegiatan *</label>
+                  <input type="text" id="rnd-materi" required placeholder="Contoh: Dinamika Kelompok & Teknik Kepramukaan"
+                    class="w-full px-3 py-2 rounded-xl border border-scout-sand text-xs" />
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold uppercase text-scout-brown mb-1">Narasumber / Pelatih *</label>
+                  <input type="text" id="rnd-narasumber" required placeholder="Nama Pelatih"
+                    class="w-full px-3 py-2 rounded-xl border border-scout-sand text-xs" />
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold uppercase text-scout-brown mb-1">Keterangan</label>
+                  <input type="text" id="rnd-ket" placeholder="Contoh: Lapangan Utama"
+                    class="w-full px-3 py-2 rounded-xl border border-scout-sand text-xs" />
+                </div>
+                <button type="submit" class="w-full py-2.5 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-bold">
+                  Simpan ke Rundown
+                </button>
+              </form>
+            </div>
+
+            <!-- Upload File Jadwal / Rundown -->
+            <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout">
+              <h4 class="text-sm font-extrabold text-scout-dark mb-1">Upload Berkas Jadwal (PDF/Excel/Doc)</h4>
+              <p class="text-[11px] text-gray-500 mb-3">Unggah dokumen jadwal resmi yang siap dibagikan</p>
+              <label class="w-full cursor-pointer py-2.5 px-3 rounded-xl bg-scout-cream hover:bg-scout-sand/50 border border-dashed border-scout-khaki text-xs font-bold text-scout-dark flex items-center justify-center gap-2">
+                <i data-lucide="upload-cloud" class="w-4 h-4 text-scout-forest"></i>
+                <span>Unggah File Jadwal</span>
+                <input type="file" onchange="uploadCourseRundownFile(event, '${course.id}')" class="hidden" />
+              </label>
+
+              <div class="mt-3 space-y-2">
+                ${detail.rundownFiles.map(f => `
+                  <div class="flex items-center justify-between p-2 rounded-lg bg-scout-cream/60 border border-scout-sand text-xs">
+                    <span class="font-semibold text-scout-dark truncate max-w-[150px]">${escapeHtml(f.name)}</span>
+                    <div class="flex items-center gap-1">
+                      <a href="${f.dataUrl}" download="${escapeHtml(f.name)}" class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[10px]">Unduh</a>
+                      <button type="button" onclick="deleteCourseRundownFile('${course.id}', '${f.id}')" class="p-1 text-red-600">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </div>
+                `).join('') || '<p class="text-[11px] text-gray-400 italic">Belum ada file jadwal diunggah.</p>'}
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabel Rundown Interaktif Siap Cetak -->
+          <div id="print-area" class="lg:col-span-8 bg-white rounded-2xl border border-scout-sand shadow-scout overflow-hidden">
+            <div class="p-5 border-b border-scout-sand/70 flex items-center justify-between">
+              <div>
+                <h4 class="text-base font-extrabold text-scout-dark">Jadwal / Rundown Pelaksanaan Kursus</h4>
+                <p class="text-xs text-gray-500">${escapeHtml(course.nama)} • ${escapeHtml(course.tanggal)}</p>
+              </div>
+              <button type="button" onclick="window.print()"
+                class="px-3.5 py-2 rounded-xl bg-scout-dark text-white text-xs font-bold flex items-center gap-1.5 no-print">
+                <i data-lucide="printer" class="w-3.5 h-3.5 text-scout-gold"></i>
+                <span>Cetak Rundown</span>
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-scout-cream text-scout-brown text-[11px] font-extrabold uppercase border-b border-scout-sand">
+                    <th class="py-3 px-4">Hari / Sesi</th>
+                    <th class="py-3 px-4">Waktu</th>
+                    <th class="py-3 px-4">Materi / Kegiatan</th>
+                    <th class="py-3 px-4">Narasumber / Pelatih</th>
+                    <th class="py-3 px-4">Keterangan</th>
+                    <th class="py-3 px-4 text-right no-print">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 text-xs">
+                  ${detail.rundown.map(r => `
+                    <tr class="hover:bg-scout-cream/40">
+                      <td class="py-3 px-4 font-bold text-scout-dark whitespace-nowrap">${escapeHtml(r.sesi)}</td>
+                      <td class="py-3 px-4 whitespace-nowrap text-gray-700 font-medium">${escapeHtml(r.waktu)}</td>
+                      <td class="py-3 px-4 font-semibold text-gray-900">${escapeHtml(r.materi)}</td>
+                      <td class="py-3 px-4 text-scout-brown font-medium">${escapeHtml(r.narasumber)}</td>
+                      <td class="py-3 px-4 text-gray-500">${escapeHtml(r.keterangan || '-')}</td>
+                      <td class="py-3 px-4 text-right no-print">
+                        <button type="button" onclick="deleteCourseRundownItem('${course.id}', '${r.id}')"
+                          class="p-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100">
+                          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  `).join('') || '<tr><td colspan="6" class="py-8 text-center text-gray-500">Belum ada sesi jadwal yang ditambahkan.</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function addCourseRundownItem(e, courseId) {
+      e.preventDefault();
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      detail.rundown.push({
+        id: generateId('rnd'),
+        sesi: document.getElementById('rnd-sesi').value.trim(),
+        waktu: document.getElementById('rnd-waktu').value.trim(),
+        materi: document.getElementById('rnd-materi').value.trim(),
+        narasumber: document.getElementById('rnd-narasumber').value.trim(),
+        keterangan: document.getElementById('rnd-ket').value.trim()
+      });
+      saveAppData();
+      renderAdminCourseDetailView(document.getElementById('main-content'));
+      lucide.createIcons();
+      showToast('Sesi jadwal berhasil ditambahkan!', 'success');
+    }
+
+    function deleteCourseRundownItem(courseId, rndId) {
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      detail.rundown = detail.rundown.filter(r => r.id !== rndId);
+      saveAppData();
+      renderAdminCourseDetailView(document.getElementById('main-content'));
+      lucide.createIcons();
+      showToast('Sesi jadwal dihapus.', 'info');
+    }
+
+    function uploadCourseRundownFile(e, courseId) {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) {
+        showToast('Ukuran file maksimal 2 MB.', 'error');
+        return;
+      }
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        detail.rundownFiles.push({
+          id: generateId('rf'),
+          name: file.name,
+          dataUrl: ev.target.result
+        });
+        saveAppData();
+        renderAdminCourseDetailView(document.getElementById('main-content'));
+        lucide.createIcons();
+        showToast(`File jadwal "${file.name}" berhasil diunggah!`, 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function deleteCourseRundownFile(courseId, fileId) {
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      detail.rundownFiles = detail.rundownFiles.filter(f => f.id !== fileId);
+      saveAppData();
+      renderAdminCourseDetailView(document.getElementById('main-content'));
+      lucide.createIcons();
+    }
+
+    // --- TAB 5: PUSAT CETAK DOKUMEN RESMI KURSUS (PAKTA INTEGRITAS, SKL, IJAZAH, SHB) ---
+    function renderAdminCourseTabCetakResmi(course, detail, pesertaList) {
+      const docType = uiState.adminPrintDocType || 'pakta';
+      const targetRole = uiState.adminPrintTargetRole || 'Peserta';
+
+      let personOptions = [];
+      if (docType === 'pakta' && targetRole === 'Panitia') {
+        personOptions = detail.panitiaList.map(x => ({
+          id: x.id,
+          nama: x.nama,
+          sub: x.jabatan || 'Panitia Pelaksana',
+          tempatLahir: 'Tangerang',
+          tanggalLahir: '',
+          golongan: 'Penggalang',
+          pangkalan: 'Kwarcab Tangerang',
+          kwarran: course.sourceKwarran || 'Tigaraksa'
+        }));
+      } else if (docType === 'pakta' && targetRole === 'Pelatih') {
+        personOptions = detail.pelatihList.map(x => ({
+          id: x.id,
+          nama: x.nama,
+          sub: x.jabatan || 'Tim Pelatih',
+          tempatLahir: 'Tangerang',
+          tanggalLahir: '',
+          golongan: 'Penggalang',
+          pangkalan: 'Pusdiklatcab Tangerang',
+          kwarran: course.sourceKwarran || 'Tigaraksa'
+        }));
+      } else {
+        personOptions = pesertaList.map(p => ({
+          id: p.id,
+          nama: p.nama,
+          sub: `${p.pangkalan || '-'} • Kwarran ${p.kwarran || '-'}`,
+          tempatLahir: p.tempatLahir || 'Tangerang',
+          tanggalLahir: p.tanggalLahir || '1993-01-01',
+          golongan: p.golongan || 'Penggalang',
+          pangkalan: p.pangkalan || '-',
+          kwarran: p.kwarran || course.sourceKwarran || 'Tigaraksa'
+        }));
+      }
+
+      let selectedPerson = personOptions.find(x => x.id === uiState.adminPrintTargetId) || personOptions[0] || {
+        id: 'placeholder',
+        nama: 'Nama Peserta / Personel',
+        sub: 'Gugus Depan / Kwarran',
+        tempatLahir: 'Tangerang',
+        tanggalLahir: '1994-05-10',
+        golongan: 'Penggalang',
+        pangkalan: 'SDN / SMPN Tangerang',
+        kwarran: course.sourceKwarran || 'Tigaraksa'
+      };
+      if (personOptions.length && !personOptions.some(x => x.id === uiState.adminPrintTargetId)) {
+        uiState.adminPrintTargetId = selectedPerson.id;
+      }
+
+      const todayIndo = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      const jenjangLabel = course.jenjang || inferJenjangFromName(course.nama);
+      const jenjangFullMap = {
+        'KMD': 'KURSUS PEMBINA PRAMUKA MAHIR TINGKAT DASAR (KMD)',
+        'KML': 'KURSUS PEMBINA PRAMUKA MAHIR TINGKAT LANJUTAN (KML)',
+        'KPD': 'KURSUS PELATIH PEMBINA PRAMUKA TINGKAT DASAR (KPD)',
+        'KPL': 'KURSUS PELATIH PEMBINA PRAMUKA TINGKAT LANJUTAN (KPL)'
+      };
+      const jenjangFullTitle = jenjangFullMap[jenjangLabel] || course.nama.toUpperCase();
+
+      const kopHeaderHtml = `
+        <div class="flex items-center gap-4 pb-4 border-b-4 border-double border-scout-dark">
+          <div class="w-16 h-16 sm:w-20 sm:h-20 shrink-0 flex items-center justify-center">
+            ${getLogoHtml()}
+          </div>
+          <div class="flex-1 text-center">
+            <p class="text-xs font-bold uppercase tracking-widest text-scout-brown">Gerakan Pramuka Kwartir Cabang Tangerang</p>
+            <h2 class="font-serif font-black text-base sm:text-xl text-scout-dark tracking-wide mt-0.5">
+              PUSAT PENDIDIKAN DAN PELATIHAN CABANG (PUSDIKLATCAB)
+            </h2>
+            <p class="text-[11px] text-gray-600 mt-0.5">${escapeHtml(appData.profile.alamat)}</p>
+            <p class="text-[10px] text-gray-500">Telp: ${escapeHtml(appData.profile.telepon)} • Email: ${escapeHtml(appData.profile.email)}</p>
+          </div>
+        </div>
+      `;
+
+      let documentBodyHtml = '';
+      if (docType === 'pakta') {
+        const peranAktif = targetRole;
+        documentBodyHtml = `
+          ${kopHeaderHtml}
+          <div class="text-center my-6">
+            <h3 class="text-base font-extrabold uppercase underline text-scout-dark">PAKTA INTEGRITAS ${peranAktif.toUpperCase()} KURSUS</h3>
+            <p class="text-xs text-gray-600 mt-1">Nomor: ${escapeHtml(uiState.adminPrintNomorSurat)}</p>
+          </div>
+
+          <div class="text-xs sm:text-sm text-gray-800 space-y-4 leading-relaxed">
+            <p>Saya yang bertanda tangan di bawah ini:</p>
+            <table class="w-full text-xs sm:text-sm border-none">
+              <tr><td class="py-1 w-48 font-semibold border-none">Nama Lengkap</td><td class="py-1 border-none">: <strong>${escapeHtml(selectedPerson.nama)}</strong></td></tr>
+              <tr><td class="py-1 font-semibold border-none">Peran dalam Kegiatan</td><td class="py-1 border-none">: ${escapeHtml(peranAktif)} Kursus</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Pangkalan / Unit Tugas</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.pangkalan)} (Kwarran ${escapeHtml(selectedPerson.kwarran)})</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Nama Kegiatan</td><td class="py-1 border-none">: ${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Waktu & Tempat</td><td class="py-1 border-none">: ${escapeHtml(course.tanggal)} di ${escapeHtml(course.lokasi)}</td></tr>
+            </table>
+
+            <p>Dengan ini menyatakan komitmen dan berjanji dengan sungguh-sungguh untuk:</p>
+            <ol class="list-decimal pl-6 space-y-2">
+              <li>Menghayati dan mengamalkan Kode Kehormatan Gerakan Pramuka (Tri Satya dan Dasa Darma) selama mengikuti/melaksanakan seluruh rangkaian kegiatan kursus.</li>
+              <li>Mematuhi seluruh tata tertib, jadwal/rundown acara, serta ketentuan yang ditetapkan oleh Pusdiklatcab Tangerang dan Pemimpin Kursus.</li>
+              <li>Menjaga integritas, kedisiplinan, objektivitas, serta tidak melakukan tindakan kecurangan maupun pelanggaran etika kepramukaan.</li>
+              <li>Apabila melanggar pernyataan dalam Pakta Integritas ini, saya bersedia menerima sanksi sesuai peraturan Gerakan Pramuka yang berlaku.</li>
+            </ol>
+          </div>
+
+          <div class="mt-10 grid grid-cols-2 gap-6 text-xs">
+            <div class="text-center">
+              <p class="text-gray-600">Mengetahui,</p>
+              <p class="font-bold text-scout-dark">Kepala Pusdiklatcab Tangerang,</p>
+              <div class="h-16"></div>
+              <p class="font-extrabold underline text-scout-dark">${escapeHtml(appData.profile.namaKapus)}</p>
+              <p class="text-[11px] text-gray-600">NTA. ${escapeHtml(appData.profile.ntaKapus || '-')}</p>
+            </div>
+            <div class="text-center">
+              <p class="text-gray-600">Tangerang, ${todayIndo}</p>
+              <p class="font-bold text-scout-dark">Yang Membuat Pernyataan (${escapeHtml(peranAktif)}),</p>
+              <div class="h-16 flex items-center justify-center text-[10px] text-gray-400 italic">[Materai / Tanda Tangan]</div>
+              <p class="font-extrabold underline text-scout-dark">${escapeHtml(selectedPerson.nama)}</p>
+            </div>
+          </div>
+        `;
+      } else if (docType === 'skl') {
+        documentBodyHtml = `
+          ${kopHeaderHtml}
+          <div class="text-center my-6">
+            <h3 class="text-base font-extrabold uppercase underline text-scout-dark">SURAT KETERANGAN LULUS (SKL)</h3>
+            <p class="text-xs text-gray-600 mt-1">Nomor: ${escapeHtml(uiState.adminPrintNomorSurat)}</p>
+          </div>
+
+          <div class="text-xs sm:text-sm text-gray-800 space-y-4 leading-relaxed">
+            <p>
+              Kepala Pusat Pendidikan dan Pelatihan Cabang (Pusdiklatcab) Gerakan Pramuka Tangerang menerangkan bahwa:
+            </p>
+            <table class="w-full text-xs sm:text-sm">
+              <tr><td class="py-1 w-48 font-semibold border-none">Nama Lengkap</td><td class="py-1 border-none">: <strong>${escapeHtml(selectedPerson.nama)}</strong></td></tr>
+              <tr><td class="py-1 font-semibold border-none">Tempat, Tanggal Lahir</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.tempatLahir)}, ${formatDateIndo(selectedPerson.tanggalLahir)}</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Golongan Pembinaan</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.golongan)}</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Nama Pangkalan</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.pangkalan)}</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Kwartir Ranting</td><td class="py-1 border-none">: Kwartir Ranting ${escapeHtml(selectedPerson.kwarran)}</td></tr>
+            </table>
+
+            <p>
+              Telah mengikuti seluruh rangkaian pendidikan dan pelatihan serta memenuhi standar evaluasi pada kegiatan <strong>${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</strong> yang diselenggarakan pada tanggal <strong>${escapeHtml(course.tanggal)}</strong> bertempat di <strong>${escapeHtml(course.lokasi)}</strong>, dan dinyatakan:
+            </p>
+
+            <div class="my-4 py-3 px-6 rounded-xl bg-scout-cream border-2 border-scout-dark text-center">
+              <p class="text-base font-black tracking-widest text-scout-forest uppercase">L U L U S</p>
+              <p class="text-xs font-bold text-scout-dark mt-0.5">Predikat / Kualifikasi: ${escapeHtml(uiState.adminPrintKualifikasi)}</p>
+            </div>
+
+            <p>
+              Surat Keterangan Lulus ini diterbitkan sebagai bukti kelulusan resmi sementara sebelum diterbitkannya Ijazah Kursus, dan dapat dipergunakan sebagaimana mestinya.
+            </p>
+          </div>
+
+          <div class="mt-10 flex justify-end text-xs">
+            <div class="text-center w-64">
+              <p class="text-gray-600">Ditetapkan di: Tangerang</p>
+              <p class="text-gray-600">Pada tanggal: ${todayIndo}</p>
+              <p class="font-bold text-scout-dark mt-1">Kepala Pusdiklatcab Tangerang,</p>
+              <div class="h-16"></div>
+              <p class="font-extrabold underline text-scout-dark">${escapeHtml(appData.profile.namaKapus)}</p>
+              <p class="text-[11px] text-gray-600">NTA. ${escapeHtml(appData.profile.ntaKapus || '-')}</p>
+            </div>
+          </div>
+        `;
+      } else if (docType === 'ijazah') {
+        documentBodyHtml = `
+          <div class="border-4 border-double border-scout-dark p-6 sm:p-8 rounded-xl bg-gradient-to-b from-scout-cream/40 via-white to-scout-cream/40">
+            <div class="text-center pb-4 border-b-2 border-scout-gold">
+              <div class="w-16 h-16 mx-auto mb-2">${getLogoHtml()}</div>
+              <p class="text-xs font-extrabold uppercase tracking-widest text-scout-brown">Gerakan Pramuka Kwartir Cabang Tangerang</p>
+              <h2 class="font-serif font-black text-xl sm:text-2xl text-scout-dark tracking-wider mt-1">IJAZAH KURSUS KEPRAMUKAAN</h2>
+              <p class="text-xs font-bold text-scout-forest mt-0.5">${jenjangFullTitle}</p>
+              <p class="text-[11px] text-gray-600 mt-1">Nomor Seri Ijazah: <strong>${escapeHtml(uiState.adminPrintNomorSurat)}</strong></p>
+            </div>
+
+            <div class="my-6 text-center space-y-3 text-xs sm:text-sm">
+              <p class="text-gray-700">Kwartir Cabang Gerakan Pramuka Tangerang melalui Pusat Pendidikan dan Pelatihan Cabang (Pusdiklatcab) memberikan Ijazah kepada:</p>
+              <h3 class="font-serif font-black text-xl sm:text-2xl text-scout-dark underline decoration-scout-gold decoration-2 py-1">
+                ${escapeHtml(selectedPerson.nama)}
+              </h3>
+              <p class="text-gray-700">
+                Tempat, Tanggal Lahir: <strong>${escapeHtml(selectedPerson.tempatLahir)}, ${formatDateIndo(selectedPerson.tanggalLahir)}</strong><br/>
+                Pangkalan: <strong>${escapeHtml(selectedPerson.pangkalan)}</strong> — Kwartir Ranting <strong>${escapeHtml(selectedPerson.kwarran)}</strong>
+              </p>
+              <p class="max-w-2xl mx-auto leading-relaxed text-gray-800 pt-2">
+                Yang telah menyelesaikan seluruh kurikulum dan lulus pada <strong>${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</strong>, Golongan <strong>${escapeHtml(selectedPerson.golongan)}</strong>, yang diselenggarakan pada tanggal <strong>${escapeHtml(course.tanggal)}</strong> di <strong>${escapeHtml(course.lokasi)}</strong> dengan kualifikasi:
+              </p>
+              <div class="inline-block px-6 py-2 rounded-full bg-scout-dark text-scout-gold font-extrabold text-sm tracking-wide border border-scout-gold">
+                ${escapeHtml(uiState.adminPrintKualifikasi.toUpperCase())}
+              </div>
+            </div>
+
+            <div class="mt-8 grid grid-cols-2 gap-6 text-xs pt-4">
+              <div class="text-center">
+                <p class="text-gray-600">Pemimpin Kursus,</p>
+                <div class="h-16"></div>
+                <p class="font-extrabold underline text-scout-dark">${escapeHtml(course.pelatih)}</p>
+              </div>
+              <div class="text-center">
+                <p class="text-gray-600">Tangerang, ${todayIndo}</p>
+                <p class="font-bold text-scout-dark">Kepala Pusdiklatcab Tangerang,</p>
+                <div class="h-16"></div>
+                <p class="font-extrabold underline text-scout-dark">${escapeHtml(appData.profile.namaKapus)}</p>
+                <p class="text-[11px] text-gray-600">NTA. ${escapeHtml(appData.profile.ntaKapus || '-')}</p>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        // Surat Hak Bina (SHB)
+        const golShb = uiState.adminPrintGolonganShb || selectedPerson.golongan || 'Penggalang';
+        documentBodyHtml = `
+          ${kopHeaderHtml}
+          <div class="text-center my-6">
+            <h3 class="text-base font-extrabold uppercase underline text-scout-dark">SURAT HAK BINA (SHB)</h3>
+            <p class="text-xs text-gray-600 mt-1">Nomor: ${escapeHtml(uiState.adminPrintNomorSurat)}</p>
+          </div>
+
+          <div class="text-xs sm:text-sm text-gray-800 space-y-4 leading-relaxed">
+            <p>
+              Berdasarkan Keputusan Kwartir Nasional Gerakan Pramuka tentang Sistem Pendidikan dan Pelatihan Kepramukaan, Kwartir Cabang Gerakan Pramuka Tangerang melalui Kepala Pusdiklatcab Tangerang memberikan <strong>HAK BINA</strong> kepada:
+            </p>
+
+            <table class="w-full text-xs sm:text-sm">
+              <tr><td class="py-1 w-48 font-semibold border-none">Nama Lengkap</td><td class="py-1 border-none">: <strong>${escapeHtml(selectedPerson.nama)}</strong></td></tr>
+              <tr><td class="py-1 font-semibold border-none">Tempat, Tanggal Lahir</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.tempatLahir)}, ${formatDateIndo(selectedPerson.tanggalLahir)}</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Pangkalan / Gugus Depan</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.pangkalan)}</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Kwartir Ranting</td><td class="py-1 border-none">: Kwartir Ranting ${escapeHtml(selectedPerson.kwarran)}</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Kualifikasi Kelulusan</td><td class="py-1 border-none">: Lulusan ${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</td></tr>
+            </table>
+
+            <div class="p-4 rounded-xl bg-scout-cream/80 border border-scout-sand">
+              <p class="font-bold text-scout-dark">Kewenangan Pembinaan:</p>
+              <p class="mt-1">
+                Yang bersangkutan berhak dan berwenang membina peserta didik Gerakan Pramuka pada <strong>Golongan ${escapeHtml(golShb)}</strong> di Gugus Depan / Pangkalan <strong>${escapeHtml(selectedPerson.pangkalan)}</strong>, Kwartir Ranting <strong>${escapeHtml(selectedPerson.kwarran)}</strong> sesuai ketentuan Anggaran Dasar dan Anggaran Rumah Tangga Gerakan Pramuka.
+              </p>
+            </div>
+
+            <p>
+              Demikian Surat Hak Bina ini diberikan untuk dilaksanakan dengan penuh tanggung jawab sesuai Tri Satya dan Dasa Darma Pramuka.
+            </p>
+          </div>
+
+          <div class="mt-10 flex justify-end text-xs">
+            <div class="text-center w-64">
+              <p class="text-gray-600">Dikeluarkan di: Tangerang</p>
+              <p class="text-gray-600">Pada tanggal: ${todayIndo}</p>
+              <p class="font-bold text-scout-dark mt-1">Kepala Pusdiklatcab Tangerang,</p>
+              <div class="h-16"></div>
+              <p class="font-extrabold underline text-scout-dark">${escapeHtml(appData.profile.namaKapus)}</p>
+              <p class="text-[11px] text-gray-600">NTA. ${escapeHtml(appData.profile.ntaKapus || '-')}</p>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Panel Pengaturan Dokumen Cetak -->
+          <div class="lg:col-span-4 bg-white rounded-2xl p-5 border border-scout-sand shadow-scout h-fit space-y-4 no-print">
+            <div>
+              <h4 class="text-base font-extrabold text-scout-dark">Pusat Cetak Dokumen Resmi</h4>
+              <p class="text-xs text-gray-500 mt-0.5">Pilih jenis dokumen resmi kursus untuk pratinjau cetak / Save PDF</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-2">
+              ${[
+                { id: 'pakta', label: 'Print Pakta / Fakta Integritas', icon: 'shield-check' },
+                { id: 'skl', label: 'Print Surat Keterangan Lulus (SKL)', icon: 'file-check' },
+                { id: 'ijazah', label: 'Print Ijazah Kursus', icon: 'award' },
+                { id: 'shb', label: 'Print Surat Hak Bina (SHB)', icon: 'badge-check' }
+              ].map(d => `
+                <button type="button" onclick="uiState.adminPrintDocType = '${d.id}'; renderAdminCourseDetailView(document.getElementById('main-content')); lucide.createIcons();"
+                  class="w-full px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2.5 border transition ${
+                    docType === d.id
+                      ? 'bg-scout-forest text-white border-scout-forest shadow-xs'
+                      : 'bg-scout-cream/50 text-scout-dark border-scout-sand hover:bg-scout-cream'
+                  }">
+                  <i data-lucide="${d.icon}" class="w-4 h-4 ${docType === d.id ? 'text-scout-gold' : 'text-scout-brown'}"></i>
+                  <span>${d.label}</span>
+                </button>
+              `).join('')}
+            </div>
+
+            ${docType === 'pakta' ? `
+              <div>
+                <label class="block text-[11px] font-bold uppercase text-scout-brown mb-1">Kategori Personel Pakta Integritas</label>
+                <select onchange="uiState.adminPrintTargetRole = this.value; uiState.adminPrintTargetId = ''; renderAdminCourseDetailView(document.getElementById('main-content')); lucide.createIcons();"
+                  class="w-full px-3 py-2 rounded-xl border border-scout-sand text-xs font-bold bg-white">
+                  <option value="Peserta" ${targetRole === 'Peserta' ? 'selected' : ''}>Peserta Kursus</option>
+                  <option value="Panitia" ${targetRole === 'Panitia' ? 'selected' : ''}>Panitia Pelaksana</option>
+                  <option value="Pelatih" ${targetRole === 'Pelatih' ? 'selected' : ''}>Tim Pelatih</option>
+                </select>
+              </div>
+            ` : ''}
+
+            <div>
+              <label class="block text-[11px] font-bold uppercase text-scout-brown mb-1">
+                Pilih Nama ${docType === 'pakta' ? targetRole : 'Peserta Lulusan'}
+              </label>
+              <select onchange="uiState.adminPrintTargetId = this.value; renderAdminCourseDetailView(document.getElementById('main-content')); lucide.createIcons();"
+                class="w-full px-3 py-2 rounded-xl border border-scout-sand text-xs font-bold bg-white">
+                ${personOptions.map(opt => `
+                  <option value="${opt.id}" ${opt.id === selectedPerson.id ? 'selected' : ''}>
+                    ${escapeHtml(opt.nama)} (${escapeHtml(opt.sub)})
+                  </option>
+                `).join('') || '<option value="">Belum ada data personel/peserta</option>'}
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold uppercase text-scout-brown mb-1">Nomor Surat / Seri Dokumen</label>
+              <input type="text" value="${escapeHtml(uiState.adminPrintNomorSurat)}"
+                oninput="uiState.adminPrintNomorSurat = this.value; renderAdminCourseDetailView(document.getElementById('main-content')); lucide.createIcons();"
+                class="w-full px-3 py-2 rounded-xl border border-scout-sand text-xs font-semibold" />
+            </div>
+
+            ${(docType === 'skl' || docType === 'ijazah') ? `
+              <div>
+                <label class="block text-[11px] font-bold uppercase text-scout-brown mb-1">Kualifikasi / Predikat Kelulusan</label>
+                <select onchange="uiState.adminPrintKualifikasi = this.value; renderAdminCourseDetailView(document.getElementById('main-content')); lucide.createIcons();"
+                  class="w-full px-3 py-2 rounded-xl border border-scout-sand text-xs font-bold bg-white">
+                  ${KUALIFIKASI_OPTIONS.map(q => `<option value="${q}" ${uiState.adminPrintKualifikasi === q ? 'selected' : ''}>${q}</option>`).join('')}
+                </select>
+              </div>
+            ` : ''}
+
+            ${docType === 'shb' ? `
+              <div>
+                <label class="block text-[11px] font-bold uppercase text-scout-brown mb-1">Golongan Hak Bina</label>
+                <select onchange="uiState.adminPrintGolonganShb = this.value; renderAdminCourseDetailView(document.getElementById('main-content')); lucide.createIcons();"
+                  class="w-full px-3 py-2 rounded-xl border border-scout-sand text-xs font-bold bg-white">
+                  ${GOLONGAN_OPTIONS.map(g => `<option value="${g}" ${(uiState.adminPrintGolonganShb || selectedPerson.golongan) === g ? 'selected' : ''}>Golongan ${g}</option>`).join('')}
+                </select>
+              </div>
+            ` : ''}
+
+            <button type="button" onclick="window.print()"
+              class="w-full py-3 px-4 rounded-xl bg-scout-dark hover:bg-scout-brown text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition">
+              <i data-lucide="printer" class="w-4 h-4 text-scout-gold"></i>
+              <span>Cetak / Print PDF Sekarang</span>
+            </button>
+          </div>
+
+          <!-- Area Pratinjau Dokumen Resmi -->
+          <div id="print-area" class="lg:col-span-8 bg-white rounded-2xl p-6 sm:p-10 border border-scout-sand shadow-scout ${docType === 'ijazah' ? 'ijazah-frame' : ''}">
+            ${documentBodyHtml}
+          </div>
+        </div>
+      `;
     }
 
     // =========================================================================
@@ -2669,7 +4189,6 @@
         uiState.laporanKwarran = myKwarran;
       }
 
-      // Data sesuai jenis laporan
       let reportTitle = 'LAPORAN DATA POTENSI PEMBINA PRAMUKA';
       let tableHtml = '';
 
@@ -3107,7 +4626,6 @@
       if (!u) return;
       const textToCopy = `Akun PUSDIKLATCAB TANGERANG\nNama: ${u.nama}\nPassword: ${u.password}\nRole: ${u.role}${u.role === 'Kwarran' && u.kwarranName ? ` (Kwarran ${u.kwarranName})` : ''}`;
 
-      // Menggunakan document.execCommand('copy') agar kompatibel penuh di iFrame
       const tempTextArea = document.createElement('textarea');
       tempTextArea.value = textToCopy;
       tempTextArea.style.position = 'fixed';
@@ -3253,8 +4771,8 @@
 
     // =========================================================================
     // 14. ATURAN KHUSUS ROLE KWARRAN: MANAJEMEN KURSUS
-    //     - Sub-Menu 1: Daftar Kursus (Auto-redirect ke Input Data Peserta setelah simpan)
-    //     - Sub-Menu 2: Input Data Peserta (Edit & Hapus dengan konfirmasi)
+    //     - Sub-Menu 1: Daftar Kursus (Auto-sync ke Admin & Auto-redirect ke Input Data Peserta)
+    //     - Sub-Menu 2: Input Data Peserta (Edit & Hapus dengan konfirmasi + Auto-sync ke Admin)
     // =========================================================================
     function renderKwarranDaftarKursusView(container) {
       const scope = getActiveKwarranScope();
@@ -3271,7 +4789,7 @@
               </div>
               <div>
                 <h3 class="text-base font-extrabold text-scout-dark">Daftarkan Penyelenggaraan Kursus</h3>
-                <p class="text-xs text-gray-500">Kwarran ${escapeHtml(myKwarran)} • Otomatis lanjut ke Input Peserta</p>
+                <p class="text-xs text-gray-500">Kwarran ${escapeHtml(myKwarran)} • Otomatis tersinkronisasi ke Admin & lanjut ke Input Peserta</p>
               </div>
             </div>
 
@@ -3314,7 +4832,7 @@
 
               <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
                 <i data-lucide="info" class="w-4 h-4 text-amber-700 shrink-0 mt-0.5"></i>
-                <span>Setelah Anda klik <strong>Simpan & Input Peserta</strong>, sistem akan otomatis membuka halaman <strong>Input Data Peserta</strong> untuk kursus ini.</span>
+                <span>Setelah Anda klik <strong>Simpan & Input Peserta</strong>, jadwal otomatis tercatat di Pusdiklatcab Tangerang dan membuka halaman <strong>Input Data Peserta</strong>.</span>
               </div>
 
               <button type="submit"
@@ -3418,13 +4936,11 @@
       };
 
       appData.kwarranCourses.unshift(newCourse);
-      saveAppData();
+      saveAppData(); // Otomatis menyinkronkan ke appData.kursus untuk role Admin
 
-      // ALUR OTOMATIS SETELAH SIMPAN:
-      // Pilih kursus yang baru dibuat dan langsung arahkan ke Sub-Menu "Input Data Peserta"
       uiState.kwarranSelectedCourseId = newCourse.id;
       uiState.kwarranEditingParticipantId = null;
-      showToast('Kursus berhasil disimpan! Dialihkan ke halaman Input Data Peserta.', 'success');
+      showToast('Kursus berhasil disimpan & tersinkronisasi! Dialihkan ke Input Data Peserta.', 'success');
       navigateTo('kwarran-input-peserta');
     }
 
@@ -3484,14 +5000,12 @@
         return;
       }
 
-      // Pastikan ada kursus aktif terpilih milik Kwarran yang sedang login
       let selectedCourse = myCourses.find(c => c.id === uiState.kwarranSelectedCourseId);
       if (!selectedCourse) {
         selectedCourse = myCourses[0];
         uiState.kwarranSelectedCourseId = selectedCourse.id;
       }
 
-      // Filter peserta secara ketat hanya pada kursus terpilih milik Kwarran aktif
       const scopedCourseParticipants = getScopedKwarranParticipants(selectedCourse.id);
       const courseParticipants = scopedCourseParticipants.filter(p => {
         if (uiState.kwarranParticipantSearch) {
@@ -3661,7 +5175,7 @@
             <div class="p-5 border-b border-scout-sand/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h4 class="text-base font-extrabold text-scout-dark">Daftar Peserta Kursus (${courseParticipants.length})</h4>
-                <p class="text-xs text-gray-500">Data peserta tersimpan untuk kursus terpilih</p>
+                <p class="text-xs text-gray-500">Data peserta tersimpan & otomatis tersinkronisasi ke Pusdiklatcab</p>
               </div>
               <div class="relative w-full sm:w-60">
                 <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-2.5"></i>
@@ -3755,10 +5269,10 @@
         showToast('Data peserta kursus berhasil diperbarui!', 'success');
       } else {
         appData.kwarranParticipants.unshift(payload);
-        showToast('Peserta baru berhasil ditambahkan ke daftar kursus!', 'success');
+        showToast('Peserta baru berhasil ditambahkan & tersinkronisasi!', 'success');
       }
 
-      saveAppData();
+      saveAppData(); // Otomatis memperbarui jumlah & daftar peserta pada kursus di sisi Admin
       renderKwarranInputPesertaView(document.getElementById('main-content'));
       lucide.createIcons();
     }
@@ -3845,6 +5359,7 @@
     // 16. INISIALISASI SAAT HALAMAN DIMUAT
     // =========================================================================
     window.addEventListener('DOMContentLoaded', () => {
+      syncKwarranCoursesToAdmin(appData);
       renderBrandLogos();
       restorePersistedSession();
       lucide.createIcons();
