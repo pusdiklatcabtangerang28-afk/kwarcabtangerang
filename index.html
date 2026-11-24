@@ -391,7 +391,7 @@
   <!-- ===================================================================== -->
   <script>
     // =========================================================================
-    // 1. KONSTANTA, UTILITAS TANGGAL INDONESIA & DATA REFERENSI WILAYAH
+    // 1. KONSTANTA, UTILITAS TANGGAL INDONESIA, NTA MASKING & REFERENSI WILAYAH
     // =========================================================================
     const STORAGE_KEY = 'pusdiklatcab_tangerang_v1';
     const SESSION_STORAGE_KEY = 'pusdiklatcab_tangerang_session_v1';
@@ -415,6 +415,52 @@
     const JENJANG_RANK = { 'Belum Kursus': 0, 'KMD': 1, 'KML': 2, 'KPD': 3, 'KPL': 4 };
     const GOLONGAN_OPTIONS = ['Siaga', 'Penggalang', 'Penegak', 'Pandega'];
     const KUALIFIKASI_OPTIONS = ['Sangat Memuaskan', 'Memuaskan', 'Baik', 'Cukup'];
+
+    // =========================================================================
+    // UTILITAS INPUT MASKING & VALIDASI FORMAT NTA (##.##.##.######.####)
+    // Pola: 2 digit - titik - 2 digit - titik - 2 digit - titik - 6 digit - titik - 4 digit (Total 16 digit)
+    // =========================================================================
+    const NTA_PATTERN_REGEX = /^\d{2}\.\d{2}\.\d{2}\.\d{6}\.\d{4}$/;
+
+    function formatNtaMask(rawValue) {
+      if (rawValue === null || rawValue === undefined) return '';
+      const digits = String(rawValue).replace(/\D/g, '').slice(0, 16);
+      if (!digits) return '';
+      const segments = [
+        digits.slice(0, 2),
+        digits.slice(2, 4),
+        digits.slice(4, 6),
+        digits.slice(6, 12),
+        digits.slice(12, 16)
+      ].filter(seg => seg.length > 0);
+      return segments.join('.');
+    }
+
+    function normalizeExistingNta(rawValue) {
+      if (!rawValue || rawValue === '-') return '';
+      const digits = String(rawValue).replace(/\D/g, '');
+      if (!digits) return '';
+      if (digits.length < 16) {
+        return formatNtaMask(digits.padEnd(16, '0'));
+      }
+      return formatNtaMask(digits);
+    }
+
+    function isValidNtaPattern(ntaValue) {
+      return NTA_PATTERN_REGEX.test(String(ntaValue || '').trim());
+    }
+
+    function handleNtaInputMask(inputEl) {
+      if (!inputEl) return;
+      const formatted = formatNtaMask(inputEl.value);
+      inputEl.value = formatted;
+      const digitCount = formatted.replace(/\D/g, '').length;
+      if (digitCount > 0 && digitCount < 16) {
+        inputEl.setCustomValidity('Format NTA harus lengkap 16 digit angka dengan pola ##.##.##.######.####');
+      } else {
+        inputEl.setCustomValidity('');
+      }
+    }
 
     // Parser tanggal aman ke format baku Indonesia (contoh: "24 November 2026" atau "Selasa, 24 November 2026")
     function formatDateIndo(dateStr, includeDay = false) {
@@ -634,18 +680,18 @@
           }
         ],
         potensi: [
-          { id: 'pot_1', nama: 'Kak Drs. H. Ahmad Fauzi, M.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1978-04-12', golongan: 'Penegak', jenjang: 'KPL', tahunLulus: '2019', gender: 'Putra', kwarran: 'Tigaraksa', pangkalan: 'SMAN 6 Kab. Tangerang', fotoUrl: '' },
-          { id: 'pot_2', nama: 'Kak Hj. Nurhayati, S.Pd., M.M.', tempatLahir: 'Serang', tanggalLahir: '1981-08-19', golongan: 'Penggalang', jenjang: 'KPD', tahunLulus: '2021', gender: 'Putri', kwarran: 'Tigaraksa', pangkalan: 'SMPN 1 Tigaraksa', fotoUrl: '' },
-          { id: 'pot_3', nama: 'Kak Dedi Kurniawan, S.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1988-02-25', golongan: 'Siaga', jenjang: 'KML', tahunLulus: '2023', gender: 'Putra', kwarran: 'Tigaraksa', pangkalan: 'SDN Tigaraksa 01', fotoUrl: '' },
-          { id: 'pot_4', nama: 'Kak Siti Rahmawati, S.Pd.SD.', tempatLahir: 'Tangerang', tanggalLahir: '1992-11-05', golongan: 'Siaga', jenjang: 'KMD', tahunLulus: '2024', gender: 'Putri', kwarran: 'Curug', pangkalan: 'SDN Curug 01', fotoUrl: '' },
-          { id: 'pot_5', nama: 'Kak Muhammad Ridwan, S.Kom.', tempatLahir: 'Jakarta', tanggalLahir: '1990-06-14', golongan: 'Penggalang', jenjang: 'KML', tahunLulus: '2022', gender: 'Putra', kwarran: 'Curug', pangkalan: 'SMPN 1 Curug', fotoUrl: '' },
-          { id: 'pot_6', nama: 'Kak Lilis Suryani, M.Pd.', tempatLahir: 'Bandung', tanggalLahir: '1983-09-30', golongan: 'Penegak', jenjang: 'KPD', tahunLulus: '2020', gender: 'Putri', kwarran: 'Curug', pangkalan: 'SMAN 3 Kab. Tangerang', fotoUrl: '' },
-          { id: 'pot_7', nama: 'Kak Andi Pratama, S.Or.', tempatLahir: 'Tangerang', tanggalLahir: '1996-01-17', golongan: 'Siaga', jenjang: 'Belum Kursus', tahunLulus: '-', gender: 'Putra', kwarran: 'Curug', pangkalan: 'SDN Binong 02', fotoUrl: '' },
-          { id: 'pot_8', nama: 'Kak Hendra Gunawan, S.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1991-07-22', golongan: 'Siaga', jenjang: 'KMD', tahunLulus: '2025', gender: 'Putra', kwarran: 'Cikupa', pangkalan: 'SDN Cikupa 01', fotoUrl: '' },
-          { id: 'pot_9', nama: 'Kak Dewi Kartika, S.Pd.', tempatLahir: 'Bogor', tanggalLahir: '1989-12-08', golongan: 'Penggalang', jenjang: 'KML', tahunLulus: '2023', gender: 'Putri', kwarran: 'Balaraja', pangkalan: 'SMPN 1 Balaraja', fotoUrl: '' },
-          { id: 'pot_10', nama: 'Kak Agus Salim, M.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1976-08-17', golongan: 'Pandega', jenjang: 'KPL', tahunLulus: '2018', gender: 'Putra', kwarran: 'Pasar Kemis', pangkalan: 'SMAN 13 Kab. Tangerang', fotoUrl: '' },
-          { id: 'pot_11', nama: 'Kak Fitria Handayani, S.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1994-03-28', golongan: 'Siaga', jenjang: 'KMD', tahunLulus: '2024', gender: 'Putri', kwarran: 'Kelapa Dua', pangkalan: 'SDN Kelapa Dua 02', fotoUrl: '' },
-          { id: 'pot_12', nama: 'Kak Rahmat Hidayat, S.T.', tempatLahir: 'Lebak', tanggalLahir: '1995-10-11', golongan: 'Penegak', jenjang: 'Belum Kursus', tahunLulus: '-', gender: 'Putra', kwarran: 'Legok', pangkalan: 'SMKN 12 Kab. Tangerang', fotoUrl: '' }
+          { id: 'pot_1', nta: '28.04.01.000101.0001', nama: 'Kak Drs. H. Ahmad Fauzi, M.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1978-04-12', golongan: 'Penegak', jenjang: 'KPL', tahunLulus: '2019', gender: 'Putra', kwarran: 'Tigaraksa', pangkalan: 'SMAN 6 Kab. Tangerang', fotoUrl: '' },
+          { id: 'pot_2', nta: '28.04.01.000102.0001', nama: 'Kak Hj. Nurhayati, S.Pd., M.M.', tempatLahir: 'Serang', tanggalLahir: '1981-08-19', golongan: 'Penggalang', jenjang: 'KPD', tahunLulus: '2021', gender: 'Putri', kwarran: 'Tigaraksa', pangkalan: 'SMPN 1 Tigaraksa', fotoUrl: '' },
+          { id: 'pot_3', nta: '28.04.01.000103.0001', nama: 'Kak Dedi Kurniawan, S.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1988-02-25', golongan: 'Siaga', jenjang: 'KML', tahunLulus: '2023', gender: 'Putra', kwarran: 'Tigaraksa', pangkalan: 'SDN Tigaraksa 01', fotoUrl: '' },
+          { id: 'pot_4', nta: '28.04.05.000201.0001', nama: 'Kak Siti Rahmawati, S.Pd.SD.', tempatLahir: 'Tangerang', tanggalLahir: '1992-11-05', golongan: 'Siaga', jenjang: 'KMD', tahunLulus: '2024', gender: 'Putri', kwarran: 'Curug', pangkalan: 'SDN Curug 01', fotoUrl: '' },
+          { id: 'pot_5', nta: '28.04.05.000202.0001', nama: 'Kak Muhammad Ridwan, S.Kom.', tempatLahir: 'Jakarta', tanggalLahir: '1990-06-14', golongan: 'Penggalang', jenjang: 'KML', tahunLulus: '2022', gender: 'Putra', kwarran: 'Curug', pangkalan: 'SMPN 1 Curug', fotoUrl: '' },
+          { id: 'pot_6', nta: '28.04.05.000203.0001', nama: 'Kak Lilis Suryani, M.Pd.', tempatLahir: 'Bandung', tanggalLahir: '1983-09-30', golongan: 'Penegak', jenjang: 'KPD', tahunLulus: '2020', gender: 'Putri', kwarran: 'Curug', pangkalan: 'SMAN 3 Kab. Tangerang', fotoUrl: '' },
+          { id: 'pot_7', nta: '28.04.05.000204.0001', nama: 'Kak Andi Pratama, S.Or.', tempatLahir: 'Tangerang', tanggalLahir: '1996-01-17', golongan: 'Siaga', jenjang: 'Belum Kursus', tahunLulus: '-', gender: 'Putra', kwarran: 'Curug', pangkalan: 'SDN Binong 02', fotoUrl: '' },
+          { id: 'pot_8', nta: '28.04.02.000301.0001', nama: 'Kak Hendra Gunawan, S.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1991-07-22', golongan: 'Siaga', jenjang: 'KMD', tahunLulus: '2025', gender: 'Putra', kwarran: 'Cikupa', pangkalan: 'SDN Cikupa 01', fotoUrl: '' },
+          { id: 'pot_9', nta: '28.04.03.000401.0001', nama: 'Kak Dewi Kartika, S.Pd.', tempatLahir: 'Bogor', tanggalLahir: '1989-12-08', golongan: 'Penggalang', jenjang: 'KML', tahunLulus: '2023', gender: 'Putri', kwarran: 'Balaraja', pangkalan: 'SMPN 1 Balaraja', fotoUrl: '' },
+          { id: 'pot_10', nta: '28.04.04.000501.0001', nama: 'Kak Agus Salim, M.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1976-08-17', golongan: 'Pandega', jenjang: 'KPL', tahunLulus: '2018', gender: 'Putra', kwarran: 'Pasar Kemis', pangkalan: 'SMAN 13 Kab. Tangerang', fotoUrl: '' },
+          { id: 'pot_11', nta: '28.04.06.000601.0001', nama: 'Kak Fitria Handayani, S.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1994-03-28', golongan: 'Siaga', jenjang: 'KMD', tahunLulus: '2024', gender: 'Putri', kwarran: 'Kelapa Dua', pangkalan: 'SDN Kelapa Dua 02', fotoUrl: '' },
+          { id: 'pot_12', nta: '28.04.07.000701.0001', nama: 'Kak Rahmat Hidayat, S.T.', tempatLahir: 'Lebak', tanggalLahir: '1995-10-11', golongan: 'Penegak', jenjang: 'Belum Kursus', tahunLulus: '-', gender: 'Putra', kwarran: 'Legok', pangkalan: 'SMKN 12 Kab. Tangerang', fotoUrl: '' }
         ],
         kursus: [
           {
@@ -762,7 +808,7 @@
             courseId: 'kc_tigaraksa_1',
             kwarran: 'Tigaraksa',
             kwarran_id: 'kwarran_tigaraksa',
-            nta: '28.04.01.00142',
+            nta: '28.04.01.000142.0001',
             namaGelar: 'Ahmad Subagja, S.Pd.',
             tempatLahir: 'Tangerang',
             tanggalLahir: '1992-05-14',
@@ -777,7 +823,7 @@
             courseId: 'kc_curug_1',
             kwarran: 'Curug',
             kwarran_id: 'kwarran_curug',
-            nta: '28.04.05.00218',
+            nta: '28.04.05.000218.0001',
             namaGelar: 'Nurlaila Sari, S.Pd.SD.',
             tempatLahir: 'Tangerang',
             tanggalLahir: '1994-08-21',
@@ -792,7 +838,7 @@
             courseId: 'kc_curug_1',
             kwarran: 'Curug',
             kwarran_id: 'kwarran_curug',
-            nta: '28.04.05.00309',
+            nta: '28.04.05.000309.0001',
             namaGelar: 'Rizky Ramadhan, S.Pd.',
             tempatLahir: 'Serang',
             tanggalLahir: '1991-03-10',
@@ -849,16 +895,17 @@
         data.kwarranParticipants.push(...seed.kwarranParticipants.filter(pt => isSameKwarran(pt.kwarran, 'Curug')));
       }
 
-      // Normalisasi properti kwarran, golongan, tahunLulus, TTL (tempatLahir & tanggalLahir) & fotoUrl pada entitas potensi
+      // Normalisasi properti nta (format ##.##.##.######.####), kwarran, golongan, tahunLulus, TTL & fotoUrl pada entitas potensi
       const seedPotMap = Object.fromEntries(seed.potensi.map(sp => [sp.id, sp]));
       data.potensi = data.potensi.map(p => {
         const seedRef = seedPotMap[p.id] || {};
         const validGolongan = GOLONGAN_OPTIONS.includes(p.golongan)
           ? p.golongan
           : (seedRef.golongan || 'Penggalang');
+        const rawNta = (p.nta !== undefined && p.nta !== null) ? String(p.nta).trim() : (seedRef.nta || '');
         return {
           ...p,
-          nta: String(p.nta || seedRef.nta || '').trim(),
+          nta: rawNta ? normalizeExistingNta(rawNta) : '',
           tempatLahir: (p.tempatLahir !== undefined && p.tempatLahir !== null) ? String(p.tempatLahir).trim() : (seedRef.tempatLahir || ''),
           tanggalLahir: (p.tanggalLahir !== undefined && p.tanggalLahir !== null) ? String(p.tanggalLahir).trim() : (seedRef.tanggalLahir || ''),
           golongan: validGolongan,
@@ -884,9 +931,10 @@
         const parentCourse = data.kwarranCourses.find(c => c.id === pt.courseId);
         const kw = normalizeKwarranName(pt.kwarran || (parentCourse ? parentCourse.kwarran : ''));
         const seedKpRef = seedKpMap[pt.id] || {};
+        const rawNta = (pt.nta !== undefined && pt.nta !== null) ? String(pt.nta).trim() : (seedKpRef.nta || '');
         return {
           ...pt,
-          nta: String(pt.nta !== undefined && pt.nta !== null ? pt.nta : (seedKpRef.nta || '')).trim(),
+          nta: rawNta ? normalizeExistingNta(rawNta) : '',
           tempatLahir: String(pt.tempatLahir || '').trim(),
           tanggalLahir: String(pt.tanggalLahir || '').trim(),
           kwarran: kw,
@@ -971,7 +1019,7 @@
 
     // =========================================================================
     // SINKRONISASI OTOMATIS PESERTA LULUS (KWARRAN / KWARCAB -> DATA POTENSI)
-    // TERMASUK MEMBAWA DATA NTA, GOLONGAN, TEMPAT/TANGGAL LAHIR (TTL) & PAS FOTO 4x6
+    // TERMASUK MEMBAWA DATA NTA (##.##.##.######.####), GOLONGAN, TTL & FOTO 4x6
     // =========================================================================
     function upsertGraduateIntoPotensi(targetData, course, participant) {
       if (!targetData || !course || !participant) return false;
@@ -987,7 +1035,7 @@
       const tempatLahirVal = String(participant.tempatLahir || '').trim();
       const tanggalLahirVal = String(participant.tanggalLahir || '').trim();
       const golonganVal = GOLONGAN_OPTIONS.includes(participant.golongan) ? participant.golongan : 'Penggalang';
-      const ntaVal = String(participant.nta || '').trim();
+      const ntaVal = participant.nta ? normalizeExistingNta(participant.nta) : '';
       const genderVal = participant.gender === 'Putri' ? 'Putri' : 'Putra';
       const fotoVal = participant.fotoUrl || '';
       const rawNama = (participant.nama || participant.namaGelar || '').trim();
@@ -999,6 +1047,7 @@
 
       const existingIdx = targetData.potensi.findIndex(p => {
         if (p.id === autoPotId || p.sourceParticipantId === participant.id) return true;
+        if (ntaVal && p.nta && normalizeExistingNta(p.nta) === ntaVal) return true;
         if (normKey && normalizePersonNameForMatch(p.nama) === normKey) {
           if (!p.kwarran || isSameKwarran(p.kwarran, kwarranName)) return true;
         }
@@ -1500,7 +1549,7 @@
             ? `Data potensi pembina pramuka wilayah Kwartir Ranting ${scope.kwarranName}`
             : (readOnly
               ? 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang (Hanya Lihat — Unduh via Menu Laporan)'
-              : 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang (Golongan, TTL, Pas Foto 4x6 & Terintegrasi Kelulusan Kursus)')
+              : 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang (NTA, Golongan, TTL, Pas Foto 4x6 & Kelulusan Kursus)')
         },
         'kursus': {
           title: 'Manajemen Kursus & Pelatihan',
@@ -1709,7 +1758,7 @@
                 Standar Pas Foto 4x6
               </span>
               <h4 class="text-base font-extrabold text-scout-dark">${escapeHtml(displayName)}</h4>
-              <p class="text-xs text-scout-forest font-bold mt-0.5">NTA: ${escapeHtml(ntaInfo)}</p>
+              <p class="text-xs font-mono text-scout-forest font-bold mt-0.5">NTA: ${escapeHtml(ntaInfo)}</p>
               <p class="text-xs text-scout-brown font-semibold mt-0.5">TTL: ${escapeHtml(ttlInfo)}</p>
               <p class="text-xs text-gray-600 mt-0.5">${escapeHtml(subInfo)}</p>
             </div>
@@ -1768,7 +1817,7 @@
                 Standar Pas Foto 4x6
               </span>
               <h4 class="text-base font-extrabold text-scout-dark">${escapeHtml(item.nama)}</h4>
-              ${item.nta ? `<p class="text-xs text-scout-forest font-bold mt-0.5">NTA: ${escapeHtml(item.nta)}</p>` : ''}
+              ${item.nta ? `<p class="text-xs font-mono text-scout-forest font-bold mt-0.5">NTA: ${escapeHtml(item.nta)}</p>` : ''}
               <p class="text-xs text-gray-700 font-semibold mt-0.5">TTL: ${escapeHtml(ttlText)}</p>
               <p class="text-xs text-scout-medium font-semibold mt-0.5">
                 Golongan ${escapeHtml(item.golongan || '-')} • Jenjang: ${escapeHtml(item.jenjang)}${tahunText} • Kwarran ${escapeHtml(item.kwarran)}
@@ -2491,7 +2540,7 @@
     }
 
     // =========================================================================
-    // 9. VIEW: DATA POTENSI (GOLONGAN + TTL + PAS FOTO 4x6 + TAHUN LULUS + AUTO-SYNC LULUSAN)
+    // 9. VIEW: DATA POTENSI (NTA ##.##.##.######.#### + GOLONGAN + TTL + FOTO 4x6)
     // =========================================================================
     function formatTahunLulusDisplay(item) {
       if (!item || item.jenjang === 'Belum Kursus') return '-';
@@ -2560,7 +2609,7 @@
                 <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3"></i>
                 <input type="text" value="${escapeHtml(uiState.potensiSearch)}"
                   oninput="uiState.potensiSearch = this.value; uiState.potensiPage = 1; renderDataPotensiView(document.getElementById('main-content')); lucide.createIcons();"
-                  placeholder="Cari nama, TTL, pangkalan..."
+                  placeholder="Cari NTA, nama, TTL, pangkalan..."
                   class="w-full pl-9 pr-3 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
               </div>
 
@@ -2612,14 +2661,14 @@
             `}
           </div>
 
-          <!-- Tabel Data Potensi (Dengan Kolom Pas Foto 4x6, Tempat Tanggal Lahir, Golongan & Tahun Lulus) -->
+          <!-- Tabel Data Potensi (Dengan Kolom Pas Foto 4x6, NTA, Tempat Tanggal Lahir, Golongan & Tahun Lulus) -->
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
                 <tr class="bg-scout-cream text-scout-brown text-[11px] font-extrabold uppercase tracking-wider border-b border-scout-sand">
                   <th class="py-3.5 px-4 w-12">No</th>
                   <th class="py-3.5 px-3 w-16">Foto 4x6</th>
-                  <th class="py-3.5 px-4">Nama Lengkap / Identitas Pembina</th>
+                  <th class="py-3.5 px-4">Nama Lengkap / NTA</th>
                   <th class="py-3.5 px-4">Tempat, Tanggal Lahir</th>
                   <th class="py-3.5 px-4">Golongan</th>
                   <th class="py-3.5 px-4">Jenjang Kursus</th>
@@ -2640,7 +2689,9 @@
                       <td class="py-2.5 px-3">${renderPembinaAvatarHtml(item, 'w-9 h-[54px]', true)}</td>
                       <td class="py-3.5 px-4">
                         <p class="font-bold text-scout-dark">${escapeHtml(item.nama)}</p>
-                        ${item.nta ? `<p class="text-[10px] font-mono font-bold text-scout-brown">NTA: ${escapeHtml(item.nta)}</p>` : ''}
+                        <p class="text-[11px] font-mono font-bold text-scout-brown mt-0.5">
+                          NTA: ${escapeHtml(item.nta || '-')}
+                        </p>
                         <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
                           ${item.fotoUrl ? '<span class="text-[10px] font-semibold text-scout-forest">Pas foto 4x6 terlampir</span>' : '<span class="text-[10px] text-gray-400">Belum ada foto 4x6</span>'}
                           ${item.sourceCourseId ? '<span class="px-1.5 py-0.2 rounded bg-emerald-50 text-scout-forest border border-emerald-200 text-[9px] font-bold">Lulusan Kursus</span>' : ''}
@@ -2745,6 +2796,7 @@
       const existing = id ? appData.potensi.find(p => p.id === id) : null;
       const lockedKwarran = currentUser.role === 'Kwarran' ? getActiveKwarranName() : null;
       uiState.potensiDraftPhoto = existing ? (existing.fotoUrl || '') : '';
+      const initialNta = existing && existing.nta ? formatNtaMask(existing.nta) : '';
       const initialJenjang = existing ? existing.jenjang : JENJANG_OPTIONS[0];
       const initialGolongan = existing && GOLONGAN_OPTIONS.includes(existing.golongan) ? existing.golongan : GOLONGAN_OPTIONS[0];
       const isBelumKursus = initialJenjang === 'Belum Kursus';
@@ -2780,13 +2832,30 @@
               </div>
             </div>
 
-            <div>
-              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">
-                Nama Lengkap / Identitas Pembina <span class="text-red-600">*</span>
-              </label>
-              <input type="text" id="pot-nama" required value="${existing ? escapeHtml(existing.nama) : ''}"
-                placeholder="Contoh: Kak Budi Santoso, S.Pd."
-                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+            <!-- Input NTA & Nama Lengkap Pembina -->
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-4">
+              <div class="sm:col-span-5">
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">
+                  NTA (Nomor Tanda Anggota) <span class="text-red-600">*</span>
+                </label>
+                <input type="text" id="pot-nta" required inputmode="numeric" maxlength="20"
+                  pattern="\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{6}\\.\\d{4}"
+                  value="${escapeHtml(initialNta)}"
+                  oninput="handleNtaInputMask(this)"
+                  placeholder="28.04.01.000101.0001"
+                  title="Format wajib 16 digit angka: ##.##.##.######.####"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm font-mono font-semibold text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                <p class="text-[10px] text-gray-500 mt-1">Pola: <code class="font-mono font-bold text-scout-brown">##.##.##.######.####</code></p>
+              </div>
+
+              <div class="sm:col-span-7">
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">
+                  Nama Lengkap / Identitas Pembina <span class="text-red-600">*</span>
+                </label>
+                <input type="text" id="pot-nama" required value="${existing ? escapeHtml(existing.nama) : ''}"
+                  placeholder="Contoh: Kak Budi Santoso, S.Pd."
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+              </div>
             </div>
 
             <!-- Input Tempat, Tanggal Lahir (TTL) -->
@@ -2940,6 +3009,12 @@
         ? scope.kwarranName
         : normalizeKwarranName(document.getElementById('pot-kwarran').value);
 
+      const ntaFormatted = formatNtaMask(document.getElementById('pot-nta').value);
+      if (!isValidNtaPattern(ntaFormatted)) {
+        showToast('NTA wajib diisi lengkap 16 digit sesuai pola ##.##.##.######.####', 'error');
+        return;
+      }
+
       const jenjangVal = document.getElementById('pot-jenjang').value;
       const golonganVal = document.getElementById('pot-golongan').value;
       if (!GOLONGAN_OPTIONS.includes(golonganVal)) {
@@ -2953,6 +3028,7 @@
       const payload = {
         ...(prev || {}),
         id: id || generateId('pot'),
+        nta: ntaFormatted,
         nama: document.getElementById('pot-nama').value.trim(),
         tempatLahir: document.getElementById('pot-tempat-lahir').value.trim(),
         tanggalLahir: document.getElementById('pot-tanggal-lahir').value,
@@ -2974,10 +3050,10 @@
           }
           appData.potensi[idx] = payload;
         }
-        showToast('Data potensi pembina berhasil diperbarui.', 'success');
+        showToast('Data potensi pembina & NTA berhasil diperbarui.', 'success');
       } else {
         appData.potensi.unshift(payload);
-        showToast('Data potensi pembina baru berhasil ditambahkan.', 'success');
+        showToast('Data potensi pembina baru & NTA berhasil ditambahkan.', 'success');
       }
 
       uiState.potensiDraftPhoto = '';
@@ -3421,7 +3497,7 @@
           manualParticipants: course.sourceType === 'kwarran' ? [] : [
             {
               id: `mp_${course.id}_1`,
-              nta: '28.04.01.00412',
+              nta: '28.04.01.000412.0001',
               nama: 'Kak Hendra Setiawan, S.Pd.',
               tempatLahir: 'Tangerang',
               tanggalLahir: '1993-04-12',
@@ -3435,7 +3511,7 @@
             },
             {
               id: `mp_${course.id}_2`,
-              nta: '28.04.05.00419',
+              nta: '28.04.05.000419.0001',
               nama: 'Kak Dewi Anggraini, S.Pd.SD.',
               tempatLahir: 'Tangerang',
               tanggalLahir: '1995-09-18',
@@ -3477,6 +3553,10 @@
       det.suratTugas = Object.assign({ nomor: '', tanggal: '', penandatangan: appData.profile.namaKapus, perihal: '', personel: '', attachments: [] }, det.suratTugas || {});
       if (!Array.isArray(det.suratTugas.attachments)) det.suratTugas.attachments = [];
       if (!Array.isArray(det.manualParticipants)) det.manualParticipants = [];
+      det.manualParticipants = det.manualParticipants.map(mp => ({
+        ...mp,
+        nta: mp.nta ? normalizeExistingNta(mp.nta) : ''
+      }));
       if (!det.attendanceStatus || typeof det.attendanceStatus !== 'object') det.attendanceStatus = {};
       if (!det.graduationStatus || typeof det.graduationStatus !== 'object') det.graduationStatus = {};
       if (!Array.isArray(det.panitiaList)) det.panitiaList = [];
@@ -3931,7 +4011,7 @@
       showToast('Lampiran surat tugas dihapus.', 'info');
     }
 
-    // --- TAB 3: ABSENSI & KELULUSAN PESERTA (NTA + TTL + AUTO-SYNC KE DATA POTENSI + PAS FOTO 4x6) ---
+    // --- TAB 3: ABSENSI & KELULUSAN PESERTA (NTA ##.##.##.######.#### + TTL + AUTO-SYNC KE DATA POTENSI + PAS FOTO 4x6) ---
     function renderAdminCourseTabAbsensi(course, detail, pesertaList) {
       const subTab = uiState.adminAttendanceRoleTab || 'peserta';
       const statusOptions = ['Hadir', 'Izin', 'Sakit', 'Alpa'];
@@ -4187,7 +4267,7 @@
         : null;
 
       uiState.cabangParticipantDraftPhoto = existing ? (existing.fotoUrl || '') : '';
-      const initialNta = existing ? (existing.nta || '') : '';
+      const initialNta = existing && existing.nta ? formatNtaMask(existing.nta) : '';
       const initialTempat = existing ? (existing.tempatLahir || '') : '';
       const initialTanggal = existing ? (existing.tanggalLahir || '') : '';
 
@@ -4219,16 +4299,19 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-4">
+              <div class="sm:col-span-5">
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">NTA (Nomor Tanda Anggota) <span class="text-red-600">*</span></label>
-                <input type="text" id="cb-p-nta" required inputmode="numeric" pattern="[0-9.\\-\\/\\s]+"
+                <input type="text" id="cb-p-nta" required inputmode="numeric" maxlength="20"
+                  pattern="\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{6}\\.\\d{4}"
                   value="${escapeHtml(initialNta)}"
-                  placeholder="Contoh: 28.04.01.00123"
-                  title="Masukkan angka/nomor NTA yang valid (boleh dipisah titik atau tanda hubung)"
+                  oninput="handleNtaInputMask(this)"
+                  placeholder="28.04.01.000123.0001"
+                  title="Format wajib 16 digit angka: ##.##.##.######.####"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm font-mono font-semibold" />
+                <p class="text-[10px] text-gray-500 mt-1">Pola: <code class="font-mono font-bold text-scout-brown">##.##.##.######.####</code></p>
               </div>
-              <div class="sm:col-span-2">
+              <div class="sm:col-span-7">
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nama Lengkap & Gelar <span class="text-red-600">*</span></label>
                 <input type="text" id="cb-p-nama" required value="${existing ? escapeHtml(existing.nama) : ''}" placeholder="Contoh: Kak Budi Santoso, S.Pd."
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
@@ -4336,16 +4419,16 @@
       const isCourseDone = course.status === 'Selesai';
       const prev = participantId ? detail.manualParticipants.find(p => p.id === participantId) : null;
 
-      const ntaVal = document.getElementById('cb-p-nta').value.trim();
-      if (!ntaVal || !/\d/.test(ntaVal)) {
-        showToast('Nomor Tanda Anggota (NTA) wajib diisi dan mengandung angka.', 'error');
+      const ntaFormatted = formatNtaMask(document.getElementById('cb-p-nta').value);
+      if (!isValidNtaPattern(ntaFormatted)) {
+        showToast('NTA wajib diisi lengkap 16 digit sesuai pola ##.##.##.######.####', 'error');
         return;
       }
 
       const payload = {
         ...(prev || {}),
         id: participantId || generateId('mp'),
-        nta: ntaVal,
+        nta: ntaFormatted,
         nama: document.getElementById('cb-p-nama').value.trim(),
         tempatLahir: document.getElementById('cb-p-tempat').value.trim(),
         tanggalLahir: document.getElementById('cb-p-tgl').value,
@@ -4739,7 +4822,7 @@
 
       let selectedPerson = personOptions.find(x => x.id === uiState.adminPrintTargetId) || personOptions[0] || {
         id: 'placeholder',
-        nta: '28.04.00.000',
+        nta: '28.04.00.000000.0000',
         nama: 'Nama Peserta / Personel',
         sub: 'Gugus Depan / Kwarran',
         tempatLahir: 'Tangerang',
@@ -4794,7 +4877,7 @@
             <p>Saya yang bertanda tangan di bawah ini:</p>
             <table class="w-full text-xs sm:text-sm border-none">
               <tr><td class="py-1 w-48 font-semibold border-none">Nama Lengkap</td><td class="py-1 border-none">: <strong>${escapeHtml(selectedPerson.nama)}</strong></td></tr>
-              ${selectedPerson.nta && selectedPerson.nta !== '-' ? `<tr><td class="py-1 font-semibold border-none">Nomor Tanda Anggota (NTA)</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.nta)}</td></tr>` : ''}
+              ${selectedPerson.nta && selectedPerson.nta !== '-' ? `<tr><td class="py-1 font-semibold border-none">Nomor Tanda Anggota (NTA)</td><td class="py-1 border-none font-mono">: ${escapeHtml(selectedPerson.nta)}</td></tr>` : ''}
               <tr><td class="py-1 font-semibold border-none">Peran dalam Kegiatan</td><td class="py-1 border-none">: ${escapeHtml(peranAktif)} Kursus</td></tr>
               <tr><td class="py-1 font-semibold border-none">Pangkalan / Unit Tugas</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.pangkalan)} (Kwarran ${escapeHtml(selectedPerson.kwarran)})</td></tr>
               <tr><td class="py-1 font-semibold border-none">Nama Kegiatan</td><td class="py-1 border-none">: ${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</td></tr>
@@ -4840,7 +4923,7 @@
             </p>
             <table class="w-full text-xs sm:text-sm">
               <tr><td class="py-1 w-48 font-semibold border-none">Nama Lengkap</td><td class="py-1 border-none">: <strong>${escapeHtml(selectedPerson.nama)}</strong></td></tr>
-              <tr><td class="py-1 font-semibold border-none">Nomor Tanda Anggota (NTA)</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.nta || '-')}</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Nomor Tanda Anggota (NTA)</td><td class="py-1 border-none font-mono">: ${escapeHtml(selectedPerson.nta || '-')}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Tempat, Tanggal Lahir</td><td class="py-1 border-none">: ${escapeHtml(formatTempatTanggalLahir(selectedPerson.tempatLahir, selectedPerson.tanggalLahir))}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Golongan Pembinaan</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.golongan)}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Nama Pangkalan</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.pangkalan)}</td></tr>
@@ -4889,7 +4972,7 @@
                 ${escapeHtml(selectedPerson.nama)}
               </h3>
               <p class="text-gray-700">
-                Nomor Tanda Anggota (NTA): <strong>${escapeHtml(selectedPerson.nta || '-')}</strong><br/>
+                Nomor Tanda Anggota (NTA): <strong class="font-mono">${escapeHtml(selectedPerson.nta || '-')}</strong><br/>
                 Tempat, Tanggal Lahir: <strong>${escapeHtml(formatTempatTanggalLahir(selectedPerson.tempatLahir, selectedPerson.tanggalLahir))}</strong><br/>
                 Pangkalan: <strong>${escapeHtml(selectedPerson.pangkalan)}</strong> — Kwartir Ranting <strong>${escapeHtml(selectedPerson.kwarran)}</strong>
               </p>
@@ -4944,7 +5027,7 @@
 
             <table class="w-full text-xs sm:text-sm">
               <tr><td class="py-1 w-48 font-semibold border-none">Nama Lengkap</td><td class="py-1 border-none">: <strong>${escapeHtml(selectedPerson.nama)}</strong></td></tr>
-              <tr><td class="py-1 font-semibold border-none">Nomor Tanda Anggota (NTA)</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.nta || '-')}</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Nomor Tanda Anggota (NTA)</td><td class="py-1 border-none font-mono">: ${escapeHtml(selectedPerson.nta || '-')}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Tempat, Tanggal Lahir</td><td class="py-1 border-none">: ${escapeHtml(formatTempatTanggalLahir(selectedPerson.tempatLahir, selectedPerson.tanggalLahir))}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Pangkalan / Gugus Depan</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.pangkalan)}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Kwartir Ranting</td><td class="py-1 border-none">: Kwartir Ranting ${escapeHtml(selectedPerson.kwarran)}</td></tr>
@@ -5385,6 +5468,7 @@
               <tr class="bg-scout-dark text-white">
                 <th class="border border-gray-300 py-2.5 px-3 w-10">No</th>
                 <th class="border border-gray-300 py-2.5 px-3 w-14 text-center">Foto 4x6</th>
+                <th class="border border-gray-300 py-2.5 px-3">NTA</th>
                 <th class="border border-gray-300 py-2.5 px-3">Nama Lengkap Pembina</th>
                 <th class="border border-gray-300 py-2.5 px-3">Tempat, Tanggal Lahir</th>
                 <th class="border border-gray-300 py-2.5 px-3">Golongan</th>
@@ -5402,6 +5486,7 @@
                   <td class="border border-gray-300 py-1.5 px-2 text-center">
                     <div class="inline-flex justify-center">${renderPembinaAvatarHtml(r, 'w-8 h-12', false)}</div>
                   </td>
+                  <td class="border border-gray-300 py-2 px-3 font-mono font-semibold whitespace-nowrap">${escapeHtml(r.nta || '-')}</td>
                   <td class="border border-gray-300 py-2 px-3 font-semibold">${escapeHtml(r.nama)}</td>
                   <td class="border border-gray-300 py-2 px-3">${escapeHtml(formatTempatTanggalLahir(r.tempatLahir, r.tanggalLahir))}</td>
                   <td class="border border-gray-300 py-2 px-3 font-semibold">${escapeHtml(r.golongan || '-')}</td>
@@ -5411,7 +5496,7 @@
                   <td class="border border-gray-300 py-2 px-3">Kwarran ${escapeHtml(r.kwarran)}</td>
                   <td class="border border-gray-300 py-2 px-3">${escapeHtml(r.pangkalan || '-')}</td>
                 </tr>
-              `).join('') || '<tr><td colspan="10" class="py-6 text-center text-gray-500">Tidak ada data untuk filter terpilih.</td></tr>'}
+              `).join('') || '<tr><td colspan="11" class="py-6 text-center text-gray-500">Tidak ada data untuk filter terpilih.</td></tr>'}
             </tbody>
           </table>
         `;
@@ -5506,7 +5591,7 @@
                     <td class="border border-gray-300 py-1.5 px-2 text-center">
                       <div class="inline-flex justify-center">${renderParticipant4x6AvatarHtml(pt, 'w-8 h-12', false)}</div>
                     </td>
-                    <td class="border border-gray-300 py-2 px-3 font-mono font-semibold">${escapeHtml(pt.nta || '-')}</td>
+                    <td class="border border-gray-300 py-2 px-3 font-mono font-semibold whitespace-nowrap">${escapeHtml(pt.nta || '-')}</td>
                     <td class="border border-gray-300 py-2 px-3 font-semibold">${escapeHtml(pt.namaGelar)}</td>
                     <td class="border border-gray-300 py-2 px-3">${escapeHtml(formatTempatTanggalLahir(pt.tempatLahir, pt.tanggalLahir))}</td>
                     <td class="border border-gray-300 py-2 px-3">${escapeHtml(pt.golongan)}</td>
@@ -5677,7 +5762,7 @@
         filename = isKwarran
           ? `Laporan_Data_Potensi_Kwarran_${scope.kwarranName}.csv`
           : 'Laporan_Data_Potensi_Tangerang.csv';
-        csvRows.push(['No', 'Nama Lengkap Pembina', 'Tempat Tanggal Lahir', 'Golongan', 'Jenjang Kursus', 'Tahun Lulus', 'Jenis Kelamin', 'Asal Kwarran', 'Pangkalan', 'Status Pas Foto 4x6']);
+        csvRows.push(['No', 'NTA', 'Nama Lengkap Pembina', 'Tempat Tanggal Lahir', 'Golongan', 'Jenjang Kursus', 'Tahun Lulus', 'Jenis Kelamin', 'Asal Kwarran', 'Pangkalan', 'Status Pas Foto 4x6']);
         const rows = getScopedPotensiList().filter(p => {
           if (!isKwarran && uiState.laporanKwarran !== 'ALL' && !isSameKwarran(p.kwarran, uiState.laporanKwarran)) return false;
           if (uiState.laporanJenjang !== 'ALL' && p.jenjang !== uiState.laporanJenjang) return false;
@@ -5686,6 +5771,7 @@
         rows.forEach((r, idx) => {
           csvRows.push([
             idx + 1,
+            `"${r.nta || '-'}"`,
             `"${r.nama}"`,
             `"${formatTempatTanggalLahir(r.tempatLahir, r.tanggalLahir)}"`,
             r.golongan || '-',
@@ -5990,7 +6076,7 @@
     // =========================================================================
     // 14. ATURAN KHUSUS ROLE KWARRAN: MANAJEMEN KURSUS
     //     - Sub-Menu 1: Daftar Kursus (Auto-sync ke Admin & Auto-redirect ke Input Data Peserta)
-    //     - Sub-Menu 2: Input Data Peserta (NTA + TTL + Pas Foto 4x6 + Edit & Hapus + Auto-sync ke Admin & Data Potensi)
+    //     - Sub-Menu 2: Input Data Peserta (NTA ##.##.##.######.#### + TTL + Pas Foto 4x6 + Edit & Hapus + Auto-sync)
     // =========================================================================
     function renderKwarranDaftarKursusView(container) {
       const scope = getActiveKwarranScope();
@@ -6293,7 +6379,7 @@
         : null;
 
       const activeDraftPhoto = uiState.kwarranParticipantDraftPhoto || '';
-      const initialNta = editingParticipant ? (editingParticipant.nta || '') : '';
+      const initialNta = editingParticipant && editingParticipant.nta ? formatNtaMask(editingParticipant.nta) : '';
       const initialTempat = editingParticipant ? (editingParticipant.tempatLahir || '') : '';
       const initialTanggal = editingParticipant ? (editingParticipant.tanggalLahir || '') : '';
 
@@ -6356,7 +6442,7 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <!-- FORM INPUT / EDIT DATA PESERTA (DENGAN PAS FOTO 4x6, NTA & TTL) -->
+          <!-- FORM INPUT / EDIT DATA PESERTA (DENGAN PAS FOTO 4x6, NTA ##.##.##.######.#### & TTL) -->
           <div class="lg:col-span-5 bg-white rounded-2xl p-6 border ${editingParticipant ? 'border-amber-400 ring-2 ring-amber-200' : 'border-scout-sand'} shadow-scout h-fit">
             <div class="flex items-center justify-between pb-4 border-b border-scout-sand/70">
               <div class="flex items-center gap-2.5">
@@ -6407,11 +6493,14 @@
                 <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1">
                   NTA (Nomor Tanda Anggota) <span class="text-red-600">*</span>
                 </label>
-                <input type="text" id="kp-nta" required inputmode="numeric" pattern="[0-9.\\-\\/\\s]+"
+                <input type="text" id="kp-nta" required inputmode="numeric" maxlength="20"
+                  pattern="\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{6}\\.\\d{4}"
                   value="${escapeHtml(initialNta)}"
-                  placeholder="Contoh: 28.04.01.00142"
-                  title="Masukkan angka/nomor NTA yang valid (boleh dipisah titik atau tanda hubung)"
-                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm font-mono font-semibold focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                  oninput="handleNtaInputMask(this)"
+                  placeholder="28.04.01.000142.0001"
+                  title="Format wajib 16 digit angka: ##.##.##.######.####"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm font-mono font-semibold text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                <p class="text-[10px] text-gray-500 mt-1">Format otomatis 16 digit angka: <code class="font-mono font-bold text-scout-brown">##.##.##.######.####</code></p>
               </div>
 
               <div>
@@ -6606,9 +6695,9 @@
         return;
       }
 
-      const ntaVal = document.getElementById('kp-nta').value.trim();
-      if (!ntaVal || !/\d/.test(ntaVal)) {
-        showToast('Nomor Tanda Anggota (NTA) wajib diisi dan mengandung angka.', 'error');
+      const ntaFormatted = formatNtaMask(document.getElementById('kp-nta').value);
+      if (!isValidNtaPattern(ntaFormatted)) {
+        showToast('NTA wajib diisi lengkap 16 digit sesuai pola ##.##.##.######.####', 'error');
         return;
       }
 
@@ -6621,7 +6710,7 @@
         courseId: ownedCourse.id,
         kwarran: myKwarran,
         kwarran_id: scope.kwarran_id,
-        nta: ntaVal,
+        nta: ntaFormatted,
         namaGelar: document.getElementById('kp-nama').value.trim(),
         tempatLahir: document.getElementById('kp-tempat-lahir').value.trim(),
         tanggalLahir: document.getElementById('kp-tanggal-lahir').value,
