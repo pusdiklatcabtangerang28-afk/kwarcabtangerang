@@ -1388,7 +1388,7 @@
             ? `Data potensi pembina pramuka wilayah Kwartir Ranting ${scope.kwarranName}`
             : (readOnly
               ? 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang (Hanya Lihat — Unduh via Menu Laporan)'
-              : 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang (Terintegrasi Otomatis dengan Kelulusan Kursus)')
+              : 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang (Pas Foto 4x6 & Terintegrasi Kelulusan Kursus)')
         },
         'kursus': {
           title: 'Manajemen Kursus & Pelatihan',
@@ -1613,20 +1613,22 @@
       );
     }
 
-    function renderPembinaAvatarHtml(item, sizeClass = 'w-10 h-10', clickable = true) {
+    function renderPembinaAvatarHtml(item, sizeClass = 'w-9 h-[54px]', clickable = true) {
       if (item && item.fotoUrl) {
         return `
           <button type="button" ${clickable ? `onclick="openPotensiPhotoPreview('${item.id}')"` : ''}
-            class="${sizeClass} rounded-xl overflow-hidden border-2 border-scout-gold/70 shadow-xs shrink-0 bg-scout-cream focus:outline-none ${clickable ? 'hover:scale-105 transition cursor-zoom-in' : ''}"
-            title="${clickable ? 'Klik untuk memperbesar foto' : escapeHtml(item.nama)}">
+            class="${sizeClass} rounded-lg overflow-hidden border-2 border-scout-gold/80 shadow-xs shrink-0 bg-scout-cream focus:outline-none ${clickable ? 'hover:scale-105 transition cursor-zoom-in' : ''}"
+            title="${clickable ? 'Pas Foto 4x6 — Klik untuk memperbesar' : escapeHtml(item.nama)}">
             <img src="${item.fotoUrl}" alt="${escapeHtml(item.nama)}" class="w-full h-full object-cover" />
           </button>
         `;
       }
       const initials = getPembinaInitials(item ? item.nama : 'P');
       return `
-        <div class="${sizeClass} rounded-xl bg-gradient-to-br from-scout-brown to-scout-dark text-scout-gold font-extrabold text-xs border border-scout-khaki/60 flex items-center justify-center shrink-0 select-none">
-          ${escapeHtml(initials)}
+        <div class="${sizeClass} rounded-lg bg-gradient-to-br from-scout-brown to-scout-dark text-scout-gold font-extrabold text-[11px] border border-scout-khaki/60 flex flex-col items-center justify-center shrink-0 select-none"
+          title="Belum ada pas foto 4x6">
+          <span>${escapeHtml(initials)}</span>
+          <span class="text-[8px] font-semibold text-scout-sand/80">4x6</span>
         </div>
       `;
     }
@@ -1638,13 +1640,16 @@
         ? ''
         : ` (Lulus ${escapeHtml(item.tahunLulus)})`;
       openFormModal(
-        `Foto Pembina — ${item.nama}`,
+        `Pas Foto 4x6 Pembina — ${item.nama}`,
         `
           <div class="flex flex-col items-center text-center space-y-4">
-            <div class="w-48 h-72 rounded-2xl overflow-hidden border-4 border-scout-gold shadow-xl bg-scout-cream">
+            <div class="w-48 h-72 rounded-xl overflow-hidden border-4 border-scout-gold shadow-xl bg-scout-cream">
               <img src="${item.fotoUrl}" alt="${escapeHtml(item.nama)}" class="w-full h-full object-cover" />
             </div>
             <div>
+              <span class="inline-block px-2.5 py-0.5 rounded-full bg-scout-forest/15 text-scout-forest text-[11px] font-bold mb-1">
+                Standar Pas Foto 4x6
+              </span>
               <h4 class="text-base font-extrabold text-scout-dark">${escapeHtml(item.nama)}</h4>
               <p class="text-xs text-scout-medium font-semibold mt-0.5">
                 Jenjang: ${escapeHtml(item.jenjang)}${tahunText} • Kwarran ${escapeHtml(item.kwarran)}
@@ -1652,10 +1657,10 @@
               <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(item.pangkalan || '-')}</p>
             </div>
             <div class="flex items-center justify-center gap-2">
-              <a href="${item.fotoUrl}" download="Foto_${escapeHtml(item.nama.replace(/[^a-zA-Z0-9]/g, '_'))}.jpg"
+              <a href="${item.fotoUrl}" download="PasFoto_4x6_${escapeHtml(item.nama.replace(/[^a-zA-Z0-9]/g, '_'))}.jpg"
                 class="px-4 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-bold inline-flex items-center gap-1.5">
                 <i data-lucide="download" class="w-3.5 h-3.5 text-scout-gold"></i>
-                <span>Unduh Foto</span>
+                <span>Unduh Pas Foto 4x6</span>
               </a>
               <button type="button" onclick="closeFormModal()"
                 class="px-5 py-2 rounded-xl bg-scout-dark text-white text-xs font-bold">
@@ -1918,7 +1923,7 @@
               </h4>
               <p class="text-[11px] text-gray-500 mt-2 font-medium">
                 ${isKwarran
-                  ? `Total ${myKwarranParticipants.length} peserta kursus terdaftar`
+                  ? `Total ${myKwanParticipantsLabel(myKwarranParticipants.length)} peserta kursus terdaftar`
                   : `Aktif: ${kursusAktif} • Selesai: ${kursusSelesai}`}
               </p>
             </div>
@@ -2109,6 +2114,10 @@
       `;
 
       initDashboardCharts(filteredPotensi);
+    }
+
+    function myKwanParticipantsLabel(count) {
+      return Number(count) || 0;
     }
 
     function initDashboardCharts(dataset) {
@@ -2372,7 +2381,7 @@
     }
 
     // =========================================================================
-    // 9. VIEW: DATA POTENSI (DENGAN FITUR FOTO & TAHUN LULUS + AUTO-SYNC LULUSAN)
+    // 9. VIEW: DATA POTENSI (PAS FOTO 4x6 + TAHUN LULUS + AUTO-SYNC LULUSAN)
     // =========================================================================
     function formatTahunLulusDisplay(item) {
       if (!item || item.jenjang === 'Belum Kursus') return '-';
@@ -2482,13 +2491,13 @@
             `}
           </div>
 
-          <!-- Tabel Data Potensi (Dengan Kolom Foto & Tahun Lulus) -->
+          <!-- Tabel Data Potensi (Dengan Kolom Pas Foto 4x6 & Tahun Lulus) -->
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
                 <tr class="bg-scout-cream text-scout-brown text-[11px] font-extrabold uppercase tracking-wider border-b border-scout-sand">
                   <th class="py-3.5 px-4 w-12">No</th>
-                  <th class="py-3.5 px-4 w-16">Foto</th>
+                  <th class="py-3.5 px-3 w-16">Foto 4x6</th>
                   <th class="py-3.5 px-4">Nama Lengkap / Identitas Pembina</th>
                   <th class="py-3.5 px-4">Jenjang Kursus</th>
                   <th class="py-3.5 px-4 text-center">Tahun Lulus</th>
@@ -2504,11 +2513,11 @@
                   return `
                     <tr class="hover:bg-scout-cream/40 transition">
                       <td class="py-3.5 px-4 font-semibold text-gray-500">${startIdx + idx + 1}</td>
-                      <td class="py-3 px-4">${renderPembinaAvatarHtml(item, 'w-10 h-10', true)}</td>
+                      <td class="py-2.5 px-3">${renderPembinaAvatarHtml(item, 'w-9 h-[54px]', true)}</td>
                       <td class="py-3.5 px-4">
                         <p class="font-bold text-scout-dark">${escapeHtml(item.nama)}</p>
                         <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
-                          ${item.fotoUrl ? '<span class="text-[10px] font-semibold text-scout-forest">Foto terlampir</span>' : '<span class="text-[10px] text-gray-400">Belum ada foto</span>'}
+                          ${item.fotoUrl ? '<span class="text-[10px] font-semibold text-scout-forest">Pas foto 4x6 terlampir</span>' : '<span class="text-[10px] text-gray-400">Belum ada foto 4x6</span>'}
                           ${item.sourceCourseId ? '<span class="px-1.5 py-0.2 rounded bg-emerald-50 text-scout-forest border border-emerald-200 text-[9px] font-bold">Lulusan Kursus</span>' : ''}
                         </div>
                       </td>
@@ -2608,12 +2617,12 @@
         existing ? 'Edit Data Potensi Pembina' : 'Tambah Data Potensi Pembina',
         `
           <form onsubmit="savePotensiForm(event, '${id || ''}')" class="space-y-4">
-            <!-- Upload Foto Pembina -->
+            <!-- Upload Foto Pembina 4x6 -->
             <div class="p-4 rounded-2xl bg-scout-cream/70 border border-dashed border-scout-khaki flex flex-col sm:flex-row items-center gap-4">
-              <div id="pot-photo-preview" class="w-16 h-24 rounded-xl bg-white border-2 border-scout-gold/70 shadow-sm overflow-hidden flex items-center justify-center shrink-0">
+              <div id="pot-photo-preview" class="w-16 h-24 rounded-xl bg-white border-2 border-scout-gold/70 shadow-sm overflow-hidden flex flex-col items-center justify-center shrink-0">
                 ${uiState.potensiDraftPhoto
-                  ? `<img src="${uiState.potensiDraftPhoto}" alt="Pratinjau Foto" class="w-full h-full object-cover" />`
-                  : `<i data-lucide="camera" class="w-6 h-6 text-scout-medium"></i>`}
+                  ? `<img src="${uiState.potensiDraftPhoto}" alt="Pratinjau Foto 4x6" class="w-full h-full object-cover" />`
+                  : `<i data-lucide="camera" class="w-6 h-6 text-scout-medium"></i><span class="text-[9px] font-bold text-gray-500 mt-0.5">4x6</span>`}
               </div>
               <div class="flex-1 text-center sm:text-left">
                 <p class="text-xs font-extrabold text-scout-dark">Pas Foto 4x6 Pembina <span class="text-gray-400 font-normal">(Opsional)</span></p>
@@ -2621,7 +2630,7 @@
                 <div class="mt-2.5 flex flex-wrap items-center justify-center sm:justify-start gap-2">
                   <label class="cursor-pointer px-3.5 py-2 rounded-xl bg-scout-dark hover:bg-scout-brown text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-xs transition">
                     <i data-lucide="upload" class="w-3.5 h-3.5 text-scout-gold"></i>
-                    <span>Pilih Foto</span>
+                    <span>Pilih Foto 4x6</span>
                     <input type="file" accept="image/*" onchange="handlePotensiPhotoUpload(event)" class="hidden" />
                   </label>
                   <button type="button" id="pot-remove-photo-btn" onclick="removePotensiDraftPhoto()"
@@ -2721,7 +2730,7 @@
         const previewEl = document.getElementById('pot-photo-preview');
         const removeBtn = document.getElementById('pot-remove-photo-btn');
         if (previewEl) {
-          previewEl.innerHTML = `<img src="${compressedDataUrl}" alt="Pratinjau Foto" class="w-full h-full object-cover" />`;
+          previewEl.innerHTML = `<img src="${compressedDataUrl}" alt="Pratinjau Foto 4x6" class="w-full h-full object-cover" />`;
         }
         if (removeBtn) {
           removeBtn.classList.remove('hidden');
@@ -2736,7 +2745,7 @@
       const previewEl = document.getElementById('pot-photo-preview');
       const removeBtn = document.getElementById('pot-remove-photo-btn');
       if (previewEl) {
-        previewEl.innerHTML = `<i data-lucide="camera" class="w-6 h-6 text-scout-medium"></i>`;
+        previewEl.innerHTML = `<i data-lucide="camera" class="w-6 h-6 text-scout-medium"></i><span class="text-[9px] font-bold text-gray-500 mt-0.5">4x6</span>`;
         lucide.createIcons();
       }
       if (removeBtn) {
@@ -5101,7 +5110,7 @@
             <thead>
               <tr class="bg-scout-dark text-white">
                 <th class="border border-gray-300 py-2.5 px-3 w-10">No</th>
-                <th class="border border-gray-300 py-2.5 px-3 w-14 text-center">Foto</th>
+                <th class="border border-gray-300 py-2.5 px-3 w-14 text-center">Foto 4x6</th>
                 <th class="border border-gray-300 py-2.5 px-3">Nama Lengkap Pembina</th>
                 <th class="border border-gray-300 py-2.5 px-3">Jenjang Kursus</th>
                 <th class="border border-gray-300 py-2.5 px-3 text-center">Tahun Lulus</th>
@@ -5115,7 +5124,7 @@
                 <tr class="odd:bg-white even:bg-scout-cream/40">
                   <td class="border border-gray-300 py-2 px-3 text-center">${i + 1}</td>
                   <td class="border border-gray-300 py-1.5 px-2 text-center">
-                    <div class="inline-flex justify-center">${renderPembinaAvatarHtml(r, 'w-9 h-9', false)}</div>
+                    <div class="inline-flex justify-center">${renderPembinaAvatarHtml(r, 'w-8 h-12', false)}</div>
                   </td>
                   <td class="border border-gray-300 py-2 px-3 font-semibold">${escapeHtml(r.nama)}</td>
                   <td class="border border-gray-300 py-2 px-3 font-bold">${escapeHtml(r.jenjang)}</td>
@@ -5385,14 +5394,14 @@
         filename = isKwarran
           ? `Laporan_Data_Potensi_Kwarran_${scope.kwarranName}.csv`
           : 'Laporan_Data_Potensi_Tangerang.csv';
-        csvRows.push(['No', 'Nama Lengkap Pembina', 'Jenjang Kursus', 'Tahun Lulus', 'Jenis Kelamin', 'Asal Kwarran', 'Pangkalan', 'Status Foto']);
+        csvRows.push(['No', 'Nama Lengkap Pembina', 'Jenjang Kursus', 'Tahun Lulus', 'Jenis Kelamin', 'Asal Kwarran', 'Pangkalan', 'Status Pas Foto 4x6']);
         const rows = getScopedPotensiList().filter(p => {
           if (!isKwarran && uiState.laporanKwarran !== 'ALL' && !isSameKwarran(p.kwarran, uiState.laporanKwarran)) return false;
           if (uiState.laporanJenjang !== 'ALL' && p.jenjang !== uiState.laporanJenjang) return false;
           return true;
         });
         rows.forEach((r, idx) => {
-          csvRows.push([idx + 1, `"${r.nama}"`, r.jenjang, formatTahunLulusDisplay(r), r.gender, r.kwarran, `"${r.pangkalan || '-'}"`, r.fotoUrl ? 'Ada Foto' : 'Belum Ada']);
+          csvRows.push([idx + 1, `"${r.nama}"`, r.jenjang, formatTahunLulusDisplay(r), r.gender, r.kwarran, `"${r.pangkalan || '-'}"`, r.fotoUrl ? 'Ada Foto 4x6' : 'Belum Ada']);
         });
       } else if (uiState.laporanType === 'kursus') {
         if (isKwarran) {
