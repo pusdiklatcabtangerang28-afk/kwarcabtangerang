@@ -117,7 +117,7 @@
   <!-- TOAST NOTIFICATION CONTAINER -->
   <div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none no-print"></div>
 
-  <!-- MODAL KONFIRMASI UNIVERSAL (Ganti confirm() bawaan browser) -->
+  <!-- MODAL KONFIRMASI UNIVERSAL -->
   <div id="confirm-modal" class="fixed inset-0 z-[90] hidden items-center justify-center bg-black/60 backdrop-blur-xs p-4 no-print">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-scout-sand animate-[fadeIn_0.15s_ease-out]">
       <div class="flex items-start gap-4">
@@ -391,10 +391,16 @@
   <!-- ===================================================================== -->
   <script>
     // =========================================================================
-    // 1. KONSTANTA & DATA REFERENSI WILAYAH TANGERANG
+    // 1. KONSTANTA, UTILITAS TANGGAL INDONESIA & DATA REFERENSI WILAYAH
     // =========================================================================
     const STORAGE_KEY = 'pusdiklatcab_tangerang_v1';
     const SESSION_STORAGE_KEY = 'pusdiklatcab_tangerang_session_v1';
+
+    const BULAN_INDO = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    const HARI_INDO = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
     const KWARRAN_LIST = [
       'Tigaraksa', 'Cikupa', 'Balaraja', 'Pasar Kemis', 'Curug',
@@ -409,6 +415,71 @@
     const JENJANG_RANK = { 'Belum Kursus': 0, 'KMD': 1, 'KML': 2, 'KPD': 3, 'KPL': 4 };
     const GOLONGAN_OPTIONS = ['Siaga', 'Penggalang', 'Penegak', 'Pandega'];
     const KUALIFIKASI_OPTIONS = ['Sangat Memuaskan', 'Memuaskan', 'Baik', 'Cukup'];
+
+    // Parser tanggal aman ke format baku Indonesia (contoh: "24 November 2026" atau "Selasa, 24 November 2026")
+    function formatDateIndo(dateStr, includeDay = false) {
+      if (!dateStr || dateStr === '-') return '-';
+      const raw = String(dateStr).trim();
+      if (!raw) return '-';
+
+      let year, monthIdx, day;
+      const isoMatch = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      const dmyMatch = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+
+      if (isoMatch) {
+        year = parseInt(isoMatch[1], 10);
+        monthIdx = parseInt(isoMatch[2], 10) - 1;
+        day = parseInt(isoMatch[3], 10);
+      } else if (dmyMatch) {
+        day = parseInt(dmyMatch[1], 10);
+        monthIdx = parseInt(dmyMatch[2], 10) - 1;
+        year = parseInt(dmyMatch[3], 10);
+      } else {
+        const parsed = new Date(raw);
+        if (isNaN(parsed.getTime())) return raw;
+        year = parsed.getFullYear();
+        monthIdx = parsed.getMonth();
+        day = parsed.getDate();
+      }
+
+      if (monthIdx < 0 || monthIdx > 11 || isNaN(day) || isNaN(year)) return raw;
+      const dayPadded = String(day).padStart(2, '0');
+      const baseFormatted = `${dayPadded} ${BULAN_INDO[monthIdx]} ${year}`;
+
+      if (includeDay) {
+        const dateObj = new Date(year, monthIdx, day);
+        if (!isNaN(dateObj.getTime())) {
+          return `${HARI_INDO[dateObj.getDay()]}, ${baseFormatted}`;
+        }
+      }
+      return baseFormatted;
+    }
+
+    // Konversi otomatis seluruh tanggal YYYY-MM-DD di dalam string atau rentang tanggal (mis. "2026-11-27 s.d. 2026-12-02")
+    function formatDateRangeIndo(text) {
+      if (!text || text === '-') return '-';
+      const raw = String(text).trim();
+      if (!raw) return '-';
+      return raw.replace(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/g, (match) => formatDateIndo(match));
+    }
+
+    function getTodayDateIndo(includeDay = false) {
+      const now = new Date();
+      const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      return formatDateIndo(iso, includeDay);
+    }
+
+    // Format tampilan gabungan "Tempat, Tanggal Lahir" (contoh: "Tangerang, 17 Agustus 1995")
+    function formatTempatTanggalLahir(tempatLahir, tanggalLahir) {
+      const tempat = String(tempatLahir || '').trim();
+      const tglFormatted = tanggalLahir ? formatDateIndo(tanggalLahir) : '';
+      if (tempat && tglFormatted && tglFormatted !== '-') {
+        return `${tempat}, ${tglFormatted}`;
+      }
+      if (tempat) return tempat;
+      if (tglFormatted && tglFormatted !== '-') return tglFormatted;
+      return '-';
+    }
 
     // Utilitas pengecekan hak akses read-only untuk role Pelatih
     function isPelatihReadOnly() {
@@ -563,18 +634,18 @@
           }
         ],
         potensi: [
-          { id: 'pot_1', nama: 'Kak Drs. H. Ahmad Fauzi, M.Pd.', jenjang: 'KPL', tahunLulus: '2019', gender: 'Putra', kwarran: 'Tigaraksa', pangkalan: 'SMAN 6 Kab. Tangerang', fotoUrl: '' },
-          { id: 'pot_2', nama: 'Kak Hj. Nurhayati, S.Pd., M.M.', jenjang: 'KPD', tahunLulus: '2021', gender: 'Putri', kwarran: 'Tigaraksa', pangkalan: 'SMPN 1 Tigaraksa', fotoUrl: '' },
-          { id: 'pot_3', nama: 'Kak Dedi Kurniawan, S.Pd.', jenjang: 'KML', tahunLulus: '2023', gender: 'Putra', kwarran: 'Tigaraksa', pangkalan: 'SDN Tigaraksa 01', fotoUrl: '' },
-          { id: 'pot_4', nama: 'Kak Siti Rahmawati, S.Pd.SD.', jenjang: 'KMD', tahunLulus: '2024', gender: 'Putri', kwarran: 'Curug', pangkalan: 'SDN Curug 01', fotoUrl: '' },
-          { id: 'pot_5', nama: 'Kak Muhammad Ridwan, S.Kom.', jenjang: 'KML', tahunLulus: '2022', gender: 'Putra', kwarran: 'Curug', pangkalan: 'SMPN 1 Curug', fotoUrl: '' },
-          { id: 'pot_6', nama: 'Kak Lilis Suryani, M.Pd.', jenjang: 'KPD', tahunLulus: '2020', gender: 'Putri', kwarran: 'Curug', pangkalan: 'SMAN 3 Kab. Tangerang', fotoUrl: '' },
-          { id: 'pot_7', nama: 'Kak Andi Pratama, S.Or.', jenjang: 'Belum Kursus', tahunLulus: '-', gender: 'Putra', kwarran: 'Curug', pangkalan: 'SDN Binong 02', fotoUrl: '' },
-          { id: 'pot_8', nama: 'Kak Hendra Gunawan, S.Pd.', jenjang: 'KMD', tahunLulus: '2025', gender: 'Putra', kwarran: 'Cikupa', pangkalan: 'SDN Cikupa 01', fotoUrl: '' },
-          { id: 'pot_9', nama: 'Kak Dewi Kartika, S.Pd.', jenjang: 'KML', tahunLulus: '2023', gender: 'Putri', kwarran: 'Balaraja', pangkalan: 'SMPN 1 Balaraja', fotoUrl: '' },
-          { id: 'pot_10', nama: 'Kak Agus Salim, M.Pd.', jenjang: 'KPL', tahunLulus: '2018', gender: 'Putra', kwarran: 'Pasar Kemis', pangkalan: 'SMAN 13 Kab. Tangerang', fotoUrl: '' },
-          { id: 'pot_11', nama: 'Kak Fitria Handayani, S.Pd.', jenjang: 'KMD', tahunLulus: '2024', gender: 'Putri', kwarran: 'Kelapa Dua', pangkalan: 'SDN Kelapa Dua 02', fotoUrl: '' },
-          { id: 'pot_12', nama: 'Kak Rahmat Hidayat, S.T.', jenjang: 'Belum Kursus', tahunLulus: '-', gender: 'Putra', kwarran: 'Legok', pangkalan: 'SMKN 12 Kab. Tangerang', fotoUrl: '' }
+          { id: 'pot_1', nama: 'Kak Drs. H. Ahmad Fauzi, M.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1978-04-12', jenjang: 'KPL', tahunLulus: '2019', gender: 'Putra', kwarran: 'Tigaraksa', pangkalan: 'SMAN 6 Kab. Tangerang', fotoUrl: '' },
+          { id: 'pot_2', nama: 'Kak Hj. Nurhayati, S.Pd., M.M.', tempatLahir: 'Serang', tanggalLahir: '1981-08-19', jenjang: 'KPD', tahunLulus: '2021', gender: 'Putri', kwarran: 'Tigaraksa', pangkalan: 'SMPN 1 Tigaraksa', fotoUrl: '' },
+          { id: 'pot_3', nama: 'Kak Dedi Kurniawan, S.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1988-02-25', jenjang: 'KML', tahunLulus: '2023', gender: 'Putra', kwarran: 'Tigaraksa', pangkalan: 'SDN Tigaraksa 01', fotoUrl: '' },
+          { id: 'pot_4', nama: 'Kak Siti Rahmawati, S.Pd.SD.', tempatLahir: 'Tangerang', tanggalLahir: '1992-11-05', jenjang: 'KMD', tahunLulus: '2024', gender: 'Putri', kwarran: 'Curug', pangkalan: 'SDN Curug 01', fotoUrl: '' },
+          { id: 'pot_5', nama: 'Kak Muhammad Ridwan, S.Kom.', tempatLahir: 'Jakarta', tanggalLahir: '1990-06-14', jenjang: 'KML', tahunLulus: '2022', gender: 'Putra', kwarran: 'Curug', pangkalan: 'SMPN 1 Curug', fotoUrl: '' },
+          { id: 'pot_6', nama: 'Kak Lilis Suryani, M.Pd.', tempatLahir: 'Bandung', tanggalLahir: '1983-09-30', jenjang: 'KPD', tahunLulus: '2020', gender: 'Putri', kwarran: 'Curug', pangkalan: 'SMAN 3 Kab. Tangerang', fotoUrl: '' },
+          { id: 'pot_7', nama: 'Kak Andi Pratama, S.Or.', tempatLahir: 'Tangerang', tanggalLahir: '1996-01-17', jenjang: 'Belum Kursus', tahunLulus: '-', gender: 'Putra', kwarran: 'Curug', pangkalan: 'SDN Binong 02', fotoUrl: '' },
+          { id: 'pot_8', nama: 'Kak Hendra Gunawan, S.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1991-07-22', jenjang: 'KMD', tahunLulus: '2025', gender: 'Putra', kwarran: 'Cikupa', pangkalan: 'SDN Cikupa 01', fotoUrl: '' },
+          { id: 'pot_9', nama: 'Kak Dewi Kartika, S.Pd.', tempatLahir: 'Bogor', tanggalLahir: '1989-12-08', jenjang: 'KML', tahunLulus: '2023', gender: 'Putri', kwarran: 'Balaraja', pangkalan: 'SMPN 1 Balaraja', fotoUrl: '' },
+          { id: 'pot_10', nama: 'Kak Agus Salim, M.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1976-08-17', jenjang: 'KPL', tahunLulus: '2018', gender: 'Putra', kwarran: 'Pasar Kemis', pangkalan: 'SMAN 13 Kab. Tangerang', fotoUrl: '' },
+          { id: 'pot_11', nama: 'Kak Fitria Handayani, S.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1994-03-28', jenjang: 'KMD', tahunLulus: '2024', gender: 'Putri', kwarran: 'Kelapa Dua', pangkalan: 'SDN Kelapa Dua 02', fotoUrl: '' },
+          { id: 'pot_12', nama: 'Kak Rahmat Hidayat, S.T.', tempatLahir: 'Lebak', tanggalLahir: '1995-10-11', jenjang: 'Belum Kursus', tahunLulus: '-', gender: 'Putra', kwarran: 'Legok', pangkalan: 'SMKN 12 Kab. Tangerang', fotoUrl: '' }
         ],
         kursus: [
           {
@@ -745,7 +816,7 @@
       data.kwarranCourses = Array.isArray(data.kwarranCourses) ? data.kwarranCourses : seed.kwarranCourses;
       data.kwarranParticipants = Array.isArray(data.kwarranParticipants) ? data.kwarranParticipants : seed.kwarranParticipants;
 
-      // Pastikan setiap user Kwarran memiliki metadata wilayah eksplisit tanpa fallback ke Tigaraksa
+      // Pastikan setiap user Kwarran memiliki metadata wilayah eksplisit
       data.users = data.users.map(u => {
         if (u.role === 'Kwarran') {
           const explicitKw = resolveExplicitUserKwarran(u);
@@ -757,7 +828,6 @@
         return u;
       });
 
-      // Pastikan akun Kwarran Curug tersedia jika belum ada di localStorage lama
       if (!data.users.some(u => u.role === 'Kwarran' && isSameKwarran(resolveExplicitUserKwarran(u), 'Curug'))) {
         data.users.push({
           id: 'usr_kwarran_curug',
@@ -768,7 +838,6 @@
         });
       }
 
-      // Pastikan data seed awal Curug ikut tersuntik jika belum pernah ada data Curug di penyimpanan lama
       if (!data.potensi.some(p => isSameKwarran(p.kwarran, 'Curug'))) {
         data.potensi.push(...seed.potensi.filter(p => isSameKwarran(p.kwarran, 'Curug')));
       }
@@ -777,16 +846,22 @@
         data.kwarranParticipants.push(...seed.kwarranParticipants.filter(pt => isSameKwarran(pt.kwarran, 'Curug')));
       }
 
-      // Normalisasi properti kwarran, tahunLulus & fotoUrl pada seluruh entitas potensi
-      const seedTahunMap = Object.fromEntries(seed.potensi.map(sp => [sp.id, sp.tahunLulus]));
-      data.potensi = data.potensi.map(p => ({
-        ...p,
-        kwarran: normalizeKwarranName(p.kwarran),
-        tahunLulus: p.jenjang === 'Belum Kursus'
-          ? '-'
-          : (p.tahunLulus && p.tahunLulus !== '-' ? String(p.tahunLulus).trim() : (seedTahunMap[p.id] || '-')),
-        fotoUrl: p.fotoUrl || ''
-      }));
+      // Normalisasi properti kwarran, tahunLulus, TTL (tempatLahir & tanggalLahir) & fotoUrl pada entitas potensi
+      const seedPotMap = Object.fromEntries(seed.potensi.map(sp => [sp.id, sp]));
+      data.potensi = data.potensi.map(p => {
+        const seedRef = seedPotMap[p.id] || {};
+        return {
+          ...p,
+          tempatLahir: (p.tempatLahir !== undefined && p.tempatLahir !== null) ? String(p.tempatLahir).trim() : (seedRef.tempatLahir || ''),
+          tanggalLahir: (p.tanggalLahir !== undefined && p.tanggalLahir !== null) ? String(p.tanggalLahir).trim() : (seedRef.tanggalLahir || ''),
+          kwarran: normalizeKwarranName(p.kwarran),
+          tahunLulus: p.jenjang === 'Belum Kursus'
+            ? '-'
+            : (p.tahunLulus && p.tahunLulus !== '-' ? String(p.tahunLulus).trim() : (seedRef.tahunLulus || '-')),
+          fotoUrl: p.fotoUrl || ''
+        };
+      });
+
       data.kwarranCourses = data.kwarranCourses.map(c => {
         const kw = normalizeKwarranName(c.kwarran);
         return {
@@ -795,11 +870,14 @@
           kwarran_id: c.kwarran_id || buildKwarranMetadata(kw).kwarran_id
         };
       });
+
       data.kwarranParticipants = data.kwarranParticipants.map(pt => {
         const parentCourse = data.kwarranCourses.find(c => c.id === pt.courseId);
         const kw = normalizeKwarranName(pt.kwarran || (parentCourse ? parentCourse.kwarran : ''));
         return {
           ...pt,
+          tempatLahir: String(pt.tempatLahir || '').trim(),
+          tanggalLahir: String(pt.tanggalLahir || '').trim(),
           kwarran: kw,
           kwarran_id: pt.kwarran_id || buildKwarranMetadata(kw).kwarran_id,
           gender: pt.gender || 'Putra',
@@ -882,6 +960,7 @@
 
     // =========================================================================
     // SINKRONISASI OTOMATIS PESERTA LULUS (KWARRAN / KWARCAB -> DATA POTENSI)
+    // TERMASUK MEMBAWA DATA TEMPAT, TANGGAL LAHIR (TTL) & PAS FOTO 4x6
     // =========================================================================
     function upsertGraduateIntoPotensi(targetData, course, participant) {
       if (!targetData || !course || !participant) return false;
@@ -894,6 +973,8 @@
         participant.kwarran || course.sourceKwarran || 'Tigaraksa'
       );
       const pangkalanName = (participant.pangkalan || participant.namaPangkalan || '').trim();
+      const tempatLahirVal = String(participant.tempatLahir || '').trim();
+      const tanggalLahirVal = String(participant.tanggalLahir || '').trim();
       const genderVal = participant.gender === 'Putri' ? 'Putri' : 'Putra';
       const fotoVal = participant.fotoUrl || '';
       const rawNama = (participant.nama || participant.namaGelar || '').trim();
@@ -920,6 +1001,8 @@
         targetData.potensi[existingIdx] = {
           ...existing,
           nama: formattedNama || existing.nama,
+          tempatLahir: tempatLahirVal || existing.tempatLahir || '',
+          tanggalLahir: tanggalLahirVal || existing.tanggalLahir || '',
           jenjang: shouldUpgrade ? graduatedJenjang : existing.jenjang,
           tahunLulus: shouldUpgrade ? tahunLulus : (existing.tahunLulus || tahunLulus),
           gender: participant.gender || existing.gender || 'Putra',
@@ -935,6 +1018,8 @@
       targetData.potensi.unshift({
         id: autoPotId,
         nama: formattedNama,
+        tempatLahir: tempatLahirVal,
+        tanggalLahir: tanggalLahirVal,
         jenjang: graduatedJenjang,
         tahunLulus: tahunLulus,
         gender: genderVal,
@@ -972,6 +1057,8 @@
               const added = upsertGraduateIntoPotensi(targetData, course, {
                 id: kp.id,
                 nama: kp.namaGelar,
+                tempatLahir: kp.tempatLahir || '',
+                tanggalLahir: kp.tanggalLahir || '',
                 kwarran: kp.kwarran || course.sourceKwarran,
                 pangkalan: kp.namaPangkalan,
                 gender: kp.gender || 'Putra',
@@ -993,6 +1080,8 @@
               const added = upsertGraduateIntoPotensi(targetData, course, {
                 id: mp.id,
                 nama: mp.nama,
+                tempatLahir: mp.tempatLahir || '',
+                tanggalLahir: mp.tanggalLahir || '',
                 kwarran: mp.kwarran || 'Tigaraksa',
                 pangkalan: mp.pangkalan,
                 gender: mp.gender || 'Putra',
@@ -1388,7 +1477,7 @@
             ? `Data potensi pembina pramuka wilayah Kwartir Ranting ${scope.kwarranName}`
             : (readOnly
               ? 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang (Hanya Lihat — Unduh via Menu Laporan)'
-              : 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang (Pas Foto 4x6 & Terintegrasi Kelulusan Kursus)')
+              : 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang (TTL, Pas Foto 4x6 & Terintegrasi Kelulusan Kursus)')
         },
         'kursus': {
           title: 'Manajemen Kursus & Pelatihan',
@@ -1418,7 +1507,7 @@
         },
         'kwarran-input-peserta': {
           title: 'Manajemen Kursus — Input Data Peserta',
-          subtitle: `Pengelolaan data peserta kursus & pas foto 4x6 Kwartir Ranting ${scope.kwarranName}`
+          subtitle: `Pengelolaan data peserta kursus, TTL & pas foto 4x6 Kwartir Ranting ${scope.kwarranName}`
         }
       };
 
@@ -1509,8 +1598,8 @@
       reader.onload = function (e) {
         const img = new Image();
         img.onload = function () {
-          const targetW = 240; // Proporsi 4
-          const targetH = 360; // Proporsi 6 (rasio 2:3)
+          const targetW = 240;
+          const targetH = 360;
           const targetRatio = targetW / targetH;
           const srcRatio = img.width / img.height;
 
@@ -1520,11 +1609,9 @@
           let sHeight = img.height;
 
           if (srcRatio > targetRatio) {
-            // Gambar lebih lebar dari 4x6 -> crop sisi kiri & kanan secara simetris
             sWidth = Math.round(img.height * targetRatio);
             sx = Math.round((img.width - sWidth) / 2);
           } else if (srcRatio < targetRatio) {
-            // Gambar lebih tinggi dari 4x6 -> crop bagian atas/bawah dengan fokus wajah atas
             sHeight = Math.round(img.width / targetRatio);
             sy = Math.round((img.height - sHeight) * 0.25);
           }
@@ -1567,6 +1654,7 @@
     function openParticipantPhotoPreview(participantId) {
       let found = appData.kwarranParticipants.find(p => p.id === participantId);
       let displayName = found ? found.namaGelar : '';
+      let ttlInfo = found ? formatTempatTanggalLahir(found.tempatLahir, found.tanggalLahir) : '-';
       let subInfo = found ? `Golongan ${found.golongan} • ${found.namaPangkalan} (Kwarran ${found.kwarran})` : '';
       let fotoUrl = found ? found.fotoUrl : '';
 
@@ -1577,6 +1665,7 @@
           if (mp && mp.fotoUrl) {
             fotoUrl = mp.fotoUrl;
             displayName = mp.nama;
+            ttlInfo = formatTempatTanggalLahir(mp.tempatLahir, mp.tanggalLahir);
             subInfo = `Golongan ${mp.golongan} • ${mp.pangkalan} (Kwarran ${mp.kwarran})`;
           }
         });
@@ -1595,6 +1684,7 @@
                 Standar Pas Foto 4x6
               </span>
               <h4 class="text-base font-extrabold text-scout-dark">${escapeHtml(displayName)}</h4>
+              <p class="text-xs text-scout-brown font-semibold mt-0.5">TTL: ${escapeHtml(ttlInfo)}</p>
               <p class="text-xs text-gray-600 mt-0.5">${escapeHtml(subInfo)}</p>
             </div>
             <div class="flex items-center justify-center gap-2">
@@ -1639,6 +1729,7 @@
       const tahunText = item.jenjang === 'Belum Kursus' || !item.tahunLulus || item.tahunLulus === '-'
         ? ''
         : ` (Lulus ${escapeHtml(item.tahunLulus)})`;
+      const ttlText = formatTempatTanggalLahir(item.tempatLahir, item.tanggalLahir);
       openFormModal(
         `Pas Foto 4x6 Pembina — ${item.nama}`,
         `
@@ -1651,6 +1742,7 @@
                 Standar Pas Foto 4x6
               </span>
               <h4 class="text-base font-extrabold text-scout-dark">${escapeHtml(item.nama)}</h4>
+              <p class="text-xs text-gray-700 font-semibold mt-0.5">TTL: ${escapeHtml(ttlText)}</p>
               <p class="text-xs text-scout-medium font-semibold mt-0.5">
                 Jenjang: ${escapeHtml(item.jenjang)}${tahunText} • Kwarran ${escapeHtml(item.kwarran)}
               </p>
@@ -1789,15 +1881,6 @@
         .replace(/'/g, '&#039;');
     }
 
-    function formatDateIndo(dateStr) {
-      if (!dateStr) return '-';
-      const parts = dateStr.split('-');
-      if (parts.length !== 3) return dateStr;
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-      const mIdx = parseInt(parts[1], 10) - 1;
-      return `${parts[2]} ${months[mIdx] || parts[1]} ${parts[0]}`;
-    }
-
     // =========================================================================
     // 7. VIEW: DASHBOARD (TERFILTER KETAT SESUAI ROLE & WILAYAH KWARRAN)
     // =========================================================================
@@ -1833,7 +1916,7 @@
             return {
               nama: kc.namaKursus || `Kursus Kwarran ${kc.kwarran}`,
               lokasi: kc.lokasi,
-              tanggal: `${kc.hari}, ${kc.tanggal}`,
+              tanggal: `${kc.hari}, ${formatDateRangeIndo(kc.tanggal)}`,
               pesertaLabel: `${cnt} Peserta`,
               status: 'Aktif Kwarran'
             };
@@ -1841,7 +1924,7 @@
         : appData.kursus.slice(0, 5).map(k => ({
             nama: k.nama,
             lokasi: k.lokasi,
-            tanggal: k.tanggal,
+            tanggal: formatDateRangeIndo(k.tanggal),
             pesertaLabel: `${k.terdaftar}/${k.kuota}`,
             status: k.status,
             sourceType: k.sourceType,
@@ -2095,7 +2178,7 @@
                       </span>
                       <p class="text-xs font-bold text-scout-dark">${escapeHtml(kc.namaKursus || 'Kursus Kepramukaan Kwarran')}</p>
                       <p class="text-[11px] text-gray-600 mt-0.5">
-                        ${escapeHtml(kc.hari)} • ${escapeHtml(kc.tanggal)}
+                        ${escapeHtml(kc.hari)} • ${escapeHtml(formatDateRangeIndo(kc.tanggal))}
                       </p>
                       <p class="text-[11px] text-gray-500 mt-0.5 flex items-center gap-1">
                         <i data-lucide="map-pin" class="w-3 h-3 text-scout-forest"></i>
@@ -2381,7 +2464,7 @@
     }
 
     // =========================================================================
-    // 9. VIEW: DATA POTENSI (PAS FOTO 4x6 + TAHUN LULUS + AUTO-SYNC LULUSAN)
+    // 9. VIEW: DATA POTENSI (TTL + PAS FOTO 4x6 + TAHUN LULUS + AUTO-SYNC LULUSAN)
     // =========================================================================
     function formatTahunLulusDisplay(item) {
       if (!item || item.jenjang === 'Belum Kursus') return '-';
@@ -2403,8 +2486,10 @@
         if (uiState.potensiGender !== 'ALL' && item.gender !== uiState.potensiGender) return false;
         if (uiState.potensiSearch) {
           const q = uiState.potensiSearch.toLowerCase();
+          const ttlStr = formatTempatTanggalLahir(item.tempatLahir, item.tanggalLahir).toLowerCase();
           const match =
             item.nama.toLowerCase().includes(q) ||
+            ttlStr.includes(q) ||
             item.kwarran.toLowerCase().includes(q) ||
             (item.pangkalan || '').toLowerCase().includes(q) ||
             String(item.tahunLulus || '').toLowerCase().includes(q);
@@ -2445,7 +2530,7 @@
                 <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3"></i>
                 <input type="text" value="${escapeHtml(uiState.potensiSearch)}"
                   oninput="uiState.potensiSearch = this.value; uiState.potensiPage = 1; renderDataPotensiView(document.getElementById('main-content')); lucide.createIcons();"
-                  placeholder="Cari nama, pangkalan, tahun lulus..."
+                  placeholder="Cari nama, TTL, pangkalan..."
                   class="w-full pl-9 pr-3 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
               </div>
 
@@ -2491,7 +2576,7 @@
             `}
           </div>
 
-          <!-- Tabel Data Potensi (Dengan Kolom Pas Foto 4x6 & Tahun Lulus) -->
+          <!-- Tabel Data Potensi (Dengan Kolom Pas Foto 4x6, Tempat Tanggal Lahir & Tahun Lulus) -->
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
@@ -2499,6 +2584,7 @@
                   <th class="py-3.5 px-4 w-12">No</th>
                   <th class="py-3.5 px-3 w-16">Foto 4x6</th>
                   <th class="py-3.5 px-4">Nama Lengkap / Identitas Pembina</th>
+                  <th class="py-3.5 px-4">Tempat, Tanggal Lahir</th>
                   <th class="py-3.5 px-4">Jenjang Kursus</th>
                   <th class="py-3.5 px-4 text-center">Tahun Lulus</th>
                   <th class="py-3.5 px-4">Jenis Kelamin</th>
@@ -2510,6 +2596,7 @@
               <tbody class="divide-y divide-gray-100 text-xs">
                 ${paginated.map((item, idx) => {
                   const tahunDisplay = formatTahunLulusDisplay(item);
+                  const ttlDisplay = formatTempatTanggalLahir(item.tempatLahir, item.tanggalLahir);
                   return `
                     <tr class="hover:bg-scout-cream/40 transition">
                       <td class="py-3.5 px-4 font-semibold text-gray-500">${startIdx + idx + 1}</td>
@@ -2521,6 +2608,7 @@
                           ${item.sourceCourseId ? '<span class="px-1.5 py-0.2 rounded bg-emerald-50 text-scout-forest border border-emerald-200 text-[9px] font-bold">Lulusan Kursus</span>' : ''}
                         </div>
                       </td>
+                      <td class="py-3.5 px-4 whitespace-nowrap text-gray-700 font-medium">${escapeHtml(ttlDisplay)}</td>
                       <td class="py-3.5 px-4">${renderJenjangBadge(item.jenjang)}</td>
                       <td class="py-3.5 px-4 text-center whitespace-nowrap">
                         ${tahunDisplay !== '-'
@@ -2552,7 +2640,7 @@
                   `;
                 }).join('') || `
                   <tr>
-                    <td colspan="${readOnly ? 8 : 9}" class="py-10 text-center text-gray-500">
+                    <td colspan="${readOnly ? 9 : 10}" class="py-10 text-center text-gray-500">
                       Tidak ditemukan data potensi pembina yang sesuai filter.
                     </td>
                   </tr>
@@ -2604,6 +2692,15 @@
       }
     }
 
+    function updatePotensiTtlPreview() {
+      const tempat = document.getElementById('pot-tempat-lahir')?.value || '';
+      const tgl = document.getElementById('pot-tanggal-lahir')?.value || '';
+      const previewEl = document.getElementById('pot-ttl-preview-text');
+      if (previewEl) {
+        previewEl.textContent = formatTempatTanggalLahir(tempat, tgl);
+      }
+    }
+
     function openPotensiModal(id = null) {
       if (guardPelatihWriteAction()) return;
       const existing = id ? appData.potensi.find(p => p.id === id) : null;
@@ -2612,6 +2709,8 @@
       const initialJenjang = existing ? existing.jenjang : JENJANG_OPTIONS[0];
       const isBelumKursus = initialJenjang === 'Belum Kursus';
       const initialTahun = existing && existing.tahunLulus && existing.tahunLulus !== '-' ? existing.tahunLulus : '';
+      const initialTempat = existing ? (existing.tempatLahir || '') : '';
+      const initialTanggal = existing ? (existing.tanggalLahir || '') : '';
 
       openFormModal(
         existing ? 'Edit Data Potensi Pembina' : 'Tambah Data Potensi Pembina',
@@ -2648,6 +2747,34 @@
               <input type="text" id="pot-nama" required value="${existing ? escapeHtml(existing.nama) : ''}"
                 placeholder="Contoh: Kak Budi Santoso, S.Pd."
                 class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+            </div>
+
+            <!-- Input Tempat, Tanggal Lahir (TTL) -->
+            <div class="p-3.5 rounded-xl bg-scout-cream/50 border border-scout-sand/80 space-y-2.5">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label class="block text-xs font-bold uppercase text-scout-brown mb-1">
+                    Tempat Lahir <span class="text-red-600">*</span>
+                  </label>
+                  <input type="text" id="pot-tempat-lahir" required
+                    value="${escapeHtml(initialTempat)}"
+                    oninput="updatePotensiTtlPreview()"
+                    placeholder="Contoh: Tangerang"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-white text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                </div>
+                <div>
+                  <label class="block text-xs font-bold uppercase text-scout-brown mb-1">
+                    Tanggal Lahir <span class="text-red-600">*</span>
+                  </label>
+                  <input type="date" id="pot-tanggal-lahir" required
+                    value="${escapeHtml(initialTanggal)}"
+                    onchange="updatePotensiTtlPreview()"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-white text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                </div>
+              </div>
+              <p class="text-[11px] text-scout-medium">
+                Format TTL Indonesia: <strong id="pot-ttl-preview-text" class="text-scout-dark">${escapeHtml(formatTempatTanggalLahir(initialTempat, initialTanggal))}</strong>
+              </p>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -2770,6 +2897,8 @@
         ...(prev || {}),
         id: id || generateId('pot'),
         nama: document.getElementById('pot-nama').value.trim(),
+        tempatLahir: document.getElementById('pot-tempat-lahir').value.trim(),
+        tanggalLahir: document.getElementById('pot-tanggal-lahir').value,
         jenjang: jenjangVal,
         tahunLulus: normalizedTahun,
         gender: document.getElementById('pot-gender').value,
@@ -2840,6 +2969,7 @@
             k.nama.toLowerCase().includes(q) ||
             k.lokasi.toLowerCase().includes(q) ||
             k.angkatan.toLowerCase().includes(q) ||
+            formatDateRangeIndo(k.tanggal).toLowerCase().includes(q) ||
             (k.sourceKwarran || '').toLowerCase().includes(q)
           );
         }
@@ -2855,7 +2985,7 @@
               <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3"></i>
               <input type="text" value="${escapeHtml(uiState.kursusSearch)}"
                 oninput="uiState.kursusSearch = this.value; renderKursusView(document.getElementById('main-content')); lucide.createIcons();"
-                placeholder="Cari nama kursus, Kwarran, angkatan, atau lokasi..."
+                placeholder="Cari nama kursus, Kwarran, tanggal, atau lokasi..."
                 class="w-full pl-9 pr-3 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
             </div>
             <select onchange="uiState.kursusOriginFilter = this.value; renderKursusView(document.getElementById('main-content')); lucide.createIcons();"
@@ -2918,7 +3048,7 @@
                   <div class="mt-4 space-y-2 text-xs text-gray-600">
                     <div class="flex items-center gap-2">
                       <i data-lucide="calendar" class="w-4 h-4 text-scout-forest shrink-0"></i>
-                      <span class="font-semibold text-scout-dark">${escapeHtml(k.hari && k.hari !== 'Sesuai Jadwal' ? `${k.hari}, ` : '')}${escapeHtml(k.tanggal)}</span>
+                      <span class="font-semibold text-scout-dark">${escapeHtml(k.hari && k.hari !== 'Sesuai Jadwal' ? `${k.hari}, ` : '')}${escapeHtml(formatDateRangeIndo(k.tanggal))}</span>
                     </div>
                     <div class="flex items-center gap-2">
                       <i data-lucide="map-pin" class="w-4 h-4 text-scout-forest shrink-0"></i>
@@ -3024,7 +3154,7 @@
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Pelaksanaan <span class="text-red-600">*</span></label>
                 <input type="text" id="krs-tanggal" required value="${k ? escapeHtml(k.tanggal) : ''}"
-                  placeholder="Contoh: 2026-12-15 s.d. 2026-12-20"
+                  placeholder="Contoh: 15 Desember 2026 s.d. 20 Desember 2026"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
               </div>
               <div>
@@ -3169,8 +3299,8 @@
           .map(p => ({
             id: p.id,
             nama: p.namaGelar,
-            tempatLahir: p.tempatLahir,
-            tanggalLahir: p.tanggalLahir,
+            tempatLahir: p.tempatLahir || '',
+            tanggalLahir: p.tanggalLahir || '',
             golongan: p.golongan,
             pangkalan: p.namaPangkalan,
             kwarran: p.kwarran,
@@ -3185,6 +3315,8 @@
 
       return (detail.manualParticipants || []).map(mp => ({
         ...mp,
+        tempatLahir: mp.tempatLahir || '',
+        tanggalLahir: mp.tanggalLahir || '',
         gender: mp.gender || 'Putra',
         fotoUrl: mp.fotoUrl || '',
         statusKelulusan: (course.status === 'Selesai' || mp.statusKelulusan === 'Lulus' || gradMap[mp.id] === 'Lulus')
@@ -3366,7 +3498,7 @@
                 </div>
                 <h3 class="text-base sm:text-xl font-extrabold text-scout-dark">${escapeHtml(course.nama)}</h3>
                 <p class="text-xs text-gray-500 mt-0.5">
-                  ${escapeHtml(course.hari || '')} (${escapeHtml(course.tanggal)}) • ${escapeHtml(course.lokasi)} • <strong>${pesertaList.length} Peserta</strong> (${graduatedCount} Lulus &rarr; Data Potensi)
+                  ${escapeHtml(course.hari || '')} (${escapeHtml(formatDateRangeIndo(course.tanggal))}) • ${escapeHtml(course.lokasi)} • <strong>${pesertaList.length} Peserta</strong> (${graduatedCount} Lulus &rarr; Data Potensi)
                 </p>
               </div>
             </div>
@@ -3657,7 +3789,7 @@
             </p>
 
             <div class="p-3 rounded-xl bg-scout-cream/60 border border-scout-sand mb-3 space-y-1">
-              <p><strong>Hari / Tanggal:</strong> ${escapeHtml(course.hari || '-')}, ${escapeHtml(course.tanggal)}</p>
+              <p><strong>Hari / Tanggal:</strong> ${escapeHtml(course.hari || '-')}, ${escapeHtml(formatDateRangeIndo(course.tanggal))}</p>
               <p><strong>Tempat:</strong> ${escapeHtml(course.lokasi)}</p>
             </div>
 
@@ -3737,7 +3869,7 @@
       showToast('Lampiran surat tugas dihapus.', 'info');
     }
 
-    // --- TAB 3: ABSENSI & KELULUSAN PESERTA (AUTO-SYNC KE DATA POTENSI + PAS FOTO 4x6) ---
+    // --- TAB 3: ABSENSI & KELULUSAN PESERTA (TTL + AUTO-SYNC KE DATA POTENSI + PAS FOTO 4x6) ---
     function renderAdminCourseTabAbsensi(course, detail, pesertaList) {
       const subTab = uiState.adminAttendanceRoleTab || 'peserta';
       const statusOptions = ['Hadir', 'Izin', 'Sakit', 'Alpa'];
@@ -3748,6 +3880,7 @@
         rowsHtml = pesertaList.map((p, idx) => {
           const curStatus = detail.attendanceStatus[p.id] || 'Hadir';
           const isLulus = p.statusKelulusan === 'Lulus';
+          const ttlText = formatTempatTanggalLahir(p.tempatLahir, p.tanggalLahir);
           return `
             <tr class="hover:bg-scout-cream/40">
               <td class="py-3 px-4 font-semibold text-gray-500">${idx + 1}</td>
@@ -3758,6 +3891,7 @@
                 <p class="font-bold text-scout-dark">${escapeHtml(p.nama)}</p>
                 <p class="text-[10px] text-gray-500">${escapeHtml(p.gender || 'Putra')}</p>
               </td>
+              <td class="py-3 px-4 whitespace-nowrap text-gray-700 font-medium">${escapeHtml(ttlText)}</td>
               <td class="py-3 px-4 text-gray-600">${escapeHtml(p.pangkalan || '-')} (Kwarran ${escapeHtml(p.kwarran || '-')})</td>
               <td class="py-3 px-4">${renderGolonganBadge(p.golongan || 'Penggalang')}</td>
               <td class="py-3 px-4">
@@ -3786,6 +3920,10 @@
                     <span>${isLulus ? 'Lulus (Di Data Potensi)' : 'Nyatakan Lulus'}</span>
                   </button>
                   ${isCabangCourse ? `
+                    <button type="button" onclick="openCabangParticipantModal('${course.id}', '${p.id}')"
+                      class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200" title="Edit Peserta">
+                      <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                    </button>
                     <button type="button" onclick="deleteCabangCourseParticipant('${course.id}', '${p.id}')"
                       class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200" title="Hapus Peserta">
                       <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
@@ -3796,7 +3934,7 @@
               </td>
             </tr>
           `;
-        }).join('') || `<tr><td colspan="7" class="py-8 text-center text-gray-500">Belum ada peserta terdaftar pada kursus ini.</td></tr>`;
+        }).join('') || `<tr><td colspan="8" class="py-8 text-center text-gray-500">Belum ada peserta terdaftar pada kursus ini.</td></tr>`;
       } else {
         const staffList = subTab === 'panitia' ? detail.panitiaList : detail.pelatihList;
         rowsHtml = staffList.map((stf, idx) => {
@@ -3851,7 +3989,7 @@
 
             <div class="flex flex-wrap items-center gap-2">
               ${subTab === 'peserta' && isCabangCourse ? `
-                <button type="button" onclick="openAddCabangParticipantModal('${course.id}')"
+                <button type="button" onclick="openCabangParticipantModal('${course.id}')"
                   class="px-3.5 py-2 rounded-xl bg-scout-cream hover:bg-scout-sand/60 text-scout-dark border border-scout-sand text-xs font-bold flex items-center gap-1.5">
                   <i data-lucide="user-plus" class="w-3.5 h-3.5 text-scout-forest"></i>
                   <span>+ Tambah Peserta Cabang</span>
@@ -3884,8 +4022,8 @@
               ${subTab === 'peserta' ? 'Daftar Hadir & Kelulusan Peserta Kursus' : (subTab === 'panitia' ? 'Daftar Hadir Panitia Pelaksana' : 'Daftar Hadir Tim Pelatih')} — ${escapeHtml(course.nama)}
             </h4>
             <p class="text-xs text-gray-500">
-              Pelaksanaan: ${escapeHtml(course.hari || '')} (${escapeHtml(course.tanggal)}) • Lokasi: ${escapeHtml(course.lokasi)}
-              ${subTab === 'peserta' ? ' • Setiap peserta yang dinyatakan Lulus otomatis masuk ke database Data Potensi.' : ''}
+              Pelaksanaan: ${escapeHtml(course.hari || '')} (${escapeHtml(formatDateRangeIndo(course.tanggal))}) • Lokasi: ${escapeHtml(course.lokasi)}
+              ${subTab === 'peserta' ? ' • Setiap peserta yang dinyatakan Lulus otomatis masuk ke database Data Potensi beserta TTL & pas foto 4x6.' : ''}
             </p>
           </div>
 
@@ -3896,6 +4034,7 @@
                   <th class="py-3 px-4 w-12">No</th>
                   ${subTab === 'peserta' ? '<th class="py-3 px-3 w-14">Foto 4x6</th>' : ''}
                   <th class="py-3 px-4">Nama Lengkap</th>
+                  ${subTab === 'peserta' ? '<th class="py-3 px-4">Tempat, Tanggal Lahir</th>' : ''}
                   <th class="py-3 px-4">${subTab === 'peserta' ? 'Pangkalan / Kwarran' : 'Jabatan / Tugas'}</th>
                   ${subTab === 'peserta' ? '<th class="py-3 px-4">Golongan</th>' : ''}
                   <th class="py-3 px-4">Status Kehadiran</th>
@@ -3963,18 +4102,38 @@
       showToast(`Seluruh (${pesertaList.length}) peserta dinyatakan LULUS & otomatis masuk ke Data Potensi!`, 'success');
     }
 
-    function openAddCabangParticipantModal(courseId) {
+    function updateCabangParticipantTtlPreview() {
+      const tempat = document.getElementById('cb-p-tempat')?.value || '';
+      const tgl = document.getElementById('cb-p-tgl')?.value || '';
+      const previewEl = document.getElementById('cb-p-ttl-preview');
+      if (previewEl) {
+        previewEl.textContent = formatTempatTanggalLahir(tempat, tgl);
+      }
+    }
+
+    function openCabangParticipantModal(courseId, participantId = null) {
       if (guardPelatihWriteAction()) return;
-      uiState.cabangParticipantDraftPhoto = '';
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      const existing = participantId
+        ? detail.manualParticipants.find(p => p.id === participantId)
+        : null;
+
+      uiState.cabangParticipantDraftPhoto = existing ? (existing.fotoUrl || '') : '';
+      const initialTempat = existing ? (existing.tempatLahir || '') : '';
+      const initialTanggal = existing ? (existing.tanggalLahir || '') : '';
+
       openFormModal(
-        'Tambah Peserta Kursus Cabang (Kwarcab)',
+        existing ? 'Edit Peserta Kursus Cabang (Kwarcab)' : 'Tambah Peserta Kursus Cabang (Kwarcab)',
         `
-          <form onsubmit="saveCabangParticipantModal(event, '${courseId}')" class="space-y-4">
+          <form onsubmit="saveCabangParticipantModal(event, '${courseId}', '${participantId || ''}')" class="space-y-4">
             <!-- Input Pas Foto 4x6 Peserta Cabang -->
             <div class="p-3.5 rounded-2xl bg-scout-cream/70 border border-dashed border-scout-khaki flex items-center gap-4">
               <div id="cb-p-photo-preview" class="w-16 h-24 rounded-xl bg-white border-2 border-scout-gold/80 shadow-xs overflow-hidden flex flex-col items-center justify-center shrink-0">
-                <i data-lucide="camera" class="w-5 h-5 text-scout-medium"></i>
-                <span class="text-[9px] font-bold text-gray-500 mt-0.5">4x6</span>
+                ${uiState.cabangParticipantDraftPhoto
+                  ? `<img src="${uiState.cabangParticipantDraftPhoto}" alt="Pas Foto 4x6" class="w-full h-full object-cover" />`
+                  : `<i data-lucide="camera" class="w-5 h-5 text-scout-medium"></i><span class="text-[9px] font-bold text-gray-500 mt-0.5">4x6</span>`}
               </div>
               <div class="flex-1">
                 <p class="text-xs font-extrabold text-scout-dark">Pas Foto Peserta Ukuran 4x6 <span class="text-gray-400 font-normal">(Opsional)</span></p>
@@ -3986,7 +4145,7 @@
                     <input type="file" accept="image/*" onchange="handleCabangParticipantPhotoUpload(event)" class="hidden" />
                   </label>
                   <button type="button" id="cb-p-remove-photo-btn" onclick="removeCabangParticipantDraftPhoto()"
-                    class="hidden px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold">
+                    class="${uiState.cabangParticipantDraftPhoto ? '' : 'hidden'} px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold">
                     Hapus Foto
                   </button>
                 </div>
@@ -3995,54 +4154,65 @@
 
             <div>
               <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nama Lengkap & Gelar <span class="text-red-600">*</span></label>
-              <input type="text" id="cb-p-nama" required placeholder="Contoh: Kak Budi Santoso, S.Pd."
+              <input type="text" id="cb-p-nama" required value="${existing ? escapeHtml(existing.nama) : ''}" placeholder="Contoh: Kak Budi Santoso, S.Pd."
                 class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tempat Lahir <span class="text-red-600">*</span></label>
-                <input type="text" id="cb-p-tempat" required placeholder="Contoh: Tangerang"
-                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+            <!-- Input Tempat, Tanggal Lahir (TTL) -->
+            <div class="p-3.5 rounded-xl bg-scout-cream/50 border border-scout-sand/80 space-y-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tempat Lahir <span class="text-red-600">*</span></label>
+                  <input type="text" id="cb-p-tempat" required value="${escapeHtml(initialTempat)}"
+                    oninput="updateCabangParticipantTtlPreview()"
+                    placeholder="Contoh: Tangerang"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-white text-sm" />
+                </div>
+                <div>
+                  <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Lahir <span class="text-red-600">*</span></label>
+                  <input type="date" id="cb-p-tgl" required value="${escapeHtml(initialTanggal)}"
+                    onchange="updateCabangParticipantTtlPreview()"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-white text-sm" />
+                </div>
               </div>
-              <div>
-                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Lahir <span class="text-red-600">*</span></label>
-                <input type="date" id="cb-p-tgl" required value="1994-05-15"
-                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
-              </div>
+              <p class="text-[11px] text-scout-medium">
+                Format TTL Indonesia: <strong id="cb-p-ttl-preview" class="text-scout-dark">${escapeHtml(formatTempatTanggalLahir(initialTempat, initialTanggal))}</strong>
+              </p>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Jenis Kelamin</label>
                 <select id="cb-p-gender" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
-                  <option value="Putra">Putra</option>
-                  <option value="Putri">Putri</option>
+                  <option value="Putra" ${existing && existing.gender === 'Putra' ? 'selected' : ''}>Putra</option>
+                  <option value="Putri" ${existing && existing.gender === 'Putri' ? 'selected' : ''}>Putri</option>
                 </select>
               </div>
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Golongan</label>
                 <select id="cb-p-golongan" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
-                  ${GOLONGAN_OPTIONS.map(g => `<option value="${g}">${g}</option>`).join('')}
+                  ${GOLONGAN_OPTIONS.map(g => `<option value="${g}" ${existing && existing.golongan === g ? 'selected' : ''}>${g}</option>`).join('')}
                 </select>
               </div>
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Asal Kwarran</label>
                 <select id="cb-p-kwarran" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
-                  ${KWARRAN_LIST.map(kw => `<option value="${kw}">${kw}</option>`).join('')}
+                  ${KWARRAN_LIST.map(kw => `<option value="${kw}" ${existing && existing.kwarran === kw ? 'selected' : ''}>${kw}</option>`).join('')}
                 </select>
               </div>
             </div>
 
             <div>
               <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nama Pangkalan / Gugus Depan <span class="text-red-600">*</span></label>
-              <input type="text" id="cb-p-pangkalan" required placeholder="Contoh: SDN Tigaraksa 01"
+              <input type="text" id="cb-p-pangkalan" required value="${existing ? escapeHtml(existing.pangkalan || '') : ''}" placeholder="Contoh: SDN Tigaraksa 01"
                 class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
             </div>
 
             <div class="pt-3 flex justify-end gap-2 border-t border-gray-100">
               <button type="button" onclick="closeFormModal()" class="px-4 py-2 rounded-xl bg-gray-100 text-xs font-bold text-gray-700">Batal</button>
-              <button type="submit" class="px-5 py-2 rounded-xl bg-scout-forest text-white text-xs font-bold">Simpan Peserta</button>
+              <button type="submit" class="px-5 py-2 rounded-xl bg-scout-forest text-white text-xs font-bold">
+                ${existing ? 'Simpan Perubahan' : 'Simpan Peserta'}
+              </button>
             </div>
           </form>
         `
@@ -4080,15 +4250,18 @@
       }
     }
 
-    function saveCabangParticipantModal(e, courseId) {
+    function saveCabangParticipantModal(e, courseId, participantId = '') {
       e.preventDefault();
       if (guardPelatihWriteAction()) return;
       const course = appData.kursus.find(c => c.id === courseId);
       if (!course) return;
       const detail = ensureCourseDetailRecord(course);
       const isCourseDone = course.status === 'Selesai';
-      const newParticipant = {
-        id: generateId('mp'),
+      const prev = participantId ? detail.manualParticipants.find(p => p.id === participantId) : null;
+
+      const payload = {
+        ...(prev || {}),
+        id: participantId || generateId('mp'),
         nama: document.getElementById('cb-p-nama').value.trim(),
         tempatLahir: document.getElementById('cb-p-tempat').value.trim(),
         tanggalLahir: document.getElementById('cb-p-tgl').value,
@@ -4097,20 +4270,28 @@
         kwarran: document.getElementById('cb-p-kwarran').value,
         pangkalan: document.getElementById('cb-p-pangkalan').value.trim(),
         fotoUrl: uiState.cabangParticipantDraftPhoto || '',
-        statusKelulusan: isCourseDone ? 'Lulus' : 'Belum Lulus',
+        statusKelulusan: prev ? prev.statusKelulusan : (isCourseDone ? 'Lulus' : 'Belum Lulus'),
         source: 'cabang'
       };
-      detail.manualParticipants.push(newParticipant);
-      if (isCourseDone) {
-        detail.graduationStatus[newParticipant.id] = 'Lulus';
+
+      if (participantId) {
+        const idx = detail.manualParticipants.findIndex(p => p.id === participantId);
+        if (idx !== -1) detail.manualParticipants[idx] = payload;
+        showToast('Data peserta kursus cabang berhasil diperbarui.', 'success');
+      } else {
+        detail.manualParticipants.push(payload);
+        if (isCourseDone) {
+          detail.graduationStatus[payload.id] = 'Lulus';
+        }
+        course.terdaftar = Math.max(course.terdaftar, detail.manualParticipants.length);
+        showToast('Peserta kursus cabang berhasil ditambahkan.', 'success');
       }
-      course.terdaftar = Math.max(course.terdaftar, detail.manualParticipants.length);
+
       uiState.cabangParticipantDraftPhoto = '';
       saveAppData();
       closeFormModal();
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
-      showToast('Peserta kursus cabang berhasil ditambahkan.', 'success');
     }
 
     function deleteCabangCourseParticipant(courseId, participantId) {
@@ -4292,7 +4473,7 @@
             <div class="p-5 border-b border-scout-sand/70 flex items-center justify-between">
               <div>
                 <h4 class="text-base font-extrabold text-scout-dark">Jadwal / Rundown Pelaksanaan Kursus</h4>
-                <p class="text-xs text-gray-500">${escapeHtml(course.nama)} • ${escapeHtml(course.tanggal)}</p>
+                <p class="text-xs text-gray-500">${escapeHtml(course.nama)} • ${escapeHtml(formatDateRangeIndo(course.tanggal))}</p>
               </div>
               <button type="button" onclick="window.print()"
                 class="px-3.5 py-2 rounded-xl bg-scout-dark text-white text-xs font-bold flex items-center gap-1.5 no-print">
@@ -4484,7 +4665,8 @@
         uiState.adminPrintTargetId = selectedPerson.id;
       }
 
-      const todayIndo = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      const todayIndo = getTodayDateIndo(false);
+      const formattedCourseDate = formatDateRangeIndo(course.tanggal);
       const jenjangLabel = course.jenjang || inferJenjangFromName(course.nama);
       const jenjangFullMap = {
         'KMD': 'KURSUS PEMBINA PRAMUKA MAHIR TINGKAT DASAR (KMD)',
@@ -4527,7 +4709,7 @@
               <tr><td class="py-1 font-semibold border-none">Peran dalam Kegiatan</td><td class="py-1 border-none">: ${escapeHtml(peranAktif)} Kursus</td></tr>
               <tr><td class="py-1 font-semibold border-none">Pangkalan / Unit Tugas</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.pangkalan)} (Kwarran ${escapeHtml(selectedPerson.kwarran)})</td></tr>
               <tr><td class="py-1 font-semibold border-none">Nama Kegiatan</td><td class="py-1 border-none">: ${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</td></tr>
-              <tr><td class="py-1 font-semibold border-none">Waktu & Tempat</td><td class="py-1 border-none">: ${escapeHtml(course.tanggal)} di ${escapeHtml(course.lokasi)}</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Waktu & Tempat</td><td class="py-1 border-none">: ${escapeHtml(formattedCourseDate)} di ${escapeHtml(course.lokasi)}</td></tr>
             </table>
 
             <p>Dengan ini menyatakan komitmen dan berjanji dengan sungguh-sungguh untuk:</p>
@@ -4569,14 +4751,14 @@
             </p>
             <table class="w-full text-xs sm:text-sm">
               <tr><td class="py-1 w-48 font-semibold border-none">Nama Lengkap</td><td class="py-1 border-none">: <strong>${escapeHtml(selectedPerson.nama)}</strong></td></tr>
-              <tr><td class="py-1 font-semibold border-none">Tempat, Tanggal Lahir</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.tempatLahir)}, ${formatDateIndo(selectedPerson.tanggalLahir)}</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Tempat, Tanggal Lahir</td><td class="py-1 border-none">: ${escapeHtml(formatTempatTanggalLahir(selectedPerson.tempatLahir, selectedPerson.tanggalLahir))}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Golongan Pembinaan</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.golongan)}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Nama Pangkalan</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.pangkalan)}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Kwartir Ranting</td><td class="py-1 border-none">: Kwartir Ranting ${escapeHtml(selectedPerson.kwarran)}</td></tr>
             </table>
 
             <p>
-              Telah mengikuti seluruh rangkaian pendidikan dan pelatihan serta memenuhi standar evaluasi pada kegiatan <strong>${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</strong> yang diselenggarakan pada tanggal <strong>${escapeHtml(course.tanggal)}</strong> bertempat di <strong>${escapeHtml(course.lokasi)}</strong>, dan dinyatakan:
+              Telah mengikuti seluruh rangkaian pendidikan dan pelatihan serta memenuhi standar evaluasi pada kegiatan <strong>${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</strong> yang diselenggarakan pada tanggal <strong>${escapeHtml(formattedCourseDate)}</strong> bertempat di <strong>${escapeHtml(course.lokasi)}</strong>, dan dinyatakan:
             </p>
 
             <div class="my-4 py-3 px-6 rounded-xl bg-scout-cream border-2 border-scout-dark text-center">
@@ -4617,11 +4799,11 @@
                 ${escapeHtml(selectedPerson.nama)}
               </h3>
               <p class="text-gray-700">
-                Tempat, Tanggal Lahir: <strong>${escapeHtml(selectedPerson.tempatLahir)}, ${formatDateIndo(selectedPerson.tanggalLahir)}</strong><br/>
+                Tempat, Tanggal Lahir: <strong>${escapeHtml(formatTempatTanggalLahir(selectedPerson.tempatLahir, selectedPerson.tanggalLahir))}</strong><br/>
                 Pangkalan: <strong>${escapeHtml(selectedPerson.pangkalan)}</strong> — Kwartir Ranting <strong>${escapeHtml(selectedPerson.kwarran)}</strong>
               </p>
               <p class="max-w-2xl mx-auto leading-relaxed text-gray-800 pt-2">
-                Yang telah menyelesaikan seluruh kurikulum dan lulus pada <strong>${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</strong>, Golongan <strong>${escapeHtml(selectedPerson.golongan)}</strong>, yang diselenggarakan pada tanggal <strong>${escapeHtml(course.tanggal)}</strong> di <strong>${escapeHtml(course.lokasi)}</strong> dengan kualifikasi:
+                Yang telah menyelesaikan seluruh kurikulum dan lulus pada <strong>${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</strong>, Golongan <strong>${escapeHtml(selectedPerson.golongan)}</strong>, yang diselenggarakan pada tanggal <strong>${escapeHtml(formattedCourseDate)}</strong> di <strong>${escapeHtml(course.lokasi)}</strong> dengan kualifikasi:
               </p>
               <div class="inline-block px-6 py-2 rounded-full bg-scout-dark text-scout-gold font-extrabold text-sm tracking-wide border border-scout-gold">
                 ${escapeHtml(uiState.adminPrintKualifikasi.toUpperCase())}
@@ -4671,7 +4853,7 @@
 
             <table class="w-full text-xs sm:text-sm">
               <tr><td class="py-1 w-48 font-semibold border-none">Nama Lengkap</td><td class="py-1 border-none">: <strong>${escapeHtml(selectedPerson.nama)}</strong></td></tr>
-              <tr><td class="py-1 font-semibold border-none">Tempat, Tanggal Lahir</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.tempatLahir)}, ${formatDateIndo(selectedPerson.tanggalLahir)}</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Tempat, Tanggal Lahir</td><td class="py-1 border-none">: ${escapeHtml(formatTempatTanggalLahir(selectedPerson.tempatLahir, selectedPerson.tanggalLahir))}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Pangkalan / Gugus Depan</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.pangkalan)}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Kwartir Ranting</td><td class="py-1 border-none">: Kwartir Ranting ${escapeHtml(selectedPerson.kwarran)}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Kualifikasi Kelulusan</td><td class="py-1 border-none">: Lulusan ${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</td></tr>
@@ -4813,8 +4995,8 @@
         if (uiState.suratSearch) {
           const q = uiState.suratSearch.toLowerCase();
           const text = isMasuk
-            ? `${s.nomor} ${s.asal} ${s.perihal}`
-            : `${s.nomor} ${s.tujuan} ${s.perihal} ${s.penanggungJawab}`;
+            ? `${s.nomor} ${s.asal} ${s.perihal} ${formatDateIndo(s.tanggalTerima)} ${formatDateIndo(s.tanggalSurat)}`
+            : `${s.nomor} ${s.tujuan} ${s.perihal} ${s.penanggungJawab} ${formatDateIndo(s.tanggalKeluar)}`;
           if (!text.toLowerCase().includes(q)) return false;
         }
         return true;
@@ -4856,7 +5038,7 @@
               <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3"></i>
               <input type="text" value="${escapeHtml(uiState.suratSearch)}"
                 oninput="uiState.suratSearch = this.value; renderAdministrasiView(document.getElementById('main-content')); lucide.createIcons();"
-                placeholder="Cari nomor surat, asal/tujuan, atau perihal..."
+                placeholder="Cari nomor surat, asal/tujuan, tanggal, atau perihal..."
                 class="w-full pl-9 pr-3 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
             </div>
           </div>
@@ -4939,12 +5121,12 @@
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Terima <span class="text-red-600">*</span></label>
-                  <input type="date" id="srt-tgl-terima" required value="${s ? s.tanggalTerima : '2026-11-22'}"
+                  <input type="date" id="srt-tgl-terima" required value="${s ? s.tanggalTerima : '2026-11-24'}"
                     class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
                 </div>
                 <div>
                   <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Surat <span class="text-red-600">*</span></label>
-                  <input type="date" id="srt-tgl-surat" required value="${s ? s.tanggalSurat : '2026-11-21'}"
+                  <input type="date" id="srt-tgl-surat" required value="${s ? s.tanggalSurat : '2026-11-24'}"
                     class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
                 </div>
               </div>
@@ -4966,7 +5148,7 @@
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Keluar <span class="text-red-600">*</span></label>
-                  <input type="date" id="srt-tgl-keluar" required value="${s ? s.tanggalKeluar : '2026-11-22'}"
+                  <input type="date" id="srt-tgl-keluar" required value="${s ? s.tanggalKeluar : '2026-11-24'}"
                     class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
                 </div>
                 <div>
@@ -5112,6 +5294,7 @@
                 <th class="border border-gray-300 py-2.5 px-3 w-10">No</th>
                 <th class="border border-gray-300 py-2.5 px-3 w-14 text-center">Foto 4x6</th>
                 <th class="border border-gray-300 py-2.5 px-3">Nama Lengkap Pembina</th>
+                <th class="border border-gray-300 py-2.5 px-3">Tempat, Tanggal Lahir</th>
                 <th class="border border-gray-300 py-2.5 px-3">Jenjang Kursus</th>
                 <th class="border border-gray-300 py-2.5 px-3 text-center">Tahun Lulus</th>
                 <th class="border border-gray-300 py-2.5 px-3">Gender</th>
@@ -5127,13 +5310,14 @@
                     <div class="inline-flex justify-center">${renderPembinaAvatarHtml(r, 'w-8 h-12', false)}</div>
                   </td>
                   <td class="border border-gray-300 py-2 px-3 font-semibold">${escapeHtml(r.nama)}</td>
+                  <td class="border border-gray-300 py-2 px-3">${escapeHtml(formatTempatTanggalLahir(r.tempatLahir, r.tanggalLahir))}</td>
                   <td class="border border-gray-300 py-2 px-3 font-bold">${escapeHtml(r.jenjang)}</td>
                   <td class="border border-gray-300 py-2 px-3 text-center font-semibold">${escapeHtml(formatTahunLulusDisplay(r))}</td>
                   <td class="border border-gray-300 py-2 px-3">${escapeHtml(r.gender)}</td>
                   <td class="border border-gray-300 py-2 px-3">Kwarran ${escapeHtml(r.kwarran)}</td>
                   <td class="border border-gray-300 py-2 px-3">${escapeHtml(r.pangkalan || '-')}</td>
                 </tr>
-              `).join('') || '<tr><td colspan="8" class="py-6 text-center text-gray-500">Tidak ada data untuk filter terpilih.</td></tr>'}
+              `).join('') || '<tr><td colspan="9" class="py-6 text-center text-gray-500">Tidak ada data untuk filter terpilih.</td></tr>'}
             </tbody>
           </table>
         `;
@@ -5163,7 +5347,7 @@
                   <tr>
                     <td class="border border-gray-300 py-2 px-3 text-center">${i + 1}</td>
                     <td class="border border-gray-300 py-2 px-3 font-semibold">${escapeHtml(k.nama)} (${escapeHtml(k.angkatan)})</td>
-                    <td class="border border-gray-300 py-2 px-3">${escapeHtml(k.tanggal)}</td>
+                    <td class="border border-gray-300 py-2 px-3">${escapeHtml(formatDateRangeIndo(k.tanggal))}</td>
                     <td class="border border-gray-300 py-2 px-3">${escapeHtml(k.lokasi)}</td>
                     <td class="border border-gray-300 py-2 px-3 text-center">${k.terdaftar}/${k.kuota}</td>
                     <td class="border border-gray-300 py-2 px-3">${escapeHtml(k.status)}</td>
@@ -5195,7 +5379,7 @@
                     <td class="border border-gray-300 py-2 px-3 text-center">${i + 1}</td>
                     <td class="border border-gray-300 py-2 px-3 font-semibold">Kwarran ${escapeHtml(kc.kwarran)}</td>
                     <td class="border border-gray-300 py-2 px-3">${escapeHtml(kc.namaKursus || 'Kursus Kwarran')}</td>
-                    <td class="border border-gray-300 py-2 px-3">${escapeHtml(kc.hari)}, ${escapeHtml(kc.tanggal)}</td>
+                    <td class="border border-gray-300 py-2 px-3">${escapeHtml(kc.hari)}, ${escapeHtml(formatDateRangeIndo(kc.tanggal))}</td>
                     <td class="border border-gray-300 py-2 px-3">${escapeHtml(kc.lokasi)}</td>
                     <td class="border border-gray-300 py-2 px-3 text-center font-bold">${cnt} Orang</td>
                   </tr>
@@ -5214,7 +5398,7 @@
                   <th class="border border-gray-300 py-2 px-3 w-10">No</th>
                   <th class="border border-gray-300 py-2 px-3 w-14 text-center">Foto 4x6</th>
                   <th class="border border-gray-300 py-2 px-3">Nama Lengkap + Gelar</th>
-                  <th class="border border-gray-300 py-2 px-3">Tempat, Tgl Lahir</th>
+                  <th class="border border-gray-300 py-2 px-3">Tempat, Tanggal Lahir</th>
                   <th class="border border-gray-300 py-2 px-3">Golongan</th>
                   <th class="border border-gray-300 py-2 px-3">Nama Pangkalan</th>
                   <th class="border border-gray-300 py-2 px-3">Status Kelulusan</th>
@@ -5228,7 +5412,7 @@
                       <div class="inline-flex justify-center">${renderParticipant4x6AvatarHtml(pt, 'w-8 h-12', false)}</div>
                     </td>
                     <td class="border border-gray-300 py-2 px-3 font-semibold">${escapeHtml(pt.namaGelar)}</td>
-                    <td class="border border-gray-300 py-2 px-3">${escapeHtml(pt.tempatLahir)}, ${formatDateIndo(pt.tanggalLahir)}</td>
+                    <td class="border border-gray-300 py-2 px-3">${escapeHtml(formatTempatTanggalLahir(pt.tempatLahir, pt.tanggalLahir))}</td>
                     <td class="border border-gray-300 py-2 px-3">${escapeHtml(pt.golongan)}</td>
                     <td class="border border-gray-300 py-2 px-3">${escapeHtml(pt.namaPangkalan)}</td>
                     <td class="border border-gray-300 py-2 px-3 font-bold">${escapeHtml(pt.statusKelulusan || 'Belum Lulus')}</td>
@@ -5295,6 +5479,9 @@
         `;
       }
 
+      const todayFullIndo = getTodayDateIndo(true);
+      const todayShortIndo = getTodayDateIndo(false);
+
       container.innerHTML = `
         <!-- Kontrol Filter & Tombol Export / Cetak -->
         <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
@@ -5356,7 +5543,7 @@
           <div class="text-center my-6">
             <h3 class="text-sm sm:text-base font-extrabold uppercase underline text-scout-dark">${reportTitle}</h3>
             <p class="text-xs text-gray-500 mt-1">
-              Dicetak pada: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+              Dicetak pada: ${todayFullIndo}
               ${isKwarran ? ` • Wilayah: Kwartir Ranting ${escapeHtml(myKwarran)}` : ''}
             </p>
           </div>
@@ -5369,7 +5556,7 @@
           <!-- TANDA TANGAN KAPUSDIKLATCAB -->
           <div class="mt-10 flex justify-end">
             <div class="text-center text-xs w-64">
-              <p class="text-gray-600">Tangerang, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              <p class="text-gray-600">Tangerang, ${todayShortIndo}</p>
               <p class="font-bold text-scout-dark mt-0.5">Kepala Pusdiklatcab Tangerang,</p>
               <div class="h-16 flex items-center justify-center text-[10px] italic text-gray-400">
                 [Dokumen Terverifikasi Sistem]
@@ -5394,19 +5581,29 @@
         filename = isKwarran
           ? `Laporan_Data_Potensi_Kwarran_${scope.kwarranName}.csv`
           : 'Laporan_Data_Potensi_Tangerang.csv';
-        csvRows.push(['No', 'Nama Lengkap Pembina', 'Jenjang Kursus', 'Tahun Lulus', 'Jenis Kelamin', 'Asal Kwarran', 'Pangkalan', 'Status Pas Foto 4x6']);
+        csvRows.push(['No', 'Nama Lengkap Pembina', 'Tempat Tanggal Lahir', 'Jenjang Kursus', 'Tahun Lulus', 'Jenis Kelamin', 'Asal Kwarran', 'Pangkalan', 'Status Pas Foto 4x6']);
         const rows = getScopedPotensiList().filter(p => {
           if (!isKwarran && uiState.laporanKwarran !== 'ALL' && !isSameKwarran(p.kwarran, uiState.laporanKwarran)) return false;
           if (uiState.laporanJenjang !== 'ALL' && p.jenjang !== uiState.laporanJenjang) return false;
           return true;
         });
         rows.forEach((r, idx) => {
-          csvRows.push([idx + 1, `"${r.nama}"`, r.jenjang, formatTahunLulusDisplay(r), r.gender, r.kwarran, `"${r.pangkalan || '-'}"`, r.fotoUrl ? 'Ada Foto 4x6' : 'Belum Ada']);
+          csvRows.push([
+            idx + 1,
+            `"${r.nama}"`,
+            `"${formatTempatTanggalLahir(r.tempatLahir, r.tanggalLahir)}"`,
+            r.jenjang,
+            formatTahunLulusDisplay(r),
+            r.gender,
+            r.kwarran,
+            `"${r.pangkalan || '-'}"`,
+            r.fotoUrl ? 'Ada Foto 4x6' : 'Belum Ada'
+          ]);
         });
       } else if (uiState.laporanType === 'kursus') {
         if (isKwarran) {
           filename = `Laporan_Kursus_Peserta_Kwarran_${scope.kwarranName}.csv`;
-          csvRows.push(['No', 'Kwarran', 'Nama Kursus', 'Nama Peserta + Gelar', 'Tempat Lahir', 'Tanggal Lahir', 'Golongan', 'Nama Pangkalan', 'Status Pas Foto 4x6', 'Status Kelulusan']);
+          csvRows.push(['No', 'Kwarran', 'Nama Kursus', 'Nama Peserta + Gelar', 'Tempat Tanggal Lahir', 'Golongan', 'Nama Pangkalan', 'Status Pas Foto 4x6', 'Status Kelulusan']);
           const coursesMap = Object.fromEntries(getScopedKwarranCourses().map(c => [c.id, c]));
           getScopedKwarranParticipants().forEach((pt, idx) => {
             const crs = coursesMap[pt.courseId];
@@ -5415,8 +5612,7 @@
               pt.kwarran,
               `"${crs ? (crs.namaKursus || crs.hari) : '-'}"`,
               `"${pt.namaGelar}"`,
-              `"${pt.tempatLahir}"`,
-              pt.tanggalLahir,
+              `"${formatTempatTanggalLahir(pt.tempatLahir, pt.tanggalLahir)}"`,
               pt.golongan,
               `"${pt.namaPangkalan}"`,
               pt.fotoUrl ? 'Ada Foto 4x6' : 'Belum Ada',
@@ -5427,17 +5623,17 @@
           filename = 'Laporan_Kursus_Pusdiklatcab_Tangerang.csv';
           csvRows.push(['No', 'Nama Kursus', 'Angkatan', 'Tanggal', 'Lokasi', 'Terdaftar', 'Kuota', 'Status']);
           appData.kursus.forEach((k, idx) => {
-            csvRows.push([idx + 1, `"${k.nama}"`, `"${k.angkatan}"`, `"${k.tanggal}"`, `"${k.lokasi}"`, k.terdaftar, k.kuota, k.status]);
+            csvRows.push([idx + 1, `"${k.nama}"`, `"${k.angkatan}"`, `"${formatDateRangeIndo(k.tanggal)}"`, `"${k.lokasi}"`, k.terdaftar, k.kuota, k.status]);
           });
         }
       } else {
         filename = 'Laporan_Administrasi_Surat_Tangerang.csv';
         csvRows.push(['Jenis', 'Nomor Surat', 'Tanggal', 'Asal / Tujuan', 'Perihal', 'Status / PJ']);
         appData.suratMasuk.forEach(s => {
-          csvRows.push(['Surat Masuk', `"${s.nomor}"`, s.tanggalTerima, `"${s.asal}"`, `"${s.perihal}"`, s.disposisi]);
+          csvRows.push(['Surat Masuk', `"${s.nomor}"`, `"${formatDateIndo(s.tanggalTerima)}"`, `"${s.asal}"`, `"${s.perihal}"`, s.disposisi]);
         });
         appData.suratKeluar.forEach(s => {
-          csvRows.push(['Surat Keluar', `"${s.nomor}"`, s.tanggalKeluar, `"${s.tujuan}"`, `"${s.perihal}"`, `"${s.penanggungJawab}"`]);
+          csvRows.push(['Surat Keluar', `"${s.nomor}"`, `"${formatDateIndo(s.tanggalKeluar)}"`, `"${s.tujuan}"`, `"${s.perihal}"`, `"${s.penanggungJawab}"`]);
         });
       }
 
@@ -5696,7 +5892,7 @@
     // =========================================================================
     // 14. ATURAN KHUSUS ROLE KWARRAN: MANAJEMEN KURSUS
     //     - Sub-Menu 1: Daftar Kursus (Auto-sync ke Admin & Auto-redirect ke Input Data Peserta)
-    //     - Sub-Menu 2: Input Data Peserta (Input/Edit Pas Foto 4x6 + Edit & Hapus + Auto-sync ke Admin & Data Potensi)
+    //     - Sub-Menu 2: Input Data Peserta (TTL + Pas Foto 4x6 + Edit & Hapus + Auto-sync ke Admin & Data Potensi)
     // =========================================================================
     function renderKwarranDaftarKursusView(container) {
       const scope = getActiveKwarranScope();
@@ -5741,7 +5937,7 @@
                   Tanggal Pelaksanaan <span class="text-red-600">*</span>
                 </label>
                 <input type="text" id="kc-tanggal" required
-                  placeholder="Contoh: 12 - 14 Desember 2026 atau 2026-12-12"
+                  placeholder="Contoh: 12 Desember 2026 s.d. 14 Desember 2026"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
               </div>
 
@@ -5810,7 +6006,7 @@
                         </div>
                         <div class="flex items-center gap-2">
                           <i data-lucide="calendar" class="w-4 h-4 text-scout-forest shrink-0"></i>
-                          <span><strong>Tanggal:</strong> ${escapeHtml(course.tanggal)}</span>
+                          <span><strong>Tanggal:</strong> ${escapeHtml(formatDateRangeIndo(course.tanggal))}</span>
                         </div>
                         <div class="sm:col-span-2 flex items-start gap-2">
                           <i data-lucide="map-pin" class="w-4 h-4 text-scout-brown shrink-0 mt-0.5"></i>
@@ -5938,6 +6134,15 @@
       }
     }
 
+    function updateKwarranParticipantTtlPreview() {
+      const tempat = document.getElementById('kp-tempat-lahir')?.value || '';
+      const tgl = document.getElementById('kp-tanggal-lahir')?.value || '';
+      const previewEl = document.getElementById('kp-ttl-preview');
+      if (previewEl) {
+        previewEl.textContent = formatTempatTanggalLahir(tempat, tgl);
+      }
+    }
+
     function renderKwarranInputPesertaView(container) {
       const scope = getActiveKwarranScope();
       const myKwarran = scope.kwarranName;
@@ -5973,8 +6178,10 @@
       const courseParticipants = scopedCourseParticipants.filter(p => {
         if (uiState.kwarranParticipantSearch) {
           const q = uiState.kwarranParticipantSearch.toLowerCase();
+          const ttlStr = formatTempatTanggalLahir(p.tempatLahir, p.tanggalLahir).toLowerCase();
           return (
             p.namaGelar.toLowerCase().includes(q) ||
+            ttlStr.includes(q) ||
             p.namaPangkalan.toLowerCase().includes(q) ||
             p.golongan.toLowerCase().includes(q)
           );
@@ -5987,6 +6194,8 @@
         : null;
 
       const activeDraftPhoto = uiState.kwarranParticipantDraftPhoto || '';
+      const initialTempat = editingParticipant ? (editingParticipant.tempatLahir || '') : '';
+      const initialTanggal = editingParticipant ? (editingParticipant.tanggalLahir || '') : '';
 
       container.innerHTML = `
         <!-- PEMILIH KURSUS & BANNER INFORMASI RINGKAS KURSUS TERPILIH -->
@@ -6000,7 +6209,7 @@
                 class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/50 text-xs sm:text-sm font-bold text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none">
                 ${myCourses.map(c => `
                   <option value="${c.id}" ${c.id === selectedCourse.id ? 'selected' : ''}>
-                    ${escapeHtml(c.namaKursus || 'Kursus Kwarran')} — (${escapeHtml(c.hari)}, ${escapeHtml(c.tanggal)})
+                    ${escapeHtml(c.namaKursus || 'Kursus Kwarran')} — (${escapeHtml(c.hari)}, ${escapeHtml(formatDateRangeIndo(c.tanggal))})
                   </option>
                 `).join('')}
               </select>
@@ -6030,7 +6239,7 @@
               </div>
               <div>
                 <p class="text-[10px] font-bold uppercase text-gray-500">Tanggal</p>
-                <p class="text-xs font-extrabold text-scout-dark">${escapeHtml(selectedCourse.tanggal)}</p>
+                <p class="text-xs font-extrabold text-scout-dark">${escapeHtml(formatDateRangeIndo(selectedCourse.tanggal))}</p>
               </div>
             </div>
 
@@ -6047,7 +6256,7 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <!-- FORM INPUT / EDIT DATA PESERTA (DENGAN PAS FOTO 4x6) -->
+          <!-- FORM INPUT / EDIT DATA PESERTA (DENGAN PAS FOTO 4x6 & TTL) -->
           <div class="lg:col-span-5 bg-white rounded-2xl p-6 border ${editingParticipant ? 'border-amber-400 ring-2 ring-amber-200' : 'border-scout-sand'} shadow-scout h-fit">
             <div class="flex items-center justify-between pb-4 border-b border-scout-sand/70">
               <div class="flex items-center gap-2.5">
@@ -6058,7 +6267,7 @@
                   <h4 class="text-sm sm:text-base font-extrabold text-scout-dark">
                     ${editingParticipant ? 'Edit Data Peserta' : 'Input Data Peserta Baru'}
                   </h4>
-                  <p class="text-[11px] text-gray-500">Lengkapi biodata & unggah pas foto ukuran 4x6</p>
+                  <p class="text-[11px] text-gray-500">Lengkapi biodata, TTL & unggah pas foto ukuran 4x6</p>
                 </div>
               </div>
               ${editingParticipant ? `
@@ -6104,25 +6313,33 @@
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
               </div>
 
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1">
-                    Tempat Lahir <span class="text-red-600">*</span>
-                  </label>
-                  <input type="text" id="kp-tempat-lahir" required
-                    value="${editingParticipant ? escapeHtml(editingParticipant.tempatLahir) : ''}"
-                    placeholder="Contoh: Tangerang"
-                    class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
-                </div>
+              <!-- Input Tempat, Tanggal Lahir (TTL) -->
+              <div class="p-3 rounded-xl bg-scout-cream/50 border border-scout-sand/80 space-y-2">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1">
+                      Tempat Lahir <span class="text-red-600">*</span>
+                    </label>
+                    <input type="text" id="kp-tempat-lahir" required
+                      value="${escapeHtml(initialTempat)}"
+                      oninput="updateKwarranParticipantTtlPreview()"
+                      placeholder="Contoh: Tangerang"
+                      class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-white text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                  </div>
 
-                <div>
-                  <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1">
-                    Tanggal Lahir <span class="text-red-600">*</span>
-                  </label>
-                  <input type="date" id="kp-tanggal-lahir" required
-                    value="${editingParticipant ? editingParticipant.tanggalLahir : ''}"
-                    class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                  <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1">
+                      Tanggal Lahir <span class="text-red-600">*</span>
+                    </label>
+                    <input type="date" id="kp-tanggal-lahir" required
+                      value="${escapeHtml(initialTanggal)}"
+                      onchange="updateKwarranParticipantTtlPreview()"
+                      class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-white text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                  </div>
                 </div>
+                <p class="text-[11px] text-scout-medium">
+                  Format TTL Indonesia: <strong id="kp-ttl-preview" class="text-scout-dark">${escapeHtml(formatTempatTanggalLahir(initialTempat, initialTanggal))}</strong>
+                </p>
               </div>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -6159,18 +6376,18 @@
             </form>
           </div>
 
-          <!-- TABEL DAFTAR PESERTA TERSIMPAN (DENGAN KOLOM PAS FOTO 4x6) -->
+          <!-- TABEL DAFTAR PESERTA TERSIMPAN (DENGAN KOLOM PAS FOTO 4x6 & TTL) -->
           <div class="lg:col-span-7 bg-white rounded-2xl border border-scout-sand shadow-scout overflow-hidden flex flex-col">
             <div class="p-5 border-b border-scout-sand/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h4 class="text-base font-extrabold text-scout-dark">Daftar Peserta Kursus (${courseParticipants.length})</h4>
-                <p class="text-xs text-gray-500">Peserta yang dinyatakan Lulus otomatis masuk ke Data Potensi</p>
+                <p class="text-xs text-gray-500">Peserta yang dinyatakan Lulus otomatis masuk ke Data Potensi beserta TTL & foto 4x6</p>
               </div>
               <div class="relative w-full sm:w-60">
                 <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-2.5"></i>
                 <input type="text" value="${escapeHtml(uiState.kwarranParticipantSearch)}"
                   oninput="uiState.kwarranParticipantSearch = this.value; renderKwarranInputPesertaView(document.getElementById('main-content')); lucide.createIcons();"
-                  placeholder="Cari nama / pangkalan..."
+                  placeholder="Cari nama, TTL, pangkalan..."
                   class="w-full pl-9 pr-3 py-2 rounded-xl border border-scout-sand text-xs focus:ring-2 focus:ring-scout-forest focus:outline-none" />
               </div>
             </div>
@@ -6182,7 +6399,7 @@
                     <th class="py-3 px-3 w-10">No</th>
                     <th class="py-3 px-3 w-14">Foto 4x6</th>
                     <th class="py-3 px-3.5">Nama Lengkap + Gelar</th>
-                    <th class="py-3 px-3.5">Tempat, Tgl Lahir</th>
+                    <th class="py-3 px-3.5">Tempat, Tanggal Lahir</th>
                     <th class="py-3 px-3.5">Golongan</th>
                     <th class="py-3 px-3.5">Nama Pangkalan</th>
                     <th class="py-3 px-3.5">Kelulusan</th>
@@ -6198,7 +6415,7 @@
                         <td class="py-2.5 px-3">${renderParticipant4x6AvatarHtml(p, 'w-9 h-[54px]', true)}</td>
                         <td class="py-3 px-3.5 font-bold text-scout-dark">${escapeHtml(p.namaGelar)}</td>
                         <td class="py-3 px-3.5 text-gray-600 whitespace-nowrap">
-                          ${escapeHtml(p.tempatLahir)}, ${formatDateIndo(p.tanggalLahir)}
+                          ${escapeHtml(formatTempatTanggalLahir(p.tempatLahir, p.tanggalLahir))}
                         </td>
                         <td class="py-3 px-3.5 whitespace-nowrap">${renderGolonganBadge(p.golongan)}</td>
                         <td class="py-3 px-3.5 font-medium text-scout-brown">${escapeHtml(p.namaPangkalan)}</td>
