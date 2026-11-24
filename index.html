@@ -626,7 +626,7 @@
       return {
         profile: {
           namaKapus: 'Kak H. Bambang Sudjatmiko, M.Pd.',
-          ntaKapus: '28.04.00.001',
+          ntaKapus: '28.04.00.000001.0001',
           masaBakti: '2024 - 2029',
           telepon: '(021) 5991234',
           email: 'pusdiklatcab@pramukatangerang.or.id',
@@ -856,6 +856,9 @@
       const seed = createInitialSeedData();
       const data = Object.assign({}, seed, raw || {});
       data.profile = Object.assign({}, seed.profile, data.profile || {});
+      if (data.profile.ntaKapus) {
+        data.profile.ntaKapus = normalizeExistingNta(data.profile.ntaKapus) || seed.profile.ntaKapus;
+      }
       data.users = Array.isArray(data.users) && data.users.length ? data.users : seed.users;
       data.potensi = Array.isArray(data.potensi) ? data.potensi : seed.potensi;
       data.kursus = Array.isArray(data.kursus) ? data.kursus : seed.kursus;
@@ -2382,6 +2385,7 @@
         return;
       }
       const p = appData.profile;
+      const formattedNtaKapus = p.ntaKapus ? formatNtaMask(p.ntaKapus) : '';
       container.innerHTML = `
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <!-- Kartu Upload Logo -->
@@ -2444,10 +2448,16 @@
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
-                    Nomor Tanda Anggota (NTA)
+                    Nomor Tanda Anggota (NTA) <span class="text-red-600">*</span>
                   </label>
-                  <input type="text" id="prof-nta" value="${escapeHtml(p.ntaKapus || '')}"
-                    class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm font-medium text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                  <input type="text" id="prof-nta" required inputmode="numeric" maxlength="20"
+                    pattern="\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d{6}\\.\\d{4}"
+                    value="${escapeHtml(formattedNtaKapus)}"
+                    oninput="handleNtaInputMask(this)"
+                    placeholder="28.04.00.000001.0001"
+                    title="Format wajib 16 digit angka: ##.##.##.######.####"
+                    class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm font-mono font-semibold text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                  <p class="text-[10px] text-gray-500 mt-1">Format otomatis 16 digit angka: <code class="font-mono font-bold text-scout-brown">##.##.##.######.####</code></p>
                 </div>
                 <div>
                   <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
@@ -2528,14 +2538,21 @@
     function saveProfileForm(e) {
       e.preventDefault();
       if (guardPelatihWriteAction()) return;
+      const ntaFormatted = formatNtaMask(document.getElementById('prof-nta').value);
+      if (!isValidNtaPattern(ntaFormatted)) {
+        showToast('NTA Kapusdiklatcab wajib diisi lengkap 16 digit sesuai pola ##.##.##.######.####', 'error');
+        return;
+      }
       appData.profile.namaKapus = document.getElementById('prof-nama-kapus').value.trim();
-      appData.profile.ntaKapus = document.getElementById('prof-nta').value.trim();
+      appData.profile.ntaKapus = ntaFormatted;
       appData.profile.masaBakti = document.getElementById('prof-masa-bakti').value.trim();
       appData.profile.telepon = document.getElementById('prof-telepon').value.trim();
       appData.profile.email = document.getElementById('prof-email').value.trim();
       appData.profile.alamat = document.getElementById('prof-alamat').value.trim();
       saveAppData();
       renderBrandLogos();
+      renderProfileView(document.getElementById('main-content'));
+      lucide.createIcons();
       showToast('Profil Kapusdiklatcab Tangerang berhasil disimpan!', 'success');
     }
 
