@@ -649,9 +649,9 @@
     function createInitialSeedData() {
       return {
         profile: {
-          namaKapus: 'Kak H. Bambang Sudjatmiko, M.Pd.',
-          ntaKapus: '28.04.00.000001.0001',
-          masaBakti: '2024 - 2029',
+          namaKapus: 'Kak H. Moh. Tarlan, S.Sos,. S.IP',
+          ntaKapus: '28.04.00.160468.0001',
+          masaBakti: '2026 - 2031',
           telepon: '(021) 5991234',
           email: 'pusdiklatcab@pramukatangerang.or.id',
           alamat: 'Gedung Kwartir Cabang Gerakan Pramuka Kabupaten Tangerang, Jl. Raya Tigaraksa - Cisoka, Kab. Tangerang',
@@ -779,7 +779,11 @@
             tanggalSurat: '2026-11-17',
             asal: 'Kwartir Ranting Curug',
             perihal: 'Permohonan Rekomendasi & Tim Pelatih KMD Mandiri Kwarran Curug',
-            disposisi: 'Ditindaklanjuti',
+            disposisi: 'Sudah Disposisi / Diproses',
+            tujuanDisposisi: 'Koordinator Pelatih',
+            catatanDisposisi: 'Segera bentuk tim pelatih dan jadwalkan survei lokasi.',
+            tanggalDisposisi: '19 November 2026, 09:30 WIB',
+            disposisiOleh: 'Admin Utama',
             lampiran: 'Surat_Permohonan_KMD_Curug.pdf'
           },
           {
@@ -790,9 +794,23 @@
             asal: 'Kwartir Ranting Tigaraksa',
             perihal: 'Pengiriman Daftar Calon Peserta KML Tahun 2026',
             disposisi: 'Menunggu Disposisi',
+            tujuanDisposisi: '',
+            catatanDisposisi: '',
+            tanggalDisposisi: '',
+            disposisiOleh: '',
             lampiran: 'Daftar_Peserta_Tigaraksa.pdf'
           }
         ],
+      // Tambahkan normalisasi suratMasuk di dalam migrateAndNormalizeAppData(raw) tepat setelah baris:
+      // data.suratKeluar = Array.isArray(data.suratKeluar) ? data.suratKeluar : seed.suratKeluar;
+      data.suratMasuk = data.suratMasuk.map(sm => ({
+        ...sm,
+        disposisi: sm.disposisi === 'Ditindaklanjuti' ? 'Sudah Disposisi / Diproses' : (sm.disposisi || 'Menunggu Disposisi'),
+        tujuanDisposisi: sm.tujuanDisposisi || '',
+        catatanDisposisi: sm.catatanDisposisi || '',
+        tanggalDisposisi: sm.tanggalDisposisi || '',
+        disposisiOleh: sm.disposisiOleh || ''
+      }));
         suratKeluar: [
           {
             id: 'sk_1',
@@ -5196,7 +5214,7 @@
       `;
     }
 
-    // =========================================================================
+// =========================================================================
     // 11. VIEW: ADMINISTRASI (SURAT MASUK & SURAT KELUAR - ADMIN & PANITIA)
     // =========================================================================
     function renderAdministrasiView(container) {
@@ -5204,6 +5222,7 @@
         navigateTo('dashboard');
         return;
       }
+      const isAdmin = currentUser && currentUser.role === 'Admin';
       const isMasuk = uiState.adminTab === 'masuk';
       const sourceList = isMasuk ? appData.suratMasuk : appData.suratKeluar;
 
@@ -5211,12 +5230,14 @@
         if (uiState.suratSearch) {
           const q = uiState.suratSearch.toLowerCase();
           const text = isMasuk
-            ? `${s.nomor} ${s.asal} ${s.perihal} ${formatDateIndo(s.tanggalTerima)} ${formatDateIndo(s.tanggalSurat)}`
+            ? `${s.nomor} ${s.asal} ${s.perihal} ${s.disposisi} ${s.tujuanDisposisi || ''} ${s.catatanDisposisi || ''} ${formatDateIndo(s.tanggalTerima)} ${formatDateIndo(s.tanggalSurat)}`
             : `${s.nomor} ${s.tujuan} ${s.perihal} ${s.penanggungJawab} ${formatDateIndo(s.tanggalKeluar)}`;
           if (!text.toLowerCase().includes(q)) return false;
         }
         return true;
       });
+
+      const menungguCount = appData.suratMasuk.filter(s => (s.disposisi || 'Menunggu Disposisi') === 'Menunggu Disposisi').length;
 
       container.innerHTML = `
         <!-- Tab Switcher Surat Masuk & Surat Keluar -->
@@ -5226,6 +5247,7 @@
               class="px-5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition ${isMasuk ? 'bg-scout-dark text-white shadow-sm' : 'text-scout-brown hover:bg-scout-cream'}">
               <i data-lucide="inbox" class="w-4 h-4 ${isMasuk ? 'text-scout-gold' : ''}"></i>
               <span>Surat Masuk (${appData.suratMasuk.length})</span>
+              ${menungguCount > 0 ? `<span class="px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500 text-scout-dark">${menungguCount}</span>` : ''}
             </button>
             <button type="button" onclick="uiState.adminTab = 'keluar'; renderAdministrasiView(document.getElementById('main-content')); lucide.createIcons();"
               class="px-5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition ${!isMasuk ? 'bg-scout-dark text-white shadow-sm' : 'text-scout-brown hover:bg-scout-cream'}">
@@ -5249,14 +5271,20 @@
         </div>
 
         <div class="bg-white rounded-2xl border border-scout-sand shadow-scout overflow-hidden">
-          <div class="p-4 border-b border-scout-sand/70">
-            <div class="relative max-w-md">
+          <div class="p-4 border-b border-scout-sand/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="relative max-w-md w-full">
               <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3"></i>
               <input type="text" value="${escapeHtml(uiState.suratSearch)}"
                 oninput="uiState.suratSearch = this.value; renderAdministrasiView(document.getElementById('main-content')); lucide.createIcons();"
-                placeholder="Cari nomor surat, asal/tujuan, tanggal, atau perihal..."
+                placeholder="Cari nomor surat, asal/tujuan, disposisi, atau perihal..."
                 class="w-full pl-9 pr-3 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
             </div>
+            ${isMasuk && !isAdmin ? `
+              <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-900">
+                <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-700 shrink-0"></i>
+                <span>Approval & instruksi disposisi surat masuk dikelola khusus oleh Admin.</span>
+              </div>
+            ` : ''}
           </div>
 
           <div class="overflow-x-auto">
@@ -5273,7 +5301,10 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 text-xs">
-                ${filtered.map(s => `
+                ${filtered.map(s => {
+                  const statusDisp = s.disposisi || 'Menunggu Disposisi';
+                  const isWaiting = statusDisp === 'Menunggu Disposisi';
+                  return `
                   <tr class="hover:bg-scout-cream/40">
                     <td class="py-3.5 px-4 font-extrabold text-scout-dark whitespace-nowrap">${escapeHtml(s.nomor)}</td>
                     <td class="py-3.5 px-4 whitespace-nowrap text-gray-600">
@@ -5284,9 +5315,24 @@
                     <td class="py-3.5 px-4 font-semibold text-scout-brown">${escapeHtml(isMasuk ? s.asal : s.tujuan)}</td>
                     <td class="py-3.5 px-4 text-gray-800 max-w-xs">${escapeHtml(s.perihal)}</td>
                     <td class="py-3.5 px-4">
-                      ${isMasuk
-                        ? renderStatusBadge(s.disposisi)
-                        : `<span class="font-medium text-gray-700">${escapeHtml(s.penanggungJawab)}</span>`}
+                      ${isMasuk ? `
+                        <div class="space-y-1">
+                          ${isWaiting && !isAdmin
+                            ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300"><i data-lucide="clock" class="w-3 h-3"></i>Menunggu Disposisi Admin</span>`
+                            : renderStatusBadge(statusDisp)}
+                          ${s.tujuanDisposisi ? `
+                            <div class="text-[11px] font-bold text-scout-dark">
+                              Tujuan: <span class="text-scout-forest">${escapeHtml(s.tujuanDisposisi)}</span>
+                            </div>
+                          ` : ''}
+                          ${s.catatanDisposisi ? `
+                            <p class="text-[11px] text-gray-600 italic max-w-[220px] leading-snug">"${escapeHtml(s.catatanDisposisi)}"</p>
+                          ` : ''}
+                          ${s.tanggalDisposisi ? `
+                            <p class="text-[10px] text-gray-400">Disetujui: ${escapeHtml(s.tanggalDisposisi)}</p>
+                          ` : ''}
+                        </div>
+                      ` : `<span class="font-medium text-gray-700">${escapeHtml(s.penanggungJawab)}</span>`}
                     </td>
                     <td class="py-3.5 px-4">
                       <button type="button" onclick="showToast('Membuka lampiran: ${escapeHtml(s.lampiran || 'Dokumen.pdf')}', 'info')"
@@ -5296,17 +5342,30 @@
                       </button>
                     </td>
                     <td class="py-3.5 px-4 text-right whitespace-nowrap">
-                      <button type="button" onclick="openSuratModal('${uiState.adminTab}', '${s.id}')"
-                        class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 mr-1">
-                        <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                      </button>
-                      <button type="button" onclick="deleteSurat('${uiState.adminTab}', '${s.id}')"
-                        class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                      </button>
+                      <div class="inline-flex items-center justify-end gap-1.5">
+                        ${isMasuk && isAdmin ? `
+                          <button type="button" onclick="openDisposisiModal('${s.id}')"
+                            class="px-2.5 py-1.5 rounded-lg ${isWaiting ? 'bg-scout-forest hover:bg-scout-forestDark text-white border border-scout-forest shadow-xs' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300'} font-bold text-[11px] inline-flex items-center gap-1 transition"
+                            title="Approve / Atur Disposisi Surat">
+                            <i data-lucide="check-square" class="w-3.5 h-3.5 ${isWaiting ? 'text-scout-gold' : ''}"></i>
+                            <span>${isWaiting ? 'Approve / Disposisi' : 'Disposisi'}</span>
+                          </button>
+                        ` : ''}
+                        <button type="button" onclick="openSuratModal('${uiState.adminTab}', '${s.id}')"
+                          class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition"
+                          title="Edit Surat">
+                          <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button type="button" onclick="deleteSurat('${uiState.adminTab}', '${s.id}')"
+                          class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition"
+                          title="Hapus Surat">
+                          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                `).join('') || `
+                `;
+                }).join('') || `
                   <tr><td colspan="7" class="py-10 text-center text-gray-500">Belum ada arsip surat pada kategori ini.</td></tr>
                 `}
               </tbody>
@@ -5321,6 +5380,7 @@
       const isMasuk = type === 'masuk';
       const list = isMasuk ? appData.suratMasuk : appData.suratKeluar;
       const s = id ? list.find(item => item.id === id) : null;
+      const currentStatusDisposisi = s ? (s.disposisi || 'Menunggu Disposisi') : 'Menunggu Disposisi';
 
       openFormModal(
         `${s ? 'Edit' : 'Catat'} ${isMasuk ? 'Surat Masuk' : 'Surat Keluar'}`,
@@ -5337,12 +5397,12 @@
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Terima <span class="text-red-600">*</span></label>
-                  <input type="date" id="srt-tgl-terima" required value="${s ? s.tanggalTerima : '2026-11-24'}"
+                  <input type="date" id="srt-tgl-terima" required value="${s ? s.tanggalTerima : '2026-11-25'}"
                     class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
                 </div>
                 <div>
                   <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Surat <span class="text-red-600">*</span></label>
-                  <input type="date" id="srt-tgl-surat" required value="${s ? s.tanggalSurat : '2026-11-24'}"
+                  <input type="date" id="srt-tgl-surat" required value="${s ? s.tanggalSurat : '2026-11-25'}"
                     class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
                 </div>
               </div>
@@ -5352,19 +5412,20 @@
                   placeholder="Contoh: Kwartir Ranting Balaraja"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
-              <div>
-                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Disposisi / Status</label>
-                <select id="srt-disposisi" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
-                  <option value="Menunggu Disposisi" ${s && s.disposisi === 'Menunggu Disposisi' ? 'selected' : ''}>Menunggu Disposisi</option>
-                  <option value="Ditindaklanjuti" ${s && s.disposisi === 'Ditindaklanjuti' ? 'selected' : ''}>Ditindaklanjuti</option>
-                  <option value="Selesai" ${s && s.disposisi === 'Selesai' ? 'selected' : ''}>Selesai</option>
-                </select>
+              <div class="p-3 rounded-xl bg-amber-50/90 border border-amber-200 flex items-center justify-between gap-2">
+                <div>
+                  <p class="text-[11px] font-bold uppercase text-amber-900">Status Disposisi Surat Masuk</p>
+                  <p class="text-xs font-extrabold text-scout-dark mt-0.5">${escapeHtml(currentStatusDisposisi)}</p>
+                </div>
+                <span class="px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-[11px] font-bold text-amber-800">
+                  ${currentStatusDisposisi === 'Menunggu Disposisi' ? 'Default: Menunggu Approval Admin' : 'Terdisposisi'}
+                </span>
               </div>
             ` : `
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Keluar <span class="text-red-600">*</span></label>
-                  <input type="date" id="srt-tgl-keluar" required value="${s ? s.tanggalKeluar : '2026-11-24'}"
+                  <input type="date" id="srt-tgl-keluar" required value="${s ? s.tanggalKeluar : '2026-11-25'}"
                     class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
                 </div>
                 <div>
@@ -5401,7 +5462,9 @@
 
             <div class="pt-3 flex justify-end gap-2 border-t border-gray-100">
               <button type="button" onclick="closeFormModal()" class="px-4 py-2 rounded-xl bg-gray-100 text-xs font-bold text-gray-700">Batal</button>
-              <button type="submit" class="px-5 py-2 rounded-xl bg-scout-forest text-white text-xs font-bold">Simpan Arsip Surat</button>
+              <button type="submit" class="px-5 py-2 rounded-xl bg-scout-forest text-white text-xs font-bold">
+                ${s ? 'Simpan Perubahan' : 'Simpan Arsip Surat'}
+              </button>
             </div>
           </form>
         `
@@ -5413,6 +5476,7 @@
       if (guardPelatihWriteAction()) return;
       const isMasuk = type === 'masuk';
       if (isMasuk) {
+        const existing = id ? appData.suratMasuk.find(item => item.id === id) : null;
         const payload = {
           id: id || generateId('sm'),
           nomor: document.getElementById('srt-nomor').value.trim(),
@@ -5420,7 +5484,12 @@
           tanggalSurat: document.getElementById('srt-tgl-surat').value,
           asal: document.getElementById('srt-asal').value.trim(),
           perihal: document.getElementById('srt-perihal').value.trim(),
-          disposisi: document.getElementById('srt-disposisi').value,
+          // Status default surat masuk baru selalu 'Menunggu Disposisi'; saat edit mempertahankan status disposisi yang ada
+          disposisi: existing ? (existing.disposisi || 'Menunggu Disposisi') : 'Menunggu Disposisi',
+          tujuanDisposisi: existing ? (existing.tujuanDisposisi || '') : '',
+          catatanDisposisi: existing ? (existing.catatanDisposisi || '') : '',
+          tanggalDisposisi: existing ? (existing.tanggalDisposisi || '') : '',
+          disposisiOleh: existing ? (existing.disposisiOleh || '') : '',
           lampiran: document.getElementById('srt-lampiran').value.trim() || 'Lampiran.pdf'
         };
         if (id) {
@@ -5451,7 +5520,115 @@
       closeFormModal();
       renderAdministrasiView(document.getElementById('main-content'));
       lucide.createIcons();
-      showToast('Arsip persuratan berhasil disimpan.', 'success');
+      showToast(
+        isMasuk && !id
+          ? 'Surat masuk dicatat dengan status awal "Menunggu Disposisi".'
+          : 'Arsip persuratan berhasil disimpan.',
+        'success'
+      );
+    }
+
+    // Modal Khusus Role Admin untuk Approve & Mengisi Disposisi Surat Masuk
+    function openDisposisiModal(suratId) {
+      if (!currentUser || currentUser.role !== 'Admin') {
+        showToast('Akses ditolak: Hanya Admin yang dapat melakukan approve disposisi surat.', 'error');
+        return;
+      }
+      const surat = appData.suratMasuk.find(item => item.id === suratId);
+      if (!surat) return;
+
+      const tujuanOptions = [
+        'Kapusdiklatcab',
+        'Wakil Kapusdiklatcab',
+        'Sekretaris',
+        'Koordinator Pelatih',
+        'Panitia Kursus'
+      ];
+      const selectedTujuan = surat.tujuanDisposisi || tujuanOptions[0];
+      const currentStatus = surat.disposisi === 'Selesai' ? 'Selesai' : 'Sudah Disposisi / Diproses';
+
+      openFormModal(
+        'Approve & Disposisi Surat Masuk (Admin)',
+        `
+          <form onsubmit="saveDisposisiForm(event, '${surat.id}')" class="space-y-4">
+            <div class="p-3.5 rounded-xl bg-scout-cream/70 border border-scout-sand space-y-1 text-xs">
+              <div class="flex items-center justify-between">
+                <span class="font-extrabold text-scout-dark">No. Surat: ${escapeHtml(surat.nomor)}</span>
+                <span class="text-gray-500">Terima: ${formatDateIndo(surat.tanggalTerima)}</span>
+              </div>
+              <p class="font-semibold text-scout-brown">Asal: ${escapeHtml(surat.asal)}</p>
+              <p class="text-gray-700">Perihal: ${escapeHtml(surat.perihal)}</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">
+                Tujuan Disposisi <span class="text-red-600">*</span>
+              </label>
+              <select id="disp-tujuan" required
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm font-semibold text-scout-dark bg-white focus:ring-2 focus:ring-scout-forest focus:outline-none">
+                ${tujuanOptions.map(opt => `<option value="${opt}" ${selectedTujuan === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">
+                Catatan / Instruksi Disposisi <span class="text-red-600">*</span>
+              </label>
+              <textarea id="disp-catatan" required rows="3"
+                placeholder="Tuliskan arahan atau instruksi tindak lanjut surat..."
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none">${escapeHtml(surat.catatanDisposisi || '')}</textarea>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">
+                Status Tindak Lanjut Disposisi <span class="text-red-600">*</span>
+              </label>
+              <select id="disp-status" required
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm font-bold text-scout-dark bg-white focus:ring-2 focus:ring-scout-forest focus:outline-none">
+                <option value="Sudah Disposisi / Diproses" ${currentStatus === 'Sudah Disposisi / Diproses' ? 'selected' : ''}>Sudah Disposisi / Diproses</option>
+                <option value="Selesai" ${currentStatus === 'Selesai' ? 'selected' : ''}>Selesai</option>
+              </select>
+            </div>
+
+            <div class="pt-3 flex justify-end gap-2 border-t border-gray-100">
+              <button type="button" onclick="closeFormModal()" class="px-4 py-2 rounded-xl bg-gray-100 text-xs font-bold text-gray-700">Batal</button>
+              <button type="submit" class="px-5 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="check-circle-2" class="w-4 h-4 text-scout-gold"></i>
+                <span>Simpan & Approve Disposisi</span>
+              </button>
+            </div>
+          </form>
+        `
+      );
+    }
+
+    function saveDisposisiForm(e, suratId) {
+      e.preventDefault();
+      if (!currentUser || currentUser.role !== 'Admin') {
+        showToast('Akses ditolak: Hanya Admin yang berhak menyetujui disposisi.', 'error');
+        return;
+      }
+      const idx = appData.suratMasuk.findIndex(item => item.id === suratId);
+      if (idx === -1) return;
+
+      const now = new Date();
+      const jamMenit = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} WIB`;
+      const waktuApproval = `${getTodayDateIndo(false)}, ${jamMenit}`;
+
+      appData.suratMasuk[idx] = {
+        ...appData.suratMasuk[idx],
+        tujuanDisposisi: document.getElementById('disp-tujuan').value,
+        catatanDisposisi: document.getElementById('disp-catatan').value.trim(),
+        disposisi: document.getElementById('disp-status').value,
+        tanggalDisposisi: waktuApproval,
+        disposisiOleh: currentUser.nama
+      };
+
+      saveAppData();
+      closeFormModal();
+      renderAdministrasiView(document.getElementById('main-content'));
+      lucide.createIcons();
+      showToast('Disposisi surat masuk berhasil disetujui & disimpan!', 'success');
     }
 
     function deleteSurat(type, id) {
@@ -5656,6 +5833,7 @@
                 <th class="border border-gray-300 py-2 px-3">Tgl Terima</th>
                 <th class="border border-gray-300 py-2 px-3">Asal Instansi / Kwarran</th>
                 <th class="border border-gray-300 py-2 px-3">Perihal</th>
+                <th class="border border-gray-300 py-2 px-3">Tujuan & Instruksi Disposisi</th>
                 <th class="border border-gray-300 py-2 px-3">Status</th>
               </tr>
             </thead>
@@ -5667,12 +5845,15 @@
                   <td class="border border-gray-300 py-2 px-3">${formatDateIndo(s.tanggalTerima)}</td>
                   <td class="border border-gray-300 py-2 px-3">${escapeHtml(s.asal)}</td>
                   <td class="border border-gray-300 py-2 px-3">${escapeHtml(s.perihal)}</td>
-                  <td class="border border-gray-300 py-2 px-3">${escapeHtml(s.disposisi)}</td>
+                  <td class="border border-gray-300 py-2 px-3">
+                    ${s.tujuanDisposisi ? `<strong>${escapeHtml(s.tujuanDisposisi)}</strong>${s.catatanDisposisi ? ` — <em>${escapeHtml(s.catatanDisposisi)}</em>` : ''}` : '-'}
+                  </td>
+                  <td class="border border-gray-300 py-2 px-3 font-semibold">${escapeHtml(s.disposisi || 'Menunggu Disposisi')}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
-
+          
           <h4 class="font-bold text-xs uppercase text-scout-dark mb-2">B. Rekapitulasi Surat Keluar</h4>
           <table class="w-full text-left border-collapse border border-gray-300 text-xs">
             <thead>
@@ -5851,14 +6032,33 @@
             csvRows.push([idx + 1, `"${k.nama}"`, `"${k.angkatan}"`, `"${formatDateRangeIndo(k.tanggal)}"`, `"${k.lokasi}"`, k.terdaftar, k.kuota, k.status]);
           });
         }
+
       } else {
         filename = 'Laporan_Administrasi_Surat_Kab_Tangerang.csv';
-        csvRows.push(['Jenis', 'Nomor Surat', 'Tanggal', 'Asal / Tujuan', 'Perihal', 'Status / PJ']);
+        csvRows.push(['Jenis', 'Nomor Surat', 'Tanggal', 'Asal / Tujuan', 'Perihal', 'Tujuan Disposisi / PJ', 'Catatan Disposisi', 'Status']);
         appData.suratMasuk.forEach(s => {
-          csvRows.push(['Surat Masuk', `"${s.nomor}"`, `"${formatDateIndo(s.tanggalTerima)}"`, `"${s.asal}"`, `"${s.perihal}"`, s.disposisi]);
+          csvRows.push([
+            'Surat Masuk',
+            `"${s.nomor}"`,
+            `"${formatDateIndo(s.tanggalTerima)}"`,
+            `"${s.asal}"`,
+            `"${s.perihal}"`,
+            `"${s.tujuanDisposisi || '-'}"`,
+            `"${s.catatanDisposisi || '-'}"`,
+            `"${s.disposisi || 'Menunggu Disposisi'}"`
+          ]);
         });
         appData.suratKeluar.forEach(s => {
-          csvRows.push(['Surat Keluar', `"${s.nomor}"`, `"${formatDateIndo(s.tanggalKeluar)}"`, `"${s.tujuan}"`, `"${s.perihal}"`, `"${s.penanggungJawab}"`]);
+          csvRows.push([
+            'Surat Keluar',
+            `"${s.nomor}"`,
+            `"${formatDateIndo(s.tanggalKeluar)}"`,
+            `"${s.tujuan}"`,
+            `"${s.perihal}"`,
+            `"${s.penanggungJawab}"`,
+            '"-"',
+            '"Terkirim"'
+          ]);
         });
       }
 
@@ -6843,13 +7043,14 @@
         'Akan Datang': 'bg-blue-50 text-blue-800 border-blue-200',
         'Berlangsung': 'bg-emerald-100 text-emerald-900 border-emerald-300',
         'Aktif Kwarran': 'bg-emerald-100 text-emerald-900 border-emerald-300',
-        'Selesai': 'bg-gray-100 text-gray-700 border-gray-300',
-        'Menunggu Disposisi': 'bg-amber-50 text-amber-800 border-amber-200',
+        'Selesai': 'bg-emerald-100 text-emerald-900 border-emerald-300',
+        'Menunggu Disposisi': 'bg-amber-100 text-amber-900 border-amber-300',
+        'Sudah Disposisi / Diproses': 'bg-blue-50 text-blue-800 border-blue-300',
         'Ditindaklanjuti': 'bg-emerald-50 text-emerald-800 border-emerald-200'
       };
       return `<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${map[status] || 'bg-gray-100 text-gray-700'}">${escapeHtml(status)}</span>`;
     }
-
+    
     function renderRoleBadge(role) {
       const map = {
         'Admin': 'bg-scout-dark text-scout-gold border-scout-gold/50',
