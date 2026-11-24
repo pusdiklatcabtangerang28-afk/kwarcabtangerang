@@ -406,6 +406,7 @@
     ];
 
     const JENJANG_OPTIONS = ['Belum Kursus', 'KMD', 'KML', 'KPD', 'KPL'];
+    const JENJANG_RANK = { 'Belum Kursus': 0, 'KMD': 1, 'KML': 2, 'KPD': 3, 'KPL': 4 };
     const GOLONGAN_OPTIONS = ['Siaga', 'Penggalang', 'Penegak', 'Pandega'];
     const KUALIFIKASI_OPTIONS = ['Sangat Memuaskan', 'Memuaskan', 'Baik', 'Cukup'];
 
@@ -483,6 +484,22 @@
       if (upper.includes('KPD')) return 'KPD';
       if (upper.includes('KML')) return 'KML';
       return 'KMD';
+    }
+
+    function extractGraduationYearFromCourse(course) {
+      const combined = `${course.tanggal || ''} ${course.angkatan || ''}`;
+      const match = combined.match(/\b(20\d{2}|19\d{2})\b/);
+      return match ? match[1] : String(new Date().getFullYear());
+    }
+
+    function normalizePersonNameForMatch(name) {
+      return String(name || '')
+        .toLowerCase()
+        .replace(/^kak\s+/i, '')
+        .split(',')[0]
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
     }
 
     // =========================================================================
@@ -678,7 +695,9 @@
             tempatLahir: 'Tangerang',
             tanggalLahir: '1992-05-14',
             golongan: 'Penggalang',
-            namaPangkalan: 'SDN Tigaraksa 01'
+            namaPangkalan: 'SDN Tigaraksa 01',
+            gender: 'Putra',
+            statusKelulusan: 'Belum Lulus'
           },
           {
             id: 'kp_crg_1',
@@ -689,7 +708,9 @@
             tempatLahir: 'Tangerang',
             tanggalLahir: '1994-08-21',
             golongan: 'Siaga',
-            namaPangkalan: 'SDN Curug 01'
+            namaPangkalan: 'SDN Curug 01',
+            gender: 'Putri',
+            statusKelulusan: 'Belum Lulus'
           },
           {
             id: 'kp_crg_2',
@@ -700,7 +721,9 @@
             tempatLahir: 'Serang',
             tanggalLahir: '1991-03-10',
             golongan: 'Penggalang',
-            namaPangkalan: 'SMPN 1 Curug'
+            namaPangkalan: 'SMPN 1 Curug',
+            gender: 'Putra',
+            statusKelulusan: 'Belum Lulus'
           }
         ]
       };
@@ -775,7 +798,9 @@
         return {
           ...pt,
           kwarran: kw,
-          kwarran_id: pt.kwarran_id || buildKwarranMetadata(kw).kwarran_id
+          kwarran_id: pt.kwarran_id || buildKwarranMetadata(kw).kwarran_id,
+          gender: pt.gender || 'Putra',
+          statusKelulusan: pt.statusKelulusan || 'Belum Lulus'
         };
       });
 
@@ -851,17 +876,142 @@
       });
     }
 
+    // =========================================================================
+    // SINKRONISASI OTOMATIS PESERTA LULUS (KWARRAN / KWARCAB -> DATA POTENSI)
+    // =========================================================================
+    function upsertGraduateIntoPotensi(targetData, course, participant) {
+      if (!targetData || !course || !participant) return false;
+      if (!Array.isArray(targetData.potensi)) targetData.potensi = [];
+
+      const rawJenjang = course.jenjang || inferJenjangFromName(course.nama);
+      const graduatedJenjang = JENJANG_RANK[rawJenjang] ? rawJenjang : 'KMD';
+      const tahunLulus = extractGraduationYearFromCourse(course);
+      const kwarranName = normalizeKwarranName(
+        participant.kwarran || course.sourceKwarran || 'Tigaraksa'
+      );
+      const pangkalanName = (participant.pangkalan || participant.namaPangkalan || '').trim();
+      const genderVal = participant.gender === 'Putri' ? 'Putri' : 'Putra';
+      const rawNama = (participant.nama || participant.namaGelar || '').trim();
+      if (!rawNama) return false;
+
+      const formattedNama = /^kak\s+/i.test(rawNama) ? rawNama : `Kak ${rawNama}`;
+      const normKey = normalizePersonNameForMatch(rawNama);
+      const autoPotId = `pot_grad_${participant.id}`;
+
+      const existingIdx = targetData.potensi.findIndex(p => {
+        if (p.id === autoPotId || p.sourceParticipantId === participant.id) return true;
+        if (normKey && normalizePersonNameForMatch(p.nama) === normKey) {
+          if (!p.kwarran || isSameKwarran(p.kwarran, kwarranName)) return true;
+        }
+        return false;
+      });
+
+      if (existingIdx !== -1) {
+        const existing = targetData.potensi[existingIdx];
+        const prevRank = JENJANG_RANK[existing.jenjang] || 0;
+        const nextRank = JENJANG_RANK[graduatedJenjang] || 1;
+        const shouldUpgrade = nextRank >= prevRank;
+
+        targetData.potensi[existingIdx] = {
+          ...existing,
+          nama: formattedNama || existing.nama,
+          jenjang: shouldUpgrade ? graduatedJenjang : existing.jenjang,
+          tahunLulus: shouldUpgrade ? tahunLulus : (existing.tahunLulus || tahunLulus),
+          gender: participant.gender || existing.gender || 'Putra',
+          kwarran: kwarranName || existing.kwarran,
+          pangkalan: pangkalanName || existing.pangkalan || '-',
+          sourceParticipantId: participant.id,
+          sourceCourseId: course.id
+        };
+        return false;
+      }
+
+      targetData.potensi.unshift({
+        id: autoPotId,
+        nama: formattedNama,
+        jenjang: graduatedJenjang,
+        tahunLulus: tahunLulus,
+        gender: genderVal,
+        kwarran: kwarranName,
+        pangkalan: pangkalanName || '-',
+        fotoUrl: '',
+        sourceParticipantId: participant.id,
+        sourceCourseId: course.id
+      });
+      return true;
+    }
+
+    function syncGraduatedParticipantsToPotensi(targetData = appData) {
+      if (!targetData || !Array.isArray(targetData.kursus)) return 0;
+      let newlyAddedCount = 0;
+
+      targetData.kursus.forEach(course => {
+        const detail = (targetData.courseDetails && targetData.courseDetails[course.id]) || {};
+        const gradMap = (detail.graduationStatus && typeof detail.graduationStatus === 'object')
+          ? detail.graduationStatus
+          : {};
+        const courseIsCompleted = course.status === 'Selesai';
+
+        if (course.sourceType === 'kwarran' && course.sourceCourseId) {
+          (targetData.kwarranParticipants || []).forEach(kp => {
+            if (kp.courseId !== course.sourceCourseId) return;
+            const isGraduated =
+              courseIsCompleted ||
+              kp.statusKelulusan === 'Lulus' ||
+              gradMap[kp.id] === 'Lulus';
+
+            if (isGraduated) {
+              kp.statusKelulusan = 'Lulus';
+              if (detail.graduationStatus) detail.graduationStatus[kp.id] = 'Lulus';
+              const added = upsertGraduateIntoPotensi(targetData, course, {
+                id: kp.id,
+                nama: kp.namaGelar,
+                kwarran: kp.kwarran || course.sourceKwarran,
+                pangkalan: kp.namaPangkalan,
+                gender: kp.gender || 'Putra'
+              });
+              if (added) newlyAddedCount++;
+            }
+          });
+        } else if (Array.isArray(detail.manualParticipants)) {
+          detail.manualParticipants.forEach(mp => {
+            const isGraduated =
+              courseIsCompleted ||
+              mp.statusKelulusan === 'Lulus' ||
+              gradMap[mp.id] === 'Lulus';
+
+            if (isGraduated) {
+              mp.statusKelulusan = 'Lulus';
+              if (detail.graduationStatus) detail.graduationStatus[mp.id] = 'Lulus';
+              const added = upsertGraduateIntoPotensi(targetData, course, {
+                id: mp.id,
+                nama: mp.nama,
+                kwarran: mp.kwarran || 'Tigaraksa',
+                pangkalan: mp.pangkalan,
+                gender: mp.gender || 'Putra'
+              });
+              if (added) newlyAddedCount++;
+            }
+          });
+        }
+      });
+
+      return newlyAddedCount;
+    }
+
     function loadAppData() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : null;
         const normalized = migrateAndNormalizeAppData(parsed);
         syncKwarranCoursesToAdmin(normalized);
+        syncGraduatedParticipantsToPotensi(normalized);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
         return normalized;
       } catch (err) {
         const fallback = migrateAndNormalizeAppData(null);
         syncKwarranCoursesToAdmin(fallback);
+        syncGraduatedParticipantsToPotensi(fallback);
         return fallback;
       }
     }
@@ -905,6 +1055,7 @@
     function saveAppData() {
       try {
         syncKwarranCoursesToAdmin(appData);
+        syncGraduatedParticipantsToPotensi(appData);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
       } catch (err) {
         showToast('Gagal menyimpan data ke penyimpanan browser (kapasitas penuh).', 'error');
@@ -1225,7 +1376,7 @@
             ? `Data potensi pembina pramuka wilayah Kwartir Ranting ${scope.kwarranName}`
             : (readOnly
               ? 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang (Hanya Lihat — Unduh via Menu Laporan)'
-              : 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang')
+              : 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang (Terintegrasi Otomatis dengan Kelulusan Kursus)')
         },
         'kursus': {
           title: 'Manajemen Kursus & Pelatihan',
@@ -1235,7 +1386,7 @@
         },
         'kursus-detail': {
           title: 'Detail Manajemen Kursus',
-          subtitle: 'Pengelolaan Surat Tugas, Absensi (Peserta/Panitia/Pelatih), Rundown & Cetak Dokumen Resmi'
+          subtitle: 'Pengelolaan Surat Tugas, Absensi & Kelulusan Peserta, Rundown & Cetak Dokumen Resmi'
         },
         'administrasi': {
           title: 'Administrasi Persuratan',
@@ -1515,6 +1666,7 @@
     // =========================================================================
     function renderDashboardView(container) {
       syncKwarranCoursesToAdmin(appData);
+      syncGraduatedParticipantsToPotensi(appData);
       const scope = getActiveKwarranScope();
       const isKwarran = scope.isKwarran;
       const myKwarran = scope.kwarranName;
@@ -2088,7 +2240,7 @@
     }
 
     // =========================================================================
-    // 9. VIEW: DATA POTENSI (DENGAN FITUR FOTO & TAHUN LULUS + READ-ONLY PELATIH)
+    // 9. VIEW: DATA POTENSI (DENGAN FITUR FOTO & TAHUN LULUS + AUTO-SYNC LULUSAN)
     // =========================================================================
     function formatTahunLulusDisplay(item) {
       if (!item || item.jenjang === 'Belum Kursus') return '-';
@@ -2097,6 +2249,7 @@
     }
 
     function renderDataPotensiView(container) {
+      syncGraduatedParticipantsToPotensi(appData);
       const scope = getActiveKwarranScope();
       const isKwarran = scope.isKwarran;
       const lockedKwarran = isKwarran ? scope.kwarranName : null;
@@ -2222,7 +2375,10 @@
                       <td class="py-3 px-4">${renderPembinaAvatarHtml(item, 'w-10 h-10', true)}</td>
                       <td class="py-3.5 px-4">
                         <p class="font-bold text-scout-dark">${escapeHtml(item.nama)}</p>
-                        ${item.fotoUrl ? '<span class="text-[10px] font-semibold text-scout-forest">Foto terlampir</span>' : '<span class="text-[10px] text-gray-400">Belum ada foto</span>'}
+                        <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
+                          ${item.fotoUrl ? '<span class="text-[10px] font-semibold text-scout-forest">Foto terlampir</span>' : '<span class="text-[10px] text-gray-400">Belum ada foto</span>'}
+                          ${item.sourceCourseId ? '<span class="px-1.5 py-0.2 rounded bg-emerald-50 text-scout-forest border border-emerald-200 text-[9px] font-bold">Lulusan Kursus</span>' : ''}
+                        </div>
                       </td>
                       <td class="py-3.5 px-4">${renderJenjangBadge(item.jenjang)}</td>
                       <td class="py-3.5 px-4 text-center whitespace-nowrap">
@@ -2502,7 +2658,9 @@
       const rawTahun = (document.getElementById('pot-tahun-lulus').value || '').trim();
       const normalizedTahun = jenjangVal === 'Belum Kursus' ? '-' : (rawTahun || '-');
 
+      const prev = id ? appData.potensi.find(p => p.id === id) : null;
       const payload = {
+        ...(prev || {}),
         id: id || generateId('pot'),
         nama: document.getElementById('pot-nama').value.trim(),
         jenjang: jenjangVal,
@@ -2687,7 +2845,7 @@
                         <button type="button" onclick="openAdminCourseDetail('${k.id}')"
                           class="px-3.5 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-extrabold flex items-center gap-1.5 shadow-xs transition">
                           <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-scout-gold"></i>
-                          <span>Kelola Detail Kursus</span>
+                          <span>Kelola Detail & Kelulusan</span>
                         </button>
                       ` : '<div></div>'}
 
@@ -2744,7 +2902,7 @@
                 <select id="krs-status" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
                   <option value="Akan Datang" ${k && k.status === 'Akan Datang' ? 'selected' : ''}>Akan Datang</option>
                   <option value="Berlangsung" ${k && k.status === 'Berlangsung' ? 'selected' : ''}>Berlangsung</option>
-                  <option value="Selesai" ${k && k.status === 'Selesai' ? 'selected' : ''}>Selesai</option>
+                  <option value="Selesai" ${k && k.status === 'Selesai' ? 'selected' : ''}>Selesai (Otomatis Luluskan Peserta)</option>
                 </select>
               </div>
             </div>
@@ -2813,6 +2971,7 @@
       const newHari = document.getElementById('krs-hari').value.trim() || 'Sesuai Jadwal';
       const newTanggal = document.getElementById('krs-tanggal').value.trim();
       const newLokasi = document.getElementById('krs-lokasi').value.trim();
+      const newStatus = document.getElementById('krs-status').value;
 
       const payload = {
         ...(prev || {}),
@@ -2820,7 +2979,7 @@
         nama: newNama,
         jenjang: document.getElementById('krs-jenjang').value,
         angkatan: document.getElementById('krs-angkatan').value.trim(),
-        status: document.getElementById('krs-status').value,
+        status: newStatus,
         hari: newHari,
         tanggal: newTanggal,
         lokasi: newLokasi,
@@ -2850,7 +3009,12 @@
       if (id) {
         const idx = appData.kursus.findIndex(item => item.id === id);
         if (idx !== -1) appData.kursus[idx] = payload;
-        showToast('Data kursus berhasil diperbarui.', 'success');
+        showToast(
+          newStatus === 'Selesai'
+            ? 'Kursus selesai & seluruh peserta lulus otomatis disinkronkan ke Data Potensi!'
+            : 'Data kursus berhasil diperbarui.',
+          'success'
+        );
       } else {
         appData.kursus.unshift(payload);
         showToast('Jadwal kursus baru berhasil ditambahkan.', 'success');
@@ -2885,10 +3049,13 @@
 
     // =========================================================================
     // 10B. HALAMAN DETAIL PENGELOLAAN KURSUS PADA ROLE ADMIN
-    //      (Edit Kursus, Surat Tugas & Lampiran, Absensi 3 Peran, Rundown, Cetak Resmi)
+    //      (Edit Kursus, Surat Tugas & Lampiran, Absensi & Kelulusan, Rundown, Cetak Resmi)
     // =========================================================================
     function getCourseParticipantsForAdmin(course) {
       if (!course) return [];
+      const detail = ensureCourseDetailRecord(course);
+      const gradMap = detail.graduationStatus || {};
+
       if (course.sourceType === 'kwarran' && course.sourceCourseId) {
         return appData.kwarranParticipants
           .filter(p => p.courseId === course.sourceCourseId)
@@ -2900,11 +3067,21 @@
             golongan: p.golongan,
             pangkalan: p.namaPangkalan,
             kwarran: p.kwarran,
+            gender: p.gender || 'Putra',
+            statusKelulusan: (course.status === 'Selesai' || p.statusKelulusan === 'Lulus' || gradMap[p.id] === 'Lulus')
+              ? 'Lulus'
+              : 'Belum Lulus',
             source: 'kwarran'
           }));
       }
-      const detail = ensureCourseDetailRecord(course);
-      return detail.manualParticipants || [];
+
+      return (detail.manualParticipants || []).map(mp => ({
+        ...mp,
+        gender: mp.gender || 'Putra',
+        statusKelulusan: (course.status === 'Selesai' || mp.statusKelulusan === 'Lulus' || gradMap[mp.id] === 'Lulus')
+          ? 'Lulus'
+          : 'Belum Lulus'
+      }));
     }
 
     function ensureCourseDetailRecord(course) {
@@ -2947,8 +3124,10 @@
               tempatLahir: 'Tangerang',
               tanggalLahir: '1993-04-12',
               golongan: 'Penggalang',
+              gender: 'Putra',
               pangkalan: 'SMPN 1 Tigaraksa',
               kwarran: 'Tigaraksa',
+              statusKelulusan: course.status === 'Selesai' ? 'Lulus' : 'Belum Lulus',
               source: 'cabang'
             },
             {
@@ -2957,12 +3136,15 @@
               tempatLahir: 'Tangerang',
               tanggalLahir: '1995-09-18',
               golongan: 'Siaga',
+              gender: 'Putri',
               pangkalan: 'SDN Curug 01',
               kwarran: 'Curug',
+              statusKelulusan: course.status === 'Selesai' ? 'Lulus' : 'Belum Lulus',
               source: 'cabang'
             }
           ],
           attendanceStatus: {},
+          graduationStatus: {},
           panitiaList: initialPanitia,
           pelatihList: initialPelatih,
           rundown: [
@@ -2991,6 +3173,7 @@
       if (!Array.isArray(det.suratTugas.attachments)) det.suratTugas.attachments = [];
       if (!Array.isArray(det.manualParticipants)) det.manualParticipants = [];
       if (!det.attendanceStatus || typeof det.attendanceStatus !== 'object') det.attendanceStatus = {};
+      if (!det.graduationStatus || typeof det.graduationStatus !== 'object') det.graduationStatus = {};
       if (!Array.isArray(det.panitiaList)) det.panitiaList = [];
       if (!Array.isArray(det.pelatihList)) det.pelatihList = [];
       if (!Array.isArray(det.rundown)) det.rundown = [];
@@ -3032,13 +3215,14 @@
 
       const detail = ensureCourseDetailRecord(course);
       const pesertaList = getCourseParticipantsForAdmin(course);
+      const graduatedCount = pesertaList.filter(p => p.statusKelulusan === 'Lulus').length;
       const isKwarranOrigin = course.sourceType === 'kwarran';
       const activeTab = uiState.adminCourseDetailTab || 'edit';
 
       const tabs = [
         { id: 'edit', label: '1. Edit Data Kursus', icon: 'pencil-ruler' },
         { id: 'surat-tugas', label: '2. Surat Tugas & Lampiran', icon: 'file-badge' },
-        { id: 'absensi', label: '3. Absensi (Peserta, Panitia, Pelatih)', icon: 'clipboard-check' },
+        { id: 'absensi', label: '3. Absensi & Kelulusan Peserta', icon: 'clipboard-check' },
         { id: 'rundown', label: '4. Jadwal / Rundown Acara', icon: 'calendar-clock' },
         { id: 'cetak-resmi', label: '5. Pusat Cetak Dokumen Resmi', icon: 'printer' }
       ];
@@ -3071,7 +3255,7 @@
                 </div>
                 <h3 class="text-base sm:text-xl font-extrabold text-scout-dark">${escapeHtml(course.nama)}</h3>
                 <p class="text-xs text-gray-500 mt-0.5">
-                  ${escapeHtml(course.hari || '')} (${escapeHtml(course.tanggal)}) • ${escapeHtml(course.lokasi)} • <strong>${pesertaList.length} Peserta</strong>
+                  ${escapeHtml(course.hari || '')} (${escapeHtml(course.tanggal)}) • ${escapeHtml(course.lokasi)} • <strong>${pesertaList.length} Peserta</strong> (${graduatedCount} Lulus &rarr; Data Potensi)
                 </p>
               </div>
             </div>
@@ -3144,7 +3328,7 @@
                 <select id="det-krs-status" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
                   <option value="Akan Datang" ${course.status === 'Akan Datang' ? 'selected' : ''}>Akan Datang</option>
                   <option value="Berlangsung" ${course.status === 'Berlangsung' ? 'selected' : ''}>Berlangsung</option>
-                  <option value="Selesai" ${course.status === 'Selesai' ? 'selected' : ''}>Selesai</option>
+                  <option value="Selesai" ${course.status === 'Selesai' ? 'selected' : ''}>Selesai (Otomatis Luluskan Peserta ke Data Potensi)</option>
                 </select>
               </div>
             </div>
@@ -3203,13 +3387,14 @@
       const idx = appData.kursus.findIndex(c => c.id === courseId);
       if (idx === -1) return;
       const prev = appData.kursus[idx];
+      const newStatus = document.getElementById('det-krs-status').value;
 
       const updated = {
         ...prev,
         nama: document.getElementById('det-krs-nama').value.trim(),
         jenjang: document.getElementById('det-krs-jenjang').value,
         angkatan: document.getElementById('det-krs-angkatan').value.trim(),
-        status: document.getElementById('det-krs-status').value,
+        status: newStatus,
         hari: document.getElementById('det-krs-hari').value.trim(),
         tanggal: document.getElementById('det-krs-tanggal').value.trim(),
         kuota: parseInt(document.getElementById('det-krs-kuota').value, 10) || 40,
@@ -3237,7 +3422,12 @@
       saveAppData();
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
-      showToast('Detail data kursus berhasil diperbarui dan disinkronkan!', 'success');
+      showToast(
+        newStatus === 'Selesai'
+          ? 'Kursus Selesai & peserta lulus otomatis masuk ke Data Potensi!'
+          : 'Detail data kursus berhasil diperbarui dan disinkronkan!',
+        'success'
+      );
     }
 
     // --- TAB 2: SURAT TUGAS & UPLOAD LAMPIRAN ---
@@ -3436,26 +3626,31 @@
       showToast('Lampiran surat tugas dihapus.', 'info');
     }
 
-    // --- TAB 3: ABSENSI (PESERTA, PANITIA, PELATIH) ---
+    // --- TAB 3: ABSENSI & KELULUSAN PESERTA (AUTO-SYNC KE DATA POTENSI) ---
     function renderAdminCourseTabAbsensi(course, detail, pesertaList) {
       const subTab = uiState.adminAttendanceRoleTab || 'peserta';
       const statusOptions = ['Hadir', 'Izin', 'Sakit', 'Alpa'];
+      const isCabangCourse = course.sourceType !== 'kwarran';
 
       let rowsHtml = '';
       if (subTab === 'peserta') {
         rowsHtml = pesertaList.map((p, idx) => {
           const curStatus = detail.attendanceStatus[p.id] || 'Hadir';
+          const isLulus = p.statusKelulusan === 'Lulus';
           return `
             <tr class="hover:bg-scout-cream/40">
               <td class="py-3 px-4 font-semibold text-gray-500">${idx + 1}</td>
-              <td class="py-3 px-4 font-bold text-scout-dark">${escapeHtml(p.nama)}</td>
+              <td class="py-3 px-4">
+                <p class="font-bold text-scout-dark">${escapeHtml(p.nama)}</p>
+                <p class="text-[10px] text-gray-500">${escapeHtml(p.gender || 'Putra')}</p>
+              </td>
               <td class="py-3 px-4 text-gray-600">${escapeHtml(p.pangkalan || '-')} (Kwarran ${escapeHtml(p.kwarran || '-')})</td>
               <td class="py-3 px-4">${renderGolonganBadge(p.golongan || 'Penggalang')}</td>
               <td class="py-3 px-4">
-                <div class="flex flex-wrap gap-1.5 no-print">
+                <div class="flex flex-wrap gap-1 no-print">
                   ${statusOptions.map(st => `
                     <button type="button" onclick="setCoursePersonAttendance('${course.id}', 'peserta', '${p.id}', '${st}')"
-                      class="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                      class="px-2 py-1 rounded-lg text-[10px] font-bold border transition ${
                         curStatus === st ? getAttendanceBtnActiveClass(st) : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                       }">
                       ${st}
@@ -3464,9 +3659,30 @@
                 </div>
                 <span class="hidden print:inline font-bold">${curStatus}</span>
               </td>
+              <td class="py-3 px-4 whitespace-nowrap">
+                <div class="flex items-center gap-1.5 no-print">
+                  <button type="button" onclick="setCourseParticipantGraduation('${course.id}', '${p.id}', '${isLulus ? 'Belum Lulus' : 'Lulus'}')"
+                    class="px-3 py-1.5 rounded-xl text-[11px] font-extrabold border inline-flex items-center gap-1.5 transition ${
+                      isLulus
+                        ? 'bg-scout-forest text-white border-scout-forest shadow-xs'
+                        : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                    }"
+                    title="${isLulus ? 'Sudah masuk ke Data Potensi (klik untuk ubah status)' : 'Klik untuk menyatakan Lulus & masukkan otomatis ke Data Potensi'}">
+                    <i data-lucide="${isLulus ? 'badge-check' : 'award'}" class="w-3.5 h-3.5 ${isLulus ? 'text-scout-gold' : ''}"></i>
+                    <span>${isLulus ? 'Lulus (Di Data Potensi)' : 'Nyatakan Lulus'}</span>
+                  </button>
+                  ${isCabangCourse ? `
+                    <button type="button" onclick="deleteCabangCourseParticipant('${course.id}', '${p.id}')"
+                      class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200" title="Hapus Peserta">
+                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
+                  ` : ''}
+                </div>
+                <span class="hidden print:inline font-bold">${isLulus ? 'LULUS' : 'Belum Lulus'}</span>
+              </td>
             </tr>
           `;
-        }).join('') || `<tr><td colspan="5" class="py-8 text-center text-gray-500">Belum ada peserta terdaftar pada kursus ini.</td></tr>`;
+        }).join('') || `<tr><td colspan="6" class="py-8 text-center text-gray-500">Belum ada peserta terdaftar pada kursus ini.</td></tr>`;
       } else {
         const staffList = subTab === 'panitia' ? detail.panitiaList : detail.pelatihList;
         rowsHtml = staffList.map((stf, idx) => {
@@ -3502,12 +3718,12 @@
 
       return `
         <div id="print-area" class="bg-white rounded-2xl border border-scout-sand shadow-scout overflow-hidden">
-          <!-- Sub-Tab Absensi: Peserta, Panitia, Pelatih -->
+          <!-- Sub-Tab Absensi & Kelulusan: Peserta, Panitia, Pelatih -->
           <div class="p-5 border-b border-scout-sand/70 flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
             <div class="inline-flex flex-wrap p-1.5 rounded-2xl bg-scout-cream border border-scout-sand gap-1">
               <button type="button" onclick="uiState.adminAttendanceRoleTab = 'peserta'; renderAdminCourseDetailView(document.getElementById('main-content')); lucide.createIcons();"
                 class="px-4 py-2 rounded-xl text-xs font-extrabold transition ${subTab === 'peserta' ? 'bg-scout-dark text-white' : 'text-scout-brown hover:bg-white/70'}">
-                Absensi Peserta (${pesertaList.length})
+                Peserta & Kelulusan (${pesertaList.length})
               </button>
               <button type="button" onclick="uiState.adminAttendanceRoleTab = 'panitia'; renderAdminCourseDetailView(document.getElementById('main-content')); lucide.createIcons();"
                 class="px-4 py-2 rounded-xl text-xs font-extrabold transition ${subTab === 'panitia' ? 'bg-scout-dark text-white' : 'text-scout-brown hover:bg-white/70'}">
@@ -3520,6 +3736,20 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
+              ${subTab === 'peserta' && isCabangCourse ? `
+                <button type="button" onclick="openAddCabangParticipantModal('${course.id}')"
+                  class="px-3.5 py-2 rounded-xl bg-scout-cream hover:bg-scout-sand/60 text-scout-dark border border-scout-sand text-xs font-bold flex items-center gap-1.5">
+                  <i data-lucide="user-plus" class="w-3.5 h-3.5 text-scout-forest"></i>
+                  <span>+ Tambah Peserta Cabang</span>
+                </button>
+              ` : ''}
+              ${subTab === 'peserta' && pesertaList.length > 0 ? `
+                <button type="button" onclick="graduateAllCourseParticipants('${course.id}')"
+                  class="px-3.5 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-extrabold flex items-center gap-1.5 shadow-xs">
+                  <i data-lucide="award" class="w-3.5 h-3.5 text-scout-gold"></i>
+                  <span>Luluskan Semua &rarr; Data Potensi</span>
+                </button>
+              ` : ''}
               ${subTab !== 'peserta' ? `
                 <button type="button" onclick="openAddCourseStaffModal('${course.id}', '${subTab}')"
                   class="px-3.5 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-bold flex items-center gap-1.5">
@@ -3537,9 +3767,12 @@
 
           <div class="p-4 bg-scout-cream/40 border-b border-scout-sand/50">
             <h4 class="font-extrabold text-sm text-scout-dark uppercase">
-              Daftar Hadir ${subTab === 'peserta' ? 'Peserta Kursus' : (subTab === 'panitia' ? 'Panitia Pelaksana' : 'Tim Pelatih')} — ${escapeHtml(course.nama)}
+              ${subTab === 'peserta' ? 'Daftar Hadir & Kelulusan Peserta Kursus' : (subTab === 'panitia' ? 'Daftar Hadir Panitia Pelaksana' : 'Daftar Hadir Tim Pelatih')} — ${escapeHtml(course.nama)}
             </h4>
-            <p class="text-xs text-gray-500">Pelaksanaan: ${escapeHtml(course.hari || '')} (${escapeHtml(course.tanggal)}) • Lokasi: ${escapeHtml(course.lokasi)}</p>
+            <p class="text-xs text-gray-500">
+              Pelaksanaan: ${escapeHtml(course.hari || '')} (${escapeHtml(course.tanggal)}) • Lokasi: ${escapeHtml(course.lokasi)}
+              ${subTab === 'peserta' ? ' • Setiap peserta yang dinyatakan Lulus otomatis masuk ke database Data Potensi.' : ''}
+            </p>
           </div>
 
           <div class="overflow-x-auto">
@@ -3551,7 +3784,9 @@
                   <th class="py-3 px-4">${subTab === 'peserta' ? 'Pangkalan / Kwarran' : 'Jabatan / Tugas'}</th>
                   ${subTab === 'peserta' ? '<th class="py-3 px-4">Golongan</th>' : ''}
                   <th class="py-3 px-4">Status Kehadiran</th>
-                  ${subTab !== 'peserta' ? '<th class="py-3 px-4 text-right no-print">Aksi</th>' : ''}
+                  ${subTab === 'peserta'
+                    ? '<th class="py-3 px-4">Kelulusan &rarr; Data Potensi</th>'
+                    : '<th class="py-3 px-4 text-right no-print">Aksi</th>'}
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 text-xs">
@@ -3561,6 +3796,162 @@
           </div>
         </div>
       `;
+    }
+
+    function setCourseParticipantGraduation(courseId, participantId, statusKelulusan) {
+      if (guardPelatihWriteAction()) return;
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      detail.graduationStatus[participantId] = statusKelulusan;
+
+      if (course.sourceType === 'kwarran' && course.sourceCourseId) {
+        const kp = appData.kwarranParticipants.find(p => p.id === participantId);
+        if (kp) kp.statusKelulusan = statusKelulusan;
+      } else {
+        const mp = detail.manualParticipants.find(p => p.id === participantId);
+        if (mp) mp.statusKelulusan = statusKelulusan;
+      }
+
+      saveAppData();
+      renderAdminCourseDetailView(document.getElementById('main-content'));
+      lucide.createIcons();
+
+      if (statusKelulusan === 'Lulus') {
+        showToast('Peserta dinyatakan LULUS dan otomatis masuk ke Data Potensi!', 'success');
+      } else {
+        showToast('Status kelulusan peserta diperbarui menjadi Belum Lulus.', 'info');
+      }
+    }
+
+    function graduateAllCourseParticipants(courseId) {
+      if (guardPelatihWriteAction()) return;
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      const pesertaList = getCourseParticipantsForAdmin(course);
+
+      pesertaList.forEach(p => {
+        detail.graduationStatus[p.id] = 'Lulus';
+        if (course.sourceType === 'kwarran' && course.sourceCourseId) {
+          const kp = appData.kwarranParticipants.find(item => item.id === p.id);
+          if (kp) kp.statusKelulusan = 'Lulus';
+        } else {
+          const mp = detail.manualParticipants.find(item => item.id === p.id);
+          if (mp) mp.statusKelulusan = 'Lulus';
+        }
+      });
+
+      saveAppData();
+      renderAdminCourseDetailView(document.getElementById('main-content'));
+      lucide.createIcons();
+      showToast(`Seluruh (${pesertaList.length}) peserta dinyatakan LULUS & otomatis masuk ke Data Potensi!`, 'success');
+    }
+
+    function openAddCabangParticipantModal(courseId) {
+      if (guardPelatihWriteAction()) return;
+      openFormModal(
+        'Tambah Peserta Kursus Cabang (Kwarcab)',
+        `
+          <form onsubmit="saveCabangParticipantModal(event, '${courseId}')" class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nama Lengkap & Gelar <span class="text-red-600">*</span></label>
+              <input type="text" id="cb-p-nama" required placeholder="Contoh: Kak Budi Santoso, S.Pd."
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tempat Lahir <span class="text-red-600">*</span></label>
+                <input type="text" id="cb-p-tempat" required placeholder="Contoh: Tangerang"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Lahir <span class="text-red-600">*</span></label>
+                <input type="date" id="cb-p-tgl" required value="1994-05-15"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Jenis Kelamin</label>
+                <select id="cb-p-gender" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
+                  <option value="Putra">Putra</option>
+                  <option value="Putri">Putri</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Golongan</label>
+                <select id="cb-p-golongan" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
+                  ${GOLONGAN_OPTIONS.map(g => `<option value="${g}">${g}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Asal Kwarran</label>
+                <select id="cb-p-kwarran" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
+                  ${KWARRAN_LIST.map(kw => `<option value="${kw}">${kw}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nama Pangkalan / Gugus Depan <span class="text-red-600">*</span></label>
+              <input type="text" id="cb-p-pangkalan" required placeholder="Contoh: SDN Tigaraksa 01"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+            </div>
+
+            <div class="pt-3 flex justify-end gap-2 border-t border-gray-100">
+              <button type="button" onclick="closeFormModal()" class="px-4 py-2 rounded-xl bg-gray-100 text-xs font-bold text-gray-700">Batal</button>
+              <button type="submit" class="px-5 py-2 rounded-xl bg-scout-forest text-white text-xs font-bold">Simpan Peserta</button>
+            </div>
+          </form>
+        `
+      );
+    }
+
+    function saveCabangParticipantModal(e, courseId) {
+      e.preventDefault();
+      if (guardPelatihWriteAction()) return;
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      const isCourseDone = course.status === 'Selesai';
+      const newParticipant = {
+        id: generateId('mp'),
+        nama: document.getElementById('cb-p-nama').value.trim(),
+        tempatLahir: document.getElementById('cb-p-tempat').value.trim(),
+        tanggalLahir: document.getElementById('cb-p-tgl').value,
+        gender: document.getElementById('cb-p-gender').value,
+        golongan: document.getElementById('cb-p-golongan').value,
+        kwarran: document.getElementById('cb-p-kwarran').value,
+        pangkalan: document.getElementById('cb-p-pangkalan').value.trim(),
+        statusKelulusan: isCourseDone ? 'Lulus' : 'Belum Lulus',
+        source: 'cabang'
+      };
+      detail.manualParticipants.push(newParticipant);
+      if (isCourseDone) {
+        detail.graduationStatus[newParticipant.id] = 'Lulus';
+      }
+      course.terdaftar = Math.max(course.terdaftar, detail.manualParticipants.length);
+      saveAppData();
+      closeFormModal();
+      renderAdminCourseDetailView(document.getElementById('main-content'));
+      lucide.createIcons();
+      showToast('Peserta kursus cabang berhasil ditambahkan.', 'success');
+    }
+
+    function deleteCabangCourseParticipant(courseId, participantId) {
+      if (guardPelatihWriteAction()) return;
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      detail.manualParticipants = detail.manualParticipants.filter(p => p.id !== participantId);
+      delete detail.graduationStatus[participantId];
+      saveAppData();
+      renderAdminCourseDetailView(document.getElementById('main-content'));
+      lucide.createIcons();
+      showToast('Peserta dihapus dari daftar kursus.', 'info');
     }
 
     function getAttendanceBtnActiveClass(status) {
@@ -3844,6 +4235,27 @@
     }
 
     // --- TAB 5: PUSAT CETAK DOKUMEN RESMI KURSUS (PAKTA INTEGRITAS, SKL, IJAZAH, SHB) ---
+    function handleOfficialDocPrint(courseId) {
+      const docType = uiState.adminPrintDocType || 'pakta';
+      const targetId = uiState.adminPrintTargetId;
+      if ((docType === 'skl' || docType === 'ijazah') && targetId && targetId !== 'placeholder') {
+        const course = appData.kursus.find(c => c.id === courseId);
+        if (course) {
+          const detail = ensureCourseDetailRecord(course);
+          detail.graduationStatus[targetId] = 'Lulus';
+          if (course.sourceType === 'kwarran' && course.sourceCourseId) {
+            const kp = appData.kwarranParticipants.find(p => p.id === targetId);
+            if (kp) kp.statusKelulusan = 'Lulus';
+          } else {
+            const mp = detail.manualParticipants.find(p => p.id === targetId);
+            if (mp) mp.statusKelulusan = 'Lulus';
+          }
+          saveAppData();
+        }
+      }
+      window.print();
+    }
+
     function renderAdminCourseTabCetakResmi(course, detail, pesertaList) {
       const docType = uiState.adminPrintDocType || 'pakta';
       const targetRole = uiState.adminPrintTargetRole || 'Peserta';
@@ -4186,7 +4598,7 @@
               </div>
             ` : ''}
 
-            <button type="button" onclick="window.print()"
+            <button type="button" onclick="handleOfficialDocPrint('${course.id}')"
               class="w-full py-3 px-4 rounded-xl bg-scout-dark hover:bg-scout-brown text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition">
               <i data-lucide="printer" class="w-4 h-4 text-scout-gold"></i>
               <span>Cetak / Print PDF Sekarang</span>
@@ -4482,6 +4894,7 @@
     // 12. VIEW: LAPORAN (EKSPOR CSV & CETAK KOP RESMI PUSDIKLATCAB)
     // =========================================================================
     function renderLaporanView(container) {
+      syncGraduatedParticipantsToPotensi(appData);
       const scope = getActiveKwarranScope();
       const isKwarran = scope.isKwarran;
       const myKwarran = scope.kwarranName;
@@ -4618,6 +5031,7 @@
                   <th class="border border-gray-300 py-2 px-3">Tempat, Tgl Lahir</th>
                   <th class="border border-gray-300 py-2 px-3">Golongan</th>
                   <th class="border border-gray-300 py-2 px-3">Nama Pangkalan</th>
+                  <th class="border border-gray-300 py-2 px-3">Status Kelulusan</th>
                 </tr>
               </thead>
               <tbody>
@@ -4628,8 +5042,9 @@
                     <td class="border border-gray-300 py-2 px-3">${escapeHtml(pt.tempatLahir)}, ${formatDateIndo(pt.tanggalLahir)}</td>
                     <td class="border border-gray-300 py-2 px-3">${escapeHtml(pt.golongan)}</td>
                     <td class="border border-gray-300 py-2 px-3">${escapeHtml(pt.namaPangkalan)}</td>
+                    <td class="border border-gray-300 py-2 px-3 font-bold">${escapeHtml(pt.statusKelulusan || 'Belum Lulus')}</td>
                   </tr>
-                `).join('') || '<tr><td colspan="5" class="py-4 text-center text-gray-500">Belum ada peserta terdaftar pada Kwarran ini.</td></tr>'}
+                `).join('') || '<tr><td colspan="6" class="py-4 text-center text-gray-500">Belum ada peserta terdaftar pada Kwarran ini.</td></tr>'}
               </tbody>
             </table>
           ` : ''}
@@ -4802,7 +5217,7 @@
       } else if (uiState.laporanType === 'kursus') {
         if (isKwarran) {
           filename = `Laporan_Kursus_Peserta_Kwarran_${scope.kwarranName}.csv`;
-          csvRows.push(['No', 'Kwarran', 'Nama Kursus', 'Nama Peserta + Gelar', 'Tempat Lahir', 'Tanggal Lahir', 'Golongan', 'Nama Pangkalan']);
+          csvRows.push(['No', 'Kwarran', 'Nama Kursus', 'Nama Peserta + Gelar', 'Tempat Lahir', 'Tanggal Lahir', 'Golongan', 'Nama Pangkalan', 'Status Kelulusan']);
           const coursesMap = Object.fromEntries(getScopedKwarranCourses().map(c => [c.id, c]));
           getScopedKwarranParticipants().forEach((pt, idx) => {
             const crs = coursesMap[pt.courseId];
@@ -4814,7 +5229,8 @@
               `"${pt.tempatLahir}"`,
               pt.tanggalLahir,
               pt.golongan,
-              `"${pt.namaPangkalan}"`
+              `"${pt.namaPangkalan}"`,
+              pt.statusKelulusan || 'Belum Lulus'
             ]);
           });
         } else {
@@ -4986,7 +5402,7 @@
               <select id="usr-role" onchange="handleUserRoleSelectChange(this.value)"
                 class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white focus:ring-2 focus:ring-scout-forest focus:outline-none">
                 <option value="Admin" ${initialRole === 'Admin' ? 'selected' : ''}>Admin (Akses Penuh)</option>
-                <option value="Pelatih" ${initialRole === 'Pelatih' ? 'selected' : ''}>Pelatih</option>
+                <option value="Pelatih" ${initialRole === 'Pelatih' ? 'selected' : ''}>Pelatih (Hanya Lihat & Unduh)</option>
                 <option value="Panitia" ${initialRole === 'Panitia' ? 'selected' : ''}>Panitia</option>
                 <option value="Kwarran" ${initialRole === 'Kwarran' ? 'selected' : ''}>Kwarran (Kwartir Ranting)</option>
               </select>
@@ -5090,7 +5506,7 @@
     // =========================================================================
     // 14. ATURAN KHUSUS ROLE KWARRAN: MANAJEMEN KURSUS
     //     - Sub-Menu 1: Daftar Kursus (Auto-sync ke Admin & Auto-redirect ke Input Data Peserta)
-    //     - Sub-Menu 2: Input Data Peserta (Edit & Hapus dengan konfirmasi + Auto-sync ke Admin)
+    //     - Sub-Menu 2: Input Data Peserta (Edit & Hapus dengan konfirmasi + Auto-sync ke Admin & Data Potensi)
     // =========================================================================
     function renderKwarranDaftarKursusView(container) {
       const scope = getActiveKwarranScope();
@@ -5174,7 +5590,9 @@
             </div>
 
             ${myCourses.map(course => {
-              const pesertaCount = getScopedKwarranParticipants(course.id).length;
+              const pesertaList = getScopedKwarranParticipants(course.id);
+              const pesertaCount = pesertaList.length;
+              const lulusCount = pesertaList.filter(p => p.statusKelulusan === 'Lulus').length;
               return `
                 <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout hover:border-scout-khaki transition">
                   <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -5186,6 +5604,11 @@
                         <span class="px-2.5 py-0.5 rounded-md bg-scout-forest/15 text-scout-forest text-[11px] font-bold">
                           ${pesertaCount} Peserta Terdaftar
                         </span>
+                        ${lulusCount > 0 ? `
+                          <span class="px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-900 text-[11px] font-extrabold">
+                            ${lulusCount} Lulus &rarr; Data Potensi
+                          </span>
+                        ` : ''}
                       </div>
                       <h4 class="text-base font-extrabold text-scout-dark">
                         ${escapeHtml(course.namaKursus || `Kursus Kepramukaan Kwarran ${course.kwarran}`)}
@@ -5493,7 +5916,7 @@
             <div class="p-5 border-b border-scout-sand/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h4 class="text-base font-extrabold text-scout-dark">Daftar Peserta Kursus (${courseParticipants.length})</h4>
-                <p class="text-xs text-gray-500">Data peserta tersimpan & otomatis tersinkronisasi ke Pusdiklatcab</p>
+                <p class="text-xs text-gray-500">Peserta yang dinyatakan Lulus otomatis masuk ke Data Potensi</p>
               </div>
               <div class="relative w-full sm:w-60">
                 <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-2.5"></i>
@@ -5513,37 +5936,52 @@
                     <th class="py-3 px-3.5">Tempat, Tgl Lahir</th>
                     <th class="py-3 px-3.5">Golongan</th>
                     <th class="py-3 px-3.5">Nama Pangkalan</th>
+                    <th class="py-3 px-3.5">Kelulusan</th>
                     <th class="py-3 px-3.5 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 text-xs">
-                  ${courseParticipants.map((p, idx) => `
-                    <tr class="hover:bg-scout-cream/40 transition ${uiState.kwarranEditingParticipantId === p.id ? 'bg-amber-50/80' : ''}">
-                      <td class="py-3 px-3.5 font-semibold text-gray-500">${idx + 1}</td>
-                      <td class="py-3 px-3.5 font-bold text-scout-dark">${escapeHtml(p.namaGelar)}</td>
-                      <td class="py-3 px-3.5 text-gray-600 whitespace-nowrap">
-                        ${escapeHtml(p.tempatLahir)}, ${formatDateIndo(p.tanggalLahir)}
-                      </td>
-                      <td class="py-3 px-3.5 whitespace-nowrap">${renderGolonganBadge(p.golongan)}</td>
-                      <td class="py-3 px-3.5 font-medium text-scout-brown">${escapeHtml(p.namaPangkalan)}</td>
-                      <td class="py-3 px-3.5 text-right whitespace-nowrap">
-                        <button type="button" onclick="editKwarranParticipant('${p.id}')"
-                          class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[11px] inline-flex items-center gap-1 mr-1 transition"
-                          title="Edit Peserta">
-                          <i data-lucide="pencil" class="w-3 h-3"></i>
-                          <span>Edit</span>
-                        </button>
-                        <button type="button" onclick="deleteKwarranParticipant('${p.id}')"
-                          class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-[11px] inline-flex items-center gap-1 transition"
-                          title="Hapus Peserta">
-                          <i data-lucide="trash-2" class="w-3 h-3"></i>
-                          <span>Hapus</span>
-                        </button>
-                      </td>
-                    </tr>
-                  `).join('') || `
+                  ${courseParticipants.map((p, idx) => {
+                    const isLulus = p.statusKelulusan === 'Lulus';
+                    return `
+                      <tr class="hover:bg-scout-cream/40 transition ${uiState.kwarranEditingParticipantId === p.id ? 'bg-amber-50/80' : ''}">
+                        <td class="py-3 px-3.5 font-semibold text-gray-500">${idx + 1}</td>
+                        <td class="py-3 px-3.5 font-bold text-scout-dark">${escapeHtml(p.namaGelar)}</td>
+                        <td class="py-3 px-3.5 text-gray-600 whitespace-nowrap">
+                          ${escapeHtml(p.tempatLahir)}, ${formatDateIndo(p.tanggalLahir)}
+                        </td>
+                        <td class="py-3 px-3.5 whitespace-nowrap">${renderGolonganBadge(p.golongan)}</td>
+                        <td class="py-3 px-3.5 font-medium text-scout-brown">${escapeHtml(p.namaPangkalan)}</td>
+                        <td class="py-3 px-3.5 whitespace-nowrap">
+                          <button type="button" onclick="toggleKwarranParticipantGraduation('${p.id}')"
+                            class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold border transition ${
+                              isLulus
+                                ? 'bg-scout-forest text-white border-scout-forest'
+                                : 'bg-gray-100 hover:bg-emerald-50 text-gray-700 border-gray-300'
+                            }"
+                            title="Klik untuk menetapkan kelulusan & otomatis sinkron ke Data Potensi">
+                            ${isLulus ? 'Lulus (Di Potensi)' : 'Belum Lulus'}
+                          </button>
+                        </td>
+                        <td class="py-3 px-3.5 text-right whitespace-nowrap">
+                          <button type="button" onclick="editKwarranParticipant('${p.id}')"
+                            class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[11px] inline-flex items-center gap-1 mr-1 transition"
+                            title="Edit Peserta">
+                            <i data-lucide="pencil" class="w-3 h-3"></i>
+                            <span>Edit</span>
+                          </button>
+                          <button type="button" onclick="deleteKwarranParticipant('${p.id}')"
+                            class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-[11px] inline-flex items-center gap-1 transition"
+                            title="Hapus Peserta">
+                            <i data-lucide="trash-2" class="w-3 h-3"></i>
+                            <span>Hapus</span>
+                          </button>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('') || `
                     <tr>
-                      <td colspan="6" class="py-10 text-center text-gray-500">
+                      <td colspan="7" class="py-10 text-center text-gray-500">
                         Belum ada peserta yang diinput untuk kursus ini. Silakan isi form di samping.
                       </td>
                     </tr>
@@ -5556,6 +5994,28 @@
       `;
     }
 
+    function toggleKwarranParticipantGraduation(participantId) {
+      const target = getScopedKwarranParticipants().find(p => p.id === participantId);
+      if (!target) return;
+      const nextStatus = target.statusKelulusan === 'Lulus' ? 'Belum Lulus' : 'Lulus';
+      target.statusKelulusan = nextStatus;
+
+      const linkedAdminCourse = appData.kursus.find(k => k.sourceCourseId === target.courseId);
+      if (linkedAdminCourse) {
+        const det = ensureCourseDetailRecord(linkedAdminCourse);
+        det.graduationStatus[participantId] = nextStatus;
+      }
+
+      saveAppData();
+      renderKwarranInputPesertaView(document.getElementById('main-content'));
+      lucide.createIcons();
+      if (nextStatus === 'Lulus') {
+        showToast(`"${target.namaGelar}" dinyatakan LULUS & otomatis masuk ke Data Potensi!`, 'success');
+      } else {
+        showToast(`Status kelulusan "${target.namaGelar}" diubah menjadi Belum Lulus.`, 'info');
+      }
+    }
+
     function saveKwarranParticipant(e) {
       e.preventDefault();
       const scope = getActiveKwarranScope();
@@ -5566,6 +6026,10 @@
         return;
       }
 
+      const prev = uiState.kwarranEditingParticipantId
+        ? appData.kwarranParticipants.find(p => p.id === uiState.kwarranEditingParticipantId)
+        : null;
+
       const payload = {
         id: uiState.kwarranEditingParticipantId || generateId('kp'),
         courseId: ownedCourse.id,
@@ -5575,7 +6039,9 @@
         tempatLahir: document.getElementById('kp-tempat-lahir').value.trim(),
         tanggalLahir: document.getElementById('kp-tanggal-lahir').value,
         golongan: document.getElementById('kp-golongan').value,
-        namaPangkalan: document.getElementById('kp-pangkalan').value.trim()
+        namaPangkalan: document.getElementById('kp-pangkalan').value.trim(),
+        gender: prev ? (prev.gender || 'Putra') : 'Putra',
+        statusKelulusan: prev ? (prev.statusKelulusan || 'Belum Lulus') : 'Belum Lulus'
       };
 
       if (uiState.kwarranEditingParticipantId) {
@@ -5678,6 +6144,7 @@
     // =========================================================================
     window.addEventListener('DOMContentLoaded', () => {
       syncKwarranCoursesToAdmin(appData);
+      syncGraduatedParticipantsToPotensi(appData);
       renderBrandLogos();
       restorePersistedSession();
       lucide.createIcons();
