@@ -1492,6 +1492,9 @@
       const totalPotensi = filteredPotensi.length;
       const totalPutra = filteredPotensi.filter(p => p.gender === 'Putra').length;
       const totalPutri = filteredPotensi.filter(p => p.gender === 'Putri').length;
+      const totalKmd = filteredPotensi.filter(p => p.jenjang === 'KMD').length;
+      const totalKml = filteredPotensi.filter(p => p.jenjang === 'KML').length;
+      const totalKmdKml = totalKmd + totalKml;
       const totalKpdKpl = filteredPotensi.filter(p => p.jenjang === 'KPD' || p.jenjang === 'KPL').length;
 
       const kursusAktif = appData.kursus.filter(k => k.status !== 'Selesai').length;
@@ -1608,19 +1611,19 @@
           <div class="bg-white rounded-2xl p-5 border border-scout-sand/80 shadow-scout flex items-start justify-between">
             <div>
               <p class="text-[11px] font-extrabold uppercase tracking-wider text-scout-medium">
-                ${isKwarran ? 'Peserta Kursus Kwarran' : 'Arsip Persuratan'}
+                ${isKwarran ? 'Peserta Kursus Kwarran' : 'Pembina (KMD/KML)'}
               </p>
               <h4 class="text-2xl sm:text-3xl font-extrabold text-scout-dark mt-1.5">
-                ${isKwarran ? myKwarranParticipants.length : (appData.suratMasuk.length + appData.suratKeluar.length)}
+                ${isKwarran ? myKwarranParticipants.length : totalKmdKml}
               </h4>
               <p class="text-[11px] text-gray-500 mt-2 font-medium">
                 ${isKwarran
                   ? `Tersebar di ${myKwarranCourses.length} jadwal pelatihan`
-                  : `Masuk: ${appData.suratMasuk.length} • Keluar: ${appData.suratKeluar.length}`}
+                  : `KMD: ${totalKmd} • KML: ${totalKml}`}
               </p>
             </div>
             <div class="w-11 h-11 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center shrink-0">
-              <i data-lucide="${isKwarran ? 'user-check' : 'mail'}" class="w-5 h-5"></i>
+              <i data-lucide="user-check" class="w-5 h-5"></i>
             </div>
           </div>
 
