@@ -409,6 +409,19 @@
     const GOLONGAN_OPTIONS = ['Siaga', 'Penggalang', 'Penegak', 'Pandega'];
     const KUALIFIKASI_OPTIONS = ['Sangat Memuaskan', 'Memuaskan', 'Baik', 'Cukup'];
 
+    // Utilitas pengecekan hak akses read-only untuk role Pelatih
+    function isPelatihReadOnly() {
+      return !!(currentUser && currentUser.role === 'Pelatih');
+    }
+
+    function guardPelatihWriteAction() {
+      if (isPelatihReadOnly()) {
+        showToast('Mode Pelatih (Hanya Lihat & Unduh): Anda tidak memiliki izin menambah, mengubah, atau menghapus data.', 'info');
+        return true;
+      }
+      return false;
+    }
+
     // Utilitas normalisasi & resolusi identitas Kwarran secara deterministik
     function normalizeKwarranName(rawValue) {
       if (!rawValue || typeof rawValue !== 'string') return '';
@@ -1003,12 +1016,12 @@
       document.getElementById('sidebar-user-avatar').textContent = (currentUser.nama || 'U').charAt(0).toUpperCase();
       document.getElementById('sidebar-user-role').textContent = currentUser.role === 'Kwarran'
         ? `Kwarran (${currentUser.kwarranName})`
-        : currentUser.role;
+        : (currentUser.role === 'Pelatih' ? 'Pelatih (Lihat & Unduh)' : currentUser.role);
 
       document.getElementById('header-user-name').textContent = currentUser.nama;
       document.getElementById('header-user-role').textContent = currentUser.role === 'Kwarran'
         ? `Role: Kwarran ${currentUser.kwarranName}`
-        : `Role: ${currentUser.role}`;
+        : (currentUser.role === 'Pelatih' ? 'Role: Pelatih (Hanya Lihat & Unduh)' : `Role: ${currentUser.role}`);
 
       document.getElementById('login-view').classList.add('hidden');
       document.getElementById('app-shell').classList.remove('hidden');
@@ -1178,6 +1191,10 @@
         syncKwarranCoursesToAdmin(appData);
         uiState.selectedAdminCourseId = null;
       }
+      if (routeId === 'kursus-detail' && isPelatihReadOnly()) {
+        guardPelatihWriteAction();
+        routeId = 'kursus';
+      }
       activeRoute = routeId;
       toggleMobileSidebar(false);
       destroyActiveCharts();
@@ -1187,13 +1204,16 @@
       const titleEl = document.getElementById('page-title');
       const subEl = document.getElementById('page-subtitle');
       const scope = getActiveKwarranScope();
+      const readOnly = isPelatihReadOnly();
 
       const metaMap = {
         'dashboard': {
           title: 'Dashboard Utama',
           subtitle: scope.isKwarran
             ? `Ringkasan statistik & penyelenggaraan kursus Kwartir Ranting ${scope.kwarranName}`
-            : 'Ringkasan statistik potensi pembina, kegiatan kursus, dan administrasi Pusdiklatcab Tangerang'
+            : (readOnly
+              ? 'Ringkasan statistik potensi pembina & jadwal kursus (Mode Lihat & Unduh Laporan)'
+              : 'Ringkasan statistik potensi pembina, kegiatan kursus, dan administrasi Pusdiklatcab Tangerang')
         },
         'profile': {
           title: 'Profile Pusdiklatcab',
@@ -1203,11 +1223,15 @@
           title: 'Data Potensi Pembina',
           subtitle: scope.isKwarran
             ? `Data potensi pembina pramuka wilayah Kwartir Ranting ${scope.kwarranName}`
-            : 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang'
+            : (readOnly
+              ? 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang (Hanya Lihat — Unduh via Menu Laporan)'
+              : 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang')
         },
         'kursus': {
           title: 'Manajemen Kursus & Pelatihan',
-          subtitle: 'Jadwal kegiatan KMD, KML, KPD, KPL Cabang maupun Usulan Kwartir Ranting'
+          subtitle: readOnly
+            ? 'Informasi jadwal kegiatan KMD, KML, KPD, KPL Cabang & Usulan Kwarran (Mode Lihat)'
+            : 'Jadwal kegiatan KMD, KML, KPD, KPL Cabang maupun Usulan Kwartir Ranting'
         },
         'kursus-detail': {
           title: 'Detail Manajemen Kursus',
@@ -1344,10 +1368,17 @@
               </p>
               <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(item.pangkalan || '-')}</p>
             </div>
-            <button type="button" onclick="closeFormModal()"
-              class="px-5 py-2 rounded-xl bg-scout-dark text-white text-xs font-bold">
-              Tutup Pratinjau
-            </button>
+            <div class="flex items-center justify-center gap-2">
+              <a href="${item.fotoUrl}" download="Foto_${escapeHtml(item.nama.replace(/[^a-zA-Z0-9]/g, '_'))}.jpg"
+                class="px-4 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-bold inline-flex items-center gap-1.5">
+                <i data-lucide="download" class="w-3.5 h-3.5 text-scout-gold"></i>
+                <span>Unduh Foto</span>
+              </a>
+              <button type="button" onclick="closeFormModal()"
+                class="px-5 py-2 rounded-xl bg-scout-dark text-white text-xs font-bold">
+                Tutup Pratinjau
+              </button>
+            </div>
           </div>
         `
       );
@@ -1431,6 +1462,7 @@
     }
 
     function openConfirmModal(title, message, onConfirm) {
+      if (guardPelatihWriteAction()) return;
       document.getElementById('confirm-title').textContent = title;
       document.getElementById('confirm-message').textContent = message;
       const modal = document.getElementById('confirm-modal');
@@ -1486,6 +1518,7 @@
       const scope = getActiveKwarranScope();
       const isKwarran = scope.isKwarran;
       const myKwarran = scope.kwarranName;
+      const readOnly = isPelatihReadOnly();
 
       const filteredPotensi = getScopedPotensiList();
 
@@ -1540,7 +1573,9 @@
             <p class="text-xs sm:text-sm text-scout-sand/90 mt-1.5 max-w-2xl leading-relaxed">
               ${isKwarran
                 ? `Panel kendali <strong>Kwartir Ranting ${escapeHtml(myKwarran)}</strong>. Kelola penyelenggaraan kursus tingkat ranting, data potensi pembina, dan input data peserta secara terisolasi.`
-                : 'Sistem informasi terpadu pengelolaan data potensi pembina, jadwal kursus pendidikan & pelatihan, serta administrasi persuratan Pusdiklatcab Tangerang.'}
+                : (readOnly
+                  ? 'Akses Korps Pelatih Pusdiklatcab Tangerang: pantau statistik data potensi pembina, jadwal kursus, serta unduh/cetak laporan resmi.'
+                  : 'Sistem informasi terpadu pengelolaan data potensi pembina, jadwal kursus pendidikan & pelatihan, serta administrasi persuratan Pusdiklatcab Tangerang.')}
             </p>
           </div>
 
@@ -1560,7 +1595,7 @@
               <button type="button" onclick="navigateTo('data-potensi')"
                 class="px-4 py-2.5 rounded-xl bg-scout-gold hover:bg-amber-400 text-scout-dark font-extrabold text-xs flex items-center gap-2 shadow-sm transition">
                 <i data-lucide="users" class="w-4 h-4"></i>
-                <span>Kelola Data Potensi</span>
+                <span>${readOnly ? 'Lihat Data Potensi' : 'Kelola Data Potensi'}</span>
               </button>
               <button type="button" onclick="navigateTo('laporan')"
                 class="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-bold text-xs flex items-center gap-2 transition">
@@ -1754,7 +1789,7 @@
                 </button>
               ` : `
                 <button type="button" onclick="navigateTo('kursus')" class="text-xs font-bold text-scout-forest hover:underline">
-                  Kelola Detail &rarr;
+                  ${readOnly ? 'Lihat Kursus' : 'Kelola Detail'} &rarr;
                 </button>
               `}
             </div>
@@ -1890,6 +1925,10 @@
     // 8. VIEW: PROFILE PUSDIKLATCAB (ADMIN: EDIT KAPUSDIKLATCAB & UPLOAD LOGO)
     // =========================================================================
     function renderProfileView(container) {
+      if (isPelatihReadOnly()) {
+        navigateTo('dashboard');
+        return;
+      }
       const p = appData.profile;
       container.innerHTML = `
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -2005,6 +2044,7 @@
     }
 
     function handleLogoUpload(event) {
+      if (guardPelatihWriteAction()) return;
       const file = event.target.files[0];
       if (!file) return;
       if (file.size > 1.8 * 1024 * 1024) {
@@ -2024,6 +2064,7 @@
     }
 
     function resetProfileLogo() {
+      if (guardPelatihWriteAction()) return;
       appData.profile.logoUrl = '';
       saveAppData();
       renderBrandLogos();
@@ -2034,6 +2075,7 @@
 
     function saveProfileForm(e) {
       e.preventDefault();
+      if (guardPelatihWriteAction()) return;
       appData.profile.namaKapus = document.getElementById('prof-nama-kapus').value.trim();
       appData.profile.ntaKapus = document.getElementById('prof-nta').value.trim();
       appData.profile.masaBakti = document.getElementById('prof-masa-bakti').value.trim();
@@ -2046,7 +2088,7 @@
     }
 
     // =========================================================================
-    // 9. VIEW: DATA POTENSI (DENGAN FITUR FOTO & TAHUN LULUS + 100% LOGIKA TERJAGA)
+    // 9. VIEW: DATA POTENSI (DENGAN FITUR FOTO & TAHUN LULUS + READ-ONLY PELATIH)
     // =========================================================================
     function formatTahunLulusDisplay(item) {
       if (!item || item.jenjang === 'Belum Kursus') return '-';
@@ -2058,6 +2100,7 @@
       const scope = getActiveKwarranScope();
       const isKwarran = scope.isKwarran;
       const lockedKwarran = isKwarran ? scope.kwarranName : null;
+      const readOnly = isPelatihReadOnly();
 
       const scopeBase = getScopedPotensiList();
       let list = scopeBase.filter(item => {
@@ -2101,7 +2144,7 @@
         </div>
 
         <div class="bg-white rounded-2xl border border-scout-sand shadow-scout overflow-hidden">
-          <!-- Toolbar Search, Filter & Tombol Tambah -->
+          <!-- Toolbar Search, Filter & Tombol Tambah/Unduh -->
           <div class="p-5 border-b border-scout-sand/70 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 flex-1">
               <div class="relative sm:col-span-2 lg:col-span-1">
@@ -2139,11 +2182,19 @@
               `}
             </div>
 
-            <button type="button" onclick="openPotensiModal()"
-              class="px-4 py-2.5 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm shrink-0 transition">
-              <i data-lucide="plus-circle" class="w-4 h-4 text-scout-gold"></i>
-              <span>Tambah Data Potensi</span>
-            </button>
+            ${readOnly ? `
+              <button type="button" onclick="uiState.laporanType = 'potensi'; navigateTo('laporan');"
+                class="px-4 py-2.5 rounded-xl bg-scout-dark hover:bg-scout-brown text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm shrink-0 transition">
+                <i data-lucide="download" class="w-4 h-4 text-scout-gold"></i>
+                <span>Unduh / Cetak Data Potensi</span>
+              </button>
+            ` : `
+              <button type="button" onclick="openPotensiModal()"
+                class="px-4 py-2.5 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm shrink-0 transition">
+                <i data-lucide="plus-circle" class="w-4 h-4 text-scout-gold"></i>
+                <span>Tambah Data Potensi</span>
+              </button>
+            `}
           </div>
 
           <!-- Tabel Data Potensi (Dengan Kolom Foto & Tahun Lulus) -->
@@ -2159,7 +2210,7 @@
                   <th class="py-3.5 px-4">Jenis Kelamin</th>
                   <th class="py-3.5 px-4">Asal Kwarran</th>
                   <th class="py-3.5 px-4">Pangkalan / Gugus Depan</th>
-                  <th class="py-3.5 px-4 text-right">Aksi</th>
+                  ${!readOnly ? '<th class="py-3.5 px-4 text-right">Aksi</th>' : ''}
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 text-xs">
@@ -2188,21 +2239,23 @@
                       </td>
                       <td class="py-3.5 px-4 font-semibold text-scout-brown">Kwarran ${escapeHtml(item.kwarran)}</td>
                       <td class="py-3.5 px-4 text-gray-600">${escapeHtml(item.pangkalan || '-')}</td>
-                      <td class="py-3.5 px-4 text-right whitespace-nowrap">
-                        <button type="button" onclick="openPotensiModal('${item.id}')"
-                          class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 mr-1 transition" title="Edit">
-                          <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                        </button>
-                        <button type="button" onclick="deletePotensi('${item.id}')"
-                          class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition" title="Hapus">
-                          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                        </button>
-                      </td>
+                      ${!readOnly ? `
+                        <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                          <button type="button" onclick="openPotensiModal('${item.id}')"
+                            class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 mr-1 transition" title="Edit">
+                            <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                          </button>
+                          <button type="button" onclick="deletePotensi('${item.id}')"
+                            class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition" title="Hapus">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                          </button>
+                        </td>
+                      ` : ''}
                     </tr>
                   `;
                 }).join('') || `
                   <tr>
-                    <td colspan="9" class="py-10 text-center text-gray-500">
+                    <td colspan="${readOnly ? 8 : 9}" class="py-10 text-center text-gray-500">
                       Tidak ditemukan data potensi pembina yang sesuai filter.
                     </td>
                   </tr>
@@ -2255,6 +2308,7 @@
     }
 
     function openPotensiModal(id = null) {
+      if (guardPelatihWriteAction()) return;
       const existing = id ? appData.potensi.find(p => p.id === id) : null;
       const lockedKwarran = currentUser.role === 'Kwarran' ? getActiveKwarranName() : null;
       uiState.potensiDraftPhoto = existing ? (existing.fotoUrl || '') : '';
@@ -2371,6 +2425,7 @@
     }
 
     function handlePotensiPhotoUpload(event) {
+      if (guardPelatihWriteAction()) return;
       const file = event.target.files[0];
       if (!file) return;
       if (!file.type.startsWith('image/')) {
@@ -2422,6 +2477,7 @@
     }
 
     function removePotensiDraftPhoto() {
+      if (guardPelatihWriteAction()) return;
       uiState.potensiDraftPhoto = '';
       const previewEl = document.getElementById('pot-photo-preview');
       const removeBtn = document.getElementById('pot-remove-photo-btn');
@@ -2436,6 +2492,7 @@
 
     function savePotensiForm(e, id) {
       e.preventDefault();
+      if (guardPelatihWriteAction()) return;
       const scope = getActiveKwarranScope();
       const resolvedKwarran = scope.isKwarran
         ? scope.kwarranName
@@ -2479,6 +2536,7 @@
     }
 
     function deletePotensi(id) {
+      if (guardPelatihWriteAction()) return;
       const scope = getActiveKwarranScope();
       const target = appData.potensi.find(p => p.id === id);
       if (!target) return;
@@ -2500,11 +2558,12 @@
     }
 
     // =========================================================================
-    // 10. VIEW: KURSUS (ADMIN, PELATIH, PANITIA) + SINKRONISASI KWARRAN
+    // 10. VIEW: KURSUS (ADMIN, PELATIH [READ-ONLY], PANITIA) + SINKRONISASI KWARRAN
     // =========================================================================
     function renderKursusView(container) {
       syncKwarranCoursesToAdmin(appData);
       const isAdmin = currentUser && currentUser.role === 'Admin';
+      const readOnly = isPelatihReadOnly();
 
       const list = appData.kursus.filter(k => {
         if (uiState.kursusStatus !== 'ALL' && k.status !== uiState.kursusStatus) return false;
@@ -2548,11 +2607,19 @@
               <option value="Selesai" ${uiState.kursusStatus === 'Selesai' ? 'selected' : ''}>Selesai</option>
             </select>
           </div>
-          <button type="button" onclick="openKursusModal()"
-            class="px-4 py-2.5 rounded-xl bg-scout-dark hover:bg-scout-brown text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm shrink-0 transition">
-            <i data-lucide="plus-circle" class="w-4 h-4 text-scout-gold"></i>
-            <span>Tambah Jadwal Kursus</span>
-          </button>
+          ${readOnly ? `
+            <button type="button" onclick="uiState.laporanType = 'kursus'; navigateTo('laporan');"
+              class="px-4 py-2.5 rounded-xl bg-scout-dark hover:bg-scout-brown text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm shrink-0 transition">
+              <i data-lucide="download" class="w-4 h-4 text-scout-gold"></i>
+              <span>Unduh / Cetak Rekap Kursus</span>
+            </button>
+          ` : `
+            <button type="button" onclick="openKursusModal()"
+              class="px-4 py-2.5 rounded-xl bg-scout-dark hover:bg-scout-brown text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm shrink-0 transition">
+              <i data-lucide="plus-circle" class="w-4 h-4 text-scout-gold"></i>
+              <span>Tambah Jadwal Kursus</span>
+            </button>
+          `}
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -2610,32 +2677,34 @@
                     </span>
                     <span class="font-extrabold text-scout-dark">${k.terdaftar} / ${k.kuota} Orang (${pct}%)</span>
                   </div>
-                  <div class="w-full h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
+                  <div class="w-full h-2 rounded-full bg-gray-100 overflow-hidden ${readOnly ? '' : 'mb-4'}">
                     <div class="h-full ${isKwarranOrigin ? 'bg-teal-700' : 'bg-scout-forest'} rounded-full" style="width: ${pct}%"></div>
                   </div>
 
-                  <div class="flex flex-wrap items-center justify-between gap-2" onclick="event.stopPropagation()">
-                    ${isAdmin ? `
-                      <button type="button" onclick="openAdminCourseDetail('${k.id}')"
-                        class="px-3.5 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-extrabold flex items-center gap-1.5 shadow-xs transition">
-                        <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-scout-gold"></i>
-                        <span>Kelola Detail Kursus</span>
-                      </button>
-                    ` : '<div></div>'}
+                  ${!readOnly ? `
+                    <div class="flex flex-wrap items-center justify-between gap-2" onclick="event.stopPropagation()">
+                      ${isAdmin ? `
+                        <button type="button" onclick="openAdminCourseDetail('${k.id}')"
+                          class="px-3.5 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-extrabold flex items-center gap-1.5 shadow-xs transition">
+                          <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-scout-gold"></i>
+                          <span>Kelola Detail Kursus</span>
+                        </button>
+                      ` : '<div></div>'}
 
-                    <div class="flex items-center gap-1.5">
-                      <button type="button" onclick="openKursusModal('${k.id}')"
-                        class="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold flex items-center gap-1.5 transition">
-                        <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                        <span>Edit</span>
-                      </button>
-                      <button type="button" onclick="deleteKursus('${k.id}')"
-                        class="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-1.5 transition">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                        <span>Hapus</span>
-                      </button>
+                      <div class="flex items-center gap-1.5">
+                        <button type="button" onclick="openKursusModal('${k.id}')"
+                          class="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold flex items-center gap-1.5 transition">
+                          <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                          <span>Edit</span>
+                        </button>
+                        <button type="button" onclick="deleteKursus('${k.id}')"
+                          class="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-1.5 transition">
+                          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                          <span>Hapus</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ` : ''}
                 </div>
               </div>
             `;
@@ -2645,6 +2714,7 @@
     }
 
     function openKursusModal(id = null) {
+      if (guardPelatihWriteAction()) return;
       const k = id ? appData.kursus.find(item => item.id === id) : null;
       openFormModal(
         k ? 'Edit Jadwal Kursus & Pelatihan' : 'Tambah Jadwal Kursus Baru',
@@ -2737,6 +2807,7 @@
 
     function saveKursusForm(e, id) {
       e.preventDefault();
+      if (guardPelatihWriteAction()) return;
       const prev = id ? appData.kursus.find(item => item.id === id) : null;
       const newNama = document.getElementById('krs-nama').value.trim();
       const newHari = document.getElementById('krs-hari').value.trim() || 'Sesuai Jadwal';
@@ -2791,6 +2862,7 @@
     }
 
     function deleteKursus(id) {
+      if (guardPelatihWriteAction()) return;
       const k = appData.kursus.find(item => item.id === id);
       if (!k) return;
       openConfirmModal(
@@ -2927,6 +2999,7 @@
     }
 
     function openAdminCourseDetail(courseId, tab = 'edit') {
+      if (guardPelatihWriteAction()) return;
       syncKwarranCoursesToAdmin(appData);
       const course = appData.kursus.find(c => c.id === courseId);
       if (!course) {
@@ -2946,6 +3019,10 @@
     }
 
     function renderAdminCourseDetailView(container) {
+      if (isPelatihReadOnly()) {
+        navigateTo('kursus');
+        return;
+      }
       syncKwarranCoursesToAdmin(appData);
       const course = appData.kursus.find(c => c.id === uiState.selectedAdminCourseId);
       if (!course) {
@@ -3122,6 +3199,7 @@
 
     function saveAdminDetailCourseEdit(e, courseId) {
       e.preventDefault();
+      if (guardPelatihWriteAction()) return;
       const idx = appData.kursus.findIndex(c => c.id === courseId);
       if (idx === -1) return;
       const prev = appData.kursus[idx];
@@ -3304,6 +3382,7 @@
 
     function saveAdminCourseSuratTugas(e, courseId) {
       e.preventDefault();
+      if (guardPelatihWriteAction()) return;
       const course = appData.kursus.find(c => c.id === courseId);
       if (!course) return;
       const detail = ensureCourseDetailRecord(course);
@@ -3319,6 +3398,7 @@
     }
 
     function uploadCourseStAttachment(e, courseId) {
+      if (guardPelatihWriteAction()) return;
       const file = e.target.files[0];
       if (!file) return;
       if (file.size > 2 * 1024 * 1024) {
@@ -3345,6 +3425,7 @@
     }
 
     function deleteCourseStAttachment(courseId, attId) {
+      if (guardPelatihWriteAction()) return;
       const course = appData.kursus.find(c => c.id === courseId);
       if (!course) return;
       const detail = ensureCourseDetailRecord(course);
@@ -3490,6 +3571,7 @@
     }
 
     function setCoursePersonAttendance(courseId, category, personId, status) {
+      if (guardPelatihWriteAction()) return;
       const course = appData.kursus.find(c => c.id === courseId);
       if (!course) return;
       const detail = ensureCourseDetailRecord(course);
@@ -3506,6 +3588,7 @@
     }
 
     function openAddCourseStaffModal(courseId, category) {
+      if (guardPelatihWriteAction()) return;
       const label = category === 'panitia' ? 'Panitia Pelaksana' : 'Tim Pelatih';
       openFormModal(
         `Tambah Personel ${label}`,
@@ -3533,6 +3616,7 @@
 
     function saveCourseStaffModal(e, courseId, category) {
       e.preventDefault();
+      if (guardPelatihWriteAction()) return;
       const course = appData.kursus.find(c => c.id === courseId);
       if (!course) return;
       const detail = ensureCourseDetailRecord(course);
@@ -3556,6 +3640,7 @@
     }
 
     function deleteCourseStaff(courseId, category, staffId) {
+      if (guardPelatihWriteAction()) return;
       const course = appData.kursus.find(c => c.id === courseId);
       if (!course) return;
       const detail = ensureCourseDetailRecord(course);
@@ -3691,6 +3776,7 @@
 
     function addCourseRundownItem(e, courseId) {
       e.preventDefault();
+      if (guardPelatihWriteAction()) return;
       const course = appData.kursus.find(c => c.id === courseId);
       if (!course) return;
       const detail = ensureCourseDetailRecord(course);
@@ -3709,6 +3795,7 @@
     }
 
     function deleteCourseRundownItem(courseId, rndId) {
+      if (guardPelatihWriteAction()) return;
       const course = appData.kursus.find(c => c.id === courseId);
       if (!course) return;
       const detail = ensureCourseDetailRecord(course);
@@ -3720,6 +3807,7 @@
     }
 
     function uploadCourseRundownFile(e, courseId) {
+      if (guardPelatihWriteAction()) return;
       const file = e.target.files[0];
       if (!file) return;
       if (file.size > 2 * 1024 * 1024) {
@@ -3745,6 +3833,7 @@
     }
 
     function deleteCourseRundownFile(courseId, fileId) {
+      if (guardPelatihWriteAction()) return;
       const course = appData.kursus.find(c => c.id === courseId);
       if (!course) return;
       const detail = ensureCourseDetailRecord(course);
@@ -4116,6 +4205,10 @@
     // 11. VIEW: ADMINISTRASI (SURAT MASUK & SURAT KELUAR - ADMIN & PANITIA)
     // =========================================================================
     function renderAdministrasiView(container) {
+      if (isPelatihReadOnly()) {
+        navigateTo('dashboard');
+        return;
+      }
       const isMasuk = uiState.adminTab === 'masuk';
       const sourceList = isMasuk ? appData.suratMasuk : appData.suratKeluar;
 
@@ -4229,6 +4322,7 @@
     }
 
     function openSuratModal(type, id = null) {
+      if (guardPelatihWriteAction()) return;
       const isMasuk = type === 'masuk';
       const list = isMasuk ? appData.suratMasuk : appData.suratKeluar;
       const s = id ? list.find(item => item.id === id) : null;
@@ -4321,6 +4415,7 @@
 
     function saveSuratForm(e, type, id) {
       e.preventDefault();
+      if (guardPelatihWriteAction()) return;
       const isMasuk = type === 'masuk';
       if (isMasuk) {
         const payload = {
@@ -4365,6 +4460,7 @@
     }
 
     function deleteSurat(type, id) {
+      if (guardPelatihWriteAction()) return;
       openConfirmModal(
         'Hapus Arsip Surat?',
         'Data surat yang dihapus tidak dapat dikembalikan. Lanjutkan?',
@@ -4389,9 +4485,13 @@
       const scope = getActiveKwarranScope();
       const isKwarran = scope.isKwarran;
       const myKwarran = scope.kwarranName;
+      const readOnly = isPelatihReadOnly();
 
       if (isKwarran) {
         uiState.laporanKwarran = myKwarran;
+      }
+      if (readOnly && uiState.laporanType === 'surat') {
+        uiState.laporanType = 'potensi';
       }
 
       let reportTitle = 'LAPORAN DATA POTENSI PEMBINA PRAMUKA';
@@ -4599,7 +4699,7 @@
               class="px-3.5 py-2.5 rounded-xl border border-scout-sand text-xs font-bold text-scout-dark bg-scout-cream/40">
               <option value="potensi" ${uiState.laporanType === 'potensi' ? 'selected' : ''}>1. Laporan Data Potensi Pembina</option>
               <option value="kursus" ${uiState.laporanType === 'kursus' ? 'selected' : ''}>2. Laporan Pelaksanaan Kursus</option>
-              ${!isKwarran ? `<option value="surat" ${uiState.laporanType === 'surat' ? 'selected' : ''}>3. Laporan Administrasi Surat</option>` : ''}
+              ${(!isKwarran && !readOnly) ? `<option value="surat" ${uiState.laporanType === 'surat' ? 'selected' : ''}>3. Laporan Administrasi Surat</option>` : ''}
             </select>
 
             ${uiState.laporanType === 'potensi' ? `
@@ -4750,6 +4850,10 @@
     // 13. VIEW: USER MANAGEMENT (ADMIN) - NAMA, PASSWORD, ROLE, SALIN AKUN
     // =========================================================================
     function renderUserView(container) {
+      if (isPelatihReadOnly()) {
+        navigateTo('dashboard');
+        return;
+      }
       container.innerHTML = `
         <div class="bg-white rounded-2xl border border-scout-sand shadow-scout overflow-hidden">
           <div class="p-5 border-b border-scout-sand/70 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -4853,6 +4957,7 @@
     }
 
     function openUserModal(id = null) {
+      if (guardPelatihWriteAction()) return;
       const u = id ? appData.users.find(item => item.id === id) : null;
       const initialRole = u ? u.role : 'Pelatih';
       const selectedKwarran = u ? normalizeKwarranName(u.kwarranName || u.nama) : KWARRAN_LIST[0];
@@ -4926,6 +5031,7 @@
 
     function saveUserForm(e, id) {
       e.preventDefault();
+      if (guardPelatihWriteAction()) return;
       const role = document.getElementById('usr-role').value;
       const namaVal = document.getElementById('usr-nama').value.trim();
       const kwSelectVal = document.getElementById('usr-kwarran-name').value;
@@ -4960,6 +5066,7 @@
     }
 
     function deleteUserAccount(id) {
+      if (guardPelatihWriteAction()) return;
       if (currentUser && currentUser.id === id) {
         showToast('Anda tidak dapat menghapus akun yang sedang digunakan untuk login.', 'error');
         return;
