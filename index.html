@@ -188,7 +188,7 @@
             Pusat Pendidikan dan Pelatihan Cabang
           </h2>
           <p class="text-scout-sand/90 text-sm mt-3 leading-relaxed">
-            Sistem informasi terpadu pengelolaan data potensi pembina, penyelenggaraan kursus kepramukaan (KMD, KML, KPD, KPL), administrasi persuratan, dan koordinasi Kwartir Ranting se-Tangerang.
+            Sistem informasi terpadu pengelolaan data potensi pembina, penyelenggaraan kursus kepramukaan (KMD, KML, KPD, KPL), administrasi persuratan, dan koordinasi Kwartir Ranting se-Kabupaten Tangerang.
           </p>
         </div>
 
@@ -200,7 +200,7 @@
             <span>Satyaku Kudarmakan, Darmaku Kubaktikan — Ikhlas Bakti Bina Bangsa Berbudi Bawa Laksana.</span>
           </div>
           <div class="flex items-center justify-between text-[11px] text-scout-khaki pt-1">
-            <span>Kwartir Cabang Gerakan Pramuka Tangerang</span>
+            <span>Kwartir Cabang Gerakan Pramuka Kabupaten Tangerang</span>
             <span>Sistem Terpadu</span>
           </div>
         </div>
@@ -298,7 +298,7 @@
             <div class="min-w-0">
               <p class="text-[10px] font-bold uppercase tracking-widest text-scout-gold">Gerakan Pramuka</p>
               <h1 class="font-serif font-bold text-sm text-white truncate">PUSDIKLATCAB</h1>
-              <p class="text-[11px] text-scout-sand truncate">Kab./Kota Tangerang</p>
+              <p class="text-[11px] text-scout-sand truncate">Kabupaten Tangerang</p>
             </div>
           </div>
           <button type="button" onclick="toggleMobileSidebar(false)" class="lg:hidden p-1.5 rounded-lg text-scout-sand hover:bg-white/10">
@@ -380,7 +380,7 @@
 
       <!-- FOOTER -->
       <footer class="px-6 py-4 border-t border-scout-sand/70 bg-white/60 text-xs text-gray-500 flex flex-col sm:flex-row items-center justify-between gap-2 no-print">
-        <span>&copy; 2026 <strong>PUSDIKLATCAB TANGERANG</strong> — Gerakan Pramuka Kabupaten/Kota Tangerang.</span>
+        <span>&copy; 2026 <strong>PUSDIKLATCAB TANGERANG</strong> — Gerakan Pramuka Kabupaten Tangerang.</span>
         <span class="text-scout-medium font-medium">Sistem Informasi Manajemen Pendidikan & Pelatihan Kepramukaan</span>
       </footer>
     </div>
@@ -391,7 +391,7 @@
   <!-- ===================================================================== -->
   <script>
     // =========================================================================
-    // 1. KONSTANTA, UTILITAS TANGGAL INDONESIA, NTA MASKING & REFERENSI WILAYAH
+    // 1. KONSTANTA, UTILITAS TANGGAL INDONESIA, NTA MASKING & 29 KWARRAN KAB. TANGERANG
     // =========================================================================
     const STORAGE_KEY = 'pusdiklatcab_tangerang_v1';
     const SESSION_STORAGE_KEY = 'pusdiklatcab_tangerang_session_v1';
@@ -402,13 +402,37 @@
     ];
     const HARI_INDO = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
+    // Daftar 29 Kwartir Ranting (Kwarran) resmi di Kabupaten Tangerang
     const KWARRAN_LIST = [
-      'Tigaraksa', 'Cikupa', 'Balaraja', 'Pasar Kemis', 'Curug',
-      'Kelapa Dua', 'Legok', 'Panongan', 'Cisauk', 'Pagedangan',
-      'Sepatan', 'Sepatan Timur', 'Kosambi', 'Teluknaga', 'Rajeg',
-      'Mauk', 'Kronjo', 'Kresek', 'Solear', 'Jambe',
-      'Karawaci', 'Cibodas', 'Periuk', 'Jatiuwung', 'Batuceper',
-      'Benda', 'Cipondoh', 'Pinang', 'Karang Tengah', 'Ciledug', 'Larangan'
+      'Balaraja',
+      'Cikupa',
+      'Cisauk',
+      'Cisoka',
+      'Curug',
+      'Gunung Kaler',
+      'Jambe',
+      'Jayanti',
+      'Kelapa Dua',
+      'Kemiri',
+      'Kresek',
+      'Kronjo',
+      'Kosambi',
+      'Legok',
+      'Mauk',
+      'Mekar Baru',
+      'Pagedangan',
+      'Pakuhaji',
+      'Panongan',
+      'Pasar Kemis',
+      'Rajeg',
+      'Sepatan',
+      'Sepatan Timur',
+      'Sindang Jaya',
+      'Solear',
+      'Sukadiri',
+      'Sukamulya',
+      'Teluknaga',
+      'Tigaraksa'
     ];
 
     const JENJANG_OPTIONS = ['Belum Kursus', 'KMD', 'KML', 'KPD', 'KPL'];
@@ -620,7 +644,7 @@
     }
 
     // =========================================================================
-    // 2. STATE & DATA AWAL (SEED DATA REALISTIS KAB./KOTA TANGERANG)
+    // 2. STATE & DATA AWAL (SEED DATA REALISTIS KABUPATEN TANGERANG)
     // =========================================================================
     function createInitialSeedData() {
       return {
@@ -630,7 +654,7 @@
           masaBakti: '2024 - 2029',
           telepon: '(021) 5991234',
           email: 'pusdiklatcab@pramukatangerang.or.id',
-          alamat: 'Gedung Kwartir Cabang Gerakan Pramuka Tangerang, Jl. Raya Tigaraksa - Cisoka, Kab. Tangerang',
+          alamat: 'Gedung Kwartir Cabang Gerakan Pramuka Kabupaten Tangerang, Jl. Raya Tigaraksa - Cisoka, Kab. Tangerang',
           logoUrl: ''
         },
         users: [
@@ -774,7 +798,7 @@
             id: 'sk_1',
             nomor: '088/28.04-Pusdiklatcab',
             tanggalKeluar: '2026-11-15',
-            tujuan: 'Seluruh Kwartir Ranting se-Kabupaten/Kota Tangerang',
+            tujuan: 'Seluruh Kwartir Ranting se-Kabupaten Tangerang',
             perihal: 'Edaran Pemutakhiran Data Potensi Pembina & Jadwal KMD/KML Akhir Tahun',
             penanggungJawab: 'Kak H. Bambang Sudjatmiko, M.Pd.',
             lampiran: 'Edaran_Pusdiklatcab_2026.pdf'
@@ -1551,8 +1575,8 @@
           subtitle: scope.isKwarran
             ? `Data potensi pembina pramuka wilayah Kwartir Ranting ${scope.kwarranName}`
             : (readOnly
-              ? 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang (Hanya Lihat — Unduh via Menu Laporan)'
-              : 'Database potensi pembina pramuka se-Kabupaten/Kota Tangerang (NTA, Golongan, TTL, Pas Foto 4x6 & Kelulusan Kursus)')
+              ? 'Database potensi pembina pramuka se-Kabupaten Tangerang (Hanya Lihat — Unduh via Menu Laporan)'
+              : 'Database potensi pembina pramuka se-Kabupaten Tangerang (NTA, Golongan, TTL, Pas Foto 4x6 & Kelulusan Kursus)')
         },
         'kursus': {
           title: 'Manajemen Kursus & Pelatihan',
@@ -2657,7 +2681,7 @@
               ` : `
                 <select onchange="uiState.potensiKwarran = this.value; uiState.potensiPage = 1; renderDataPotensiView(document.getElementById('main-content')); lucide.createIcons();"
                   class="px-3 py-2 rounded-xl border border-scout-sand text-xs font-semibold text-scout-dark bg-scout-cream/30 focus:outline-none">
-                  <option value="ALL">Semua Asal Kwarran</option>
+                  <option value="ALL">Semua Asal Kwarran (29)</option>
                   ${KWARRAN_LIST.map(kw => `<option value="${kw}" ${uiState.potensiKwarran === kw ? 'selected' : ''}>Kwarran ${kw}</option>`).join('')}
                 </select>
               `}
@@ -3932,7 +3956,7 @@
             <div class="flex items-center gap-3 pb-3 border-b-2 border-scout-dark">
               <div class="w-12 h-12 shrink-0">${getLogoHtml()}</div>
               <div class="text-center flex-1">
-                <p class="text-[10px] font-bold uppercase text-scout-brown">Gerakan Pramuka Kwartir Cabang Tangerang</p>
+                <p class="text-[10px] font-bold uppercase text-scout-brown">Gerakan Pramuka Kwartir Cabang Kabupaten Tangerang</p>
                 <h5 class="font-serif font-black text-sm text-scout-dark">PUSDIKLATCAB TANGERANG</h5>
                 <p class="text-[9px] text-gray-500">${escapeHtml(appData.profile.alamat)}</p>
               </div>
@@ -4807,7 +4831,7 @@
           tempatLahir: 'Tangerang',
           tanggalLahir: '',
           golongan: 'Penggalang',
-          pangkalan: 'Kwarcab Tangerang',
+          pangkalan: 'Kwarcab Kab. Tangerang',
           kwarran: course.sourceKwarran || 'Tigaraksa'
         }));
       } else if (docType === 'pakta' && targetRole === 'Pelatih') {
@@ -4845,7 +4869,7 @@
         tempatLahir: 'Tangerang',
         tanggalLahir: '1994-05-10',
         golongan: 'Penggalang',
-        pangkalan: 'SDN / SMPN Tangerang',
+        pangkalan: 'SDN / SMPN Kab. Tangerang',
         kwarran: course.sourceKwarran || 'Tigaraksa',
         fotoUrl: ''
       };
@@ -4870,7 +4894,7 @@
             ${getLogoHtml()}
           </div>
           <div class="flex-1 text-center">
-            <p class="text-xs font-bold uppercase tracking-widest text-scout-brown">Gerakan Pramuka Kwartir Cabang Tangerang</p>
+            <p class="text-xs font-bold uppercase tracking-widest text-scout-brown">Gerakan Pramuka Kwartir Cabang Kabupaten Tangerang</p>
             <h2 class="font-serif font-black text-base sm:text-xl text-scout-dark tracking-wide mt-0.5">
               PUSAT PENDIDIKAN DAN PELATIHAN CABANG (PUSDIKLATCAB)
             </h2>
@@ -4936,7 +4960,7 @@
 
           <div class="text-xs sm:text-sm text-gray-800 space-y-4 leading-relaxed">
             <p>
-              Kepala Pusat Pendidikan dan Pelatihan Cabang (Pusdiklatcab) Gerakan Pramuka Tangerang menerangkan bahwa:
+              Kepala Pusat Pendidikan dan Pelatihan Cabang (Pusdiklatcab) Gerakan Pramuka Kabupaten Tangerang menerangkan bahwa:
             </p>
             <table class="w-full text-xs sm:text-sm">
               <tr><td class="py-1 w-48 font-semibold border-none">Nama Lengkap</td><td class="py-1 border-none">: <strong>${escapeHtml(selectedPerson.nama)}</strong></td></tr>
@@ -4977,14 +5001,14 @@
           <div class="border-4 border-double border-scout-dark p-6 sm:p-8 rounded-xl bg-gradient-to-b from-scout-cream/40 via-white to-scout-cream/40">
             <div class="text-center pb-4 border-b-2 border-scout-gold">
               <div class="w-16 h-16 mx-auto mb-2">${getLogoHtml()}</div>
-              <p class="text-xs font-extrabold uppercase tracking-widest text-scout-brown">Gerakan Pramuka Kwartir Cabang Tangerang</p>
+              <p class="text-xs font-extrabold uppercase tracking-widest text-scout-brown">Gerakan Pramuka Kwartir Cabang Kabupaten Tangerang</p>
               <h2 class="font-serif font-black text-xl sm:text-2xl text-scout-dark tracking-wider mt-1">IJAZAH KURSUS KEPRAMUKAAN</h2>
               <p class="text-xs font-bold text-scout-forest mt-0.5">${jenjangFullTitle}</p>
               <p class="text-[11px] text-gray-600 mt-1">Nomor Seri Ijazah: <strong>${escapeHtml(uiState.adminPrintNomorSurat)}</strong></p>
             </div>
 
             <div class="my-6 text-center space-y-3 text-xs sm:text-sm">
-              <p class="text-gray-700">Kwartir Cabang Gerakan Pramuka Tangerang melalui Pusat Pendidikan dan Pelatihan Cabang (Pusdiklatcab) memberikan Ijazah kepada:</p>
+              <p class="text-gray-700">Kwartir Cabang Gerakan Pramuka Kabupaten Tangerang melalui Pusat Pendidikan dan Pelatihan Cabang (Pusdiklatcab) memberikan Ijazah kepada:</p>
               <h3 class="font-serif font-black text-xl sm:text-2xl text-scout-dark underline decoration-scout-gold decoration-2 py-1">
                 ${escapeHtml(selectedPerson.nama)}
               </h3>
@@ -5039,7 +5063,7 @@
 
           <div class="text-xs sm:text-sm text-gray-800 space-y-4 leading-relaxed">
             <p>
-              Berdasarkan Keputusan Kwartir Nasional Gerakan Pramuka tentang Sistem Pendidikan dan Pelatihan Kepramukaan, Kwartir Cabang Gerakan Pramuka Tangerang melalui Kepala Pusdiklatcab Tangerang memberikan <strong>HAK BINA</strong> kepada:
+              Berdasarkan Keputusan Kwartir Nasional Gerakan Pramuka tentang Sistem Pendidikan dan Pelatihan Kepramukaan, Kwartir Cabang Gerakan Pramuka Kabupaten Tangerang melalui Kepala Pusdiklatcab Tangerang memberikan <strong>HAK BINA</strong> kepada:
             </p>
 
             <table class="w-full text-xs sm:text-sm">
@@ -5352,7 +5376,7 @@
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tujuan Surat <span class="text-red-600">*</span></label>
                 <input type="text" id="srt-tujuan" required value="${s ? escapeHtml(s.tujuan) : ''}"
-                  placeholder="Contoh: Kwartir Ranting se-Kabupaten/Kota Tangerang"
+                  placeholder="Contoh: Kwartir Ranting se-Kabupaten Tangerang"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
             `}
@@ -5695,7 +5719,7 @@
               ${!isKwarran ? `
                 <select onchange="uiState.laporanKwarran = this.value; renderLaporanView(document.getElementById('main-content')); lucide.createIcons();"
                   class="px-3.5 py-2.5 rounded-xl border border-scout-sand text-xs font-semibold text-scout-dark bg-white">
-                  <option value="ALL">Semua Kwarran Tangerang</option>
+                  <option value="ALL">Semua Kwarran Kab. Tangerang (29)</option>
                   ${KWARRAN_LIST.map(kw => `<option value="${kw}" ${uiState.laporanKwarran === kw ? 'selected' : ''}>Kwarran ${kw}</option>`).join('')}
                 </select>
               ` : ''}
@@ -5729,7 +5753,7 @@
               ${getLogoHtml()}
             </div>
             <div class="flex-1 text-center">
-              <p class="text-xs sm:text-sm font-bold uppercase tracking-widest text-scout-brown">Gerakan Pramuka Kwartir Cabang Tangerang</p>
+              <p class="text-xs sm:text-sm font-bold uppercase tracking-widest text-scout-brown">Gerakan Pramuka Kwartir Cabang Kabupaten Tangerang</p>
               <h2 class="font-serif font-black text-lg sm:text-2xl text-scout-dark tracking-wide mt-0.5">
                 PUSAT PENDIDIKAN DAN PELATIHAN CABANG (PUSDIKLATCAB)
               </h2>
@@ -5772,13 +5796,13 @@
       const isKwarran = scope.isKwarran;
       let csvRows = [];
       let filename = isKwarran
-        ? `Laporan_Kwarran_${scope.kwarranName}_Tangerang.csv`
-        : 'Laporan_Pusdiklatcab_Tangerang.csv';
+        ? `Laporan_Kwarran_${scope.kwarranName}_Kab_Tangerang.csv`
+        : 'Laporan_Pusdiklatcab_Kab_Tangerang.csv';
 
       if (uiState.laporanType === 'potensi') {
         filename = isKwarran
           ? `Laporan_Data_Potensi_Kwarran_${scope.kwarranName}.csv`
-          : 'Laporan_Data_Potensi_Tangerang.csv';
+          : 'Laporan_Data_Potensi_Kab_Tangerang.csv';
         csvRows.push(['No', 'NTA', 'Nama Lengkap Pembina', 'Tempat Tanggal Lahir', 'Golongan', 'Jenjang Kursus', 'Tahun Lulus', 'Jenis Kelamin', 'Asal Kwarran', 'Pangkalan', 'Status Pas Foto 4x6']);
         const rows = getScopedPotensiList().filter(p => {
           if (!isKwarran && uiState.laporanKwarran !== 'ALL' && !isSameKwarran(p.kwarran, uiState.laporanKwarran)) return false;
@@ -5821,14 +5845,14 @@
             ]);
           });
         } else {
-          filename = 'Laporan_Kursus_Pusdiklatcab_Tangerang.csv';
+          filename = 'Laporan_Kursus_Pusdiklatcab_Kab_Tangerang.csv';
           csvRows.push(['No', 'Nama Kursus', 'Angkatan', 'Tanggal', 'Lokasi', 'Terdaftar', 'Kuota', 'Status']);
           appData.kursus.forEach((k, idx) => {
             csvRows.push([idx + 1, `"${k.nama}"`, `"${k.angkatan}"`, `"${formatDateRangeIndo(k.tanggal)}"`, `"${k.lokasi}"`, k.terdaftar, k.kuota, k.status]);
           });
         }
       } else {
-        filename = 'Laporan_Administrasi_Surat_Tangerang.csv';
+        filename = 'Laporan_Administrasi_Surat_Kab_Tangerang.csv';
         csvRows.push(['Jenis', 'Nomor Surat', 'Tanggal', 'Asal / Tujuan', 'Perihal', 'Status / PJ']);
         appData.suratMasuk.forEach(s => {
           csvRows.push(['Surat Masuk', `"${s.nomor}"`, `"${formatDateIndo(s.tanggalTerima)}"`, `"${s.asal}"`, `"${s.perihal}"`, s.disposisi]);
@@ -5862,7 +5886,7 @@
           <div class="p-5 border-b border-scout-sand/70 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h3 class="text-base font-extrabold text-scout-dark">Daftar Akun Pengguna Sistem</h3>
-              <p class="text-xs text-gray-500 mt-0.5">Kelola kredensial login untuk Admin, Pelatih, Panitia, dan Kwartir Ranting.</p>
+              <p class="text-xs text-gray-500 mt-0.5">Kelola kredensial login untuk Admin, Pelatih, Panitia, dan 29 Kwartir Ranting Kabupaten Tangerang.</p>
             </div>
             <button type="button" onclick="openUserModal()"
               class="px-4 py-2.5 rounded-xl bg-scout-dark hover:bg-scout-brown text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition">
@@ -5973,7 +5997,7 @@
               <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nama Pengguna / Login <span class="text-red-600">*</span></label>
               <input type="text" id="usr-nama" required value="${u ? escapeHtml(u.nama) : ''}"
                 oninput="syncKwarranSelectFromInput(this.value)"
-                placeholder="Contoh: Kwarran Curug atau Kak Hendra"
+                placeholder="Contoh: Kwarran Sindang Jaya atau Kak Hendra"
                 class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
             </div>
 
@@ -5996,7 +6020,7 @@
             </div>
 
             <div id="usr-kwarran-wrap" class="${initialRole === 'Kwarran' ? '' : 'hidden'}">
-              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Wilayah Kwartir Ranting Terkait</label>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Wilayah Kwartir Ranting Terkait (Kab. Tangerang)</label>
               <select id="usr-kwarran-name" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
                 ${KWARRAN_LIST.map(kw => `<option value="${kw}" ${selectedKwarran === kw ? 'selected' : ''}>Kwarran ${kw}</option>`).join('')}
               </select>
