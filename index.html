@@ -453,6 +453,17 @@
       'Selesai'
     ];
 
+    // Konstanta Jenis Surat Keluar & Tugas Pelatih
+    const JENIS_SURAT_KELUAR_OPTIONS = ['Undangan', 'Pemberitahuan', 'Tugas'];
+    const TUGAS_SEBAGAI_OPTIONS = [
+      'panitia',
+      'pinsus',
+      'sekretaris kursus',
+      'narasumber',
+      'pelatih',
+      'asisten pelatih'
+    ];
+
     function isAdminUser() {
       return !!(currentUser && currentUser.role === 'Admin');
     }
@@ -679,6 +690,54 @@
         .trim();
     }
 
+    function getPelatihCandidateNames() {
+      const namesSet = new Set();
+      (appData.users || [])
+        .filter(u => u.role === 'Pelatih' && u.nama)
+        .forEach(u => namesSet.add(u.nama.trim()));
+      (appData.potensi || [])
+        .filter(p => (p.jenjang === 'KPD' || p.jenjang === 'KPL') && p.nama)
+        .forEach(p => namesSet.add(p.nama.trim()));
+      (appData.kursus || []).forEach(k => {
+        if (k.pelatih) {
+          k.pelatih.split(',').forEach(part => {
+            const clean = part.trim();
+            if (clean && !clean.toLowerCase().includes('tim pelatih')) namesSet.add(clean);
+          });
+        }
+      });
+      return Array.from(namesSet);
+    }
+
+    function getSuratTugasForCurrentPelatih() {
+      if (!currentUser || currentUser.role !== 'Pelatih') return [];
+      const curRaw = currentUser.nama.trim().toLowerCase();
+      const curNorm = normalizePersonNameForMatch(currentUser.nama);
+
+      return (appData.suratKeluar || []).filter(sk => {
+        if (sk.jenisSurat !== 'Tugas') return false;
+        const targetRaw = String(sk.namaPelatih || sk.tujuan || '').trim().toLowerCase();
+        const targetNorm = normalizePersonNameForMatch(sk.namaPelatih || sk.tujuan || '');
+        if (!targetRaw) return false;
+        return (
+          targetRaw === curRaw ||
+          (curNorm && targetNorm && (targetNorm === curNorm || targetNorm.includes(curNorm) || curNorm.includes(targetNorm)))
+        );
+      });
+    }
+
+    function formatTugasRoleLabel(roleTugas) {
+      const val = String(roleTugas || '').trim();
+      if (!val) return '-';
+      if (val.toLowerCase() === 'pinsus') return 'Pinsus (Pemimpin Kursus)';
+      return val.replace(/\b\w/g, ch => ch.toUpperCase());
+    }
+
+    function isPanitiaTugasRole(roleTugas) {
+      const lower = String(roleTugas || '').trim().toLowerCase();
+      return lower === 'panitia' || lower === 'sekretaris kursus';
+    }
+
     // =========================================================================
     // 2. STATE & DATA AWAL (SEED DATA REALISTIS KABUPATEN TANGERANG)
     // =========================================================================
@@ -841,11 +900,30 @@
           {
             id: 'sk_1',
             nomor: '088/28.04-Pusdiklatcab',
+            jenisSurat: 'Pemberitahuan',
             tanggalKeluar: '2026-11-15',
             tujuan: 'Seluruh Kwartir Ranting se-Kabupaten Tangerang',
             perihal: 'Edaran Pemutakhiran Data Potensi Pembina & Jadwal KMD/KML Akhir Tahun',
             penanggungJawab: 'Kak H. Bambang Sudjatmiko, M.Pd.',
+            namaPelatih: '',
+            tugasSebagai: '',
+            kursusId: '',
+            namaKursus: '',
             lampiran: 'Edaran_Pusdiklatcab_2026.pdf'
+          },
+          {
+            id: 'sk_2',
+            nomor: '091/28.04-Pusdiklatcab',
+            jenisSurat: 'Tugas',
+            tanggalKeluar: '2026-11-21',
+            tujuan: 'Kak Drs. H. Ahmad Fauzi, M.Pd.',
+            perihal: 'Surat Tugas Pemimpin Kursus (Pinsus) KMD Angkatan XLI / 2026',
+            penanggungJawab: 'Kak H. Bambang Sudjatmiko, M.Pd.',
+            namaPelatih: 'Kak Drs. H. Ahmad Fauzi, M.Pd.',
+            tugasSebagai: 'pinsus',
+            kursusId: 'krs_1',
+            namaKursus: 'Kursus Pembina Pramuka Mahir Tingkat Dasar (KMD)',
+            lampiran: 'ST_Pinsus_KMD_XLI_2026.pdf'
           }
         ],
         kwarranCourses: [
@@ -945,6 +1023,19 @@
         disposisiApprovedAt: String(sm.disposisiApprovedAt || '').trim(),
         disposisiApprovedBy: String(sm.disposisiApprovedBy || '').trim()
       }));
+
+      // Normalisasi struktur jenis surat & penugasan pelatih pada Surat Keluar
+      data.suratKeluar = data.suratKeluar.map(sk => {
+        const validJenis = JENIS_SURAT_KELUAR_OPTIONS.includes(sk.jenisSurat) ? sk.jenisSurat : 'Pemberitahuan';
+        return {
+          ...sk,
+          jenisSurat: validJenis,
+          namaPelatih: validJenis === 'Tugas' ? String(sk.namaPelatih || '').trim() : '',
+          tugasSebagai: validJenis === 'Tugas' ? String(sk.tugasSebagai || '').trim() : '',
+          kursusId: validJenis === 'Tugas' ? String(sk.kursusId || '').trim() : '',
+          namaKursus: validJenis === 'Tugas' ? String(sk.namaKursus || '').trim() : ''
+        };
+      });
 
       data.users = data.users.map(u => {
         if (u.role === 'Kwarran') {
@@ -1091,6 +1182,173 @@
             sourceType: 'kwarran',
             sourceKwarran: kc.kwarran,
             sourceCourseId: kc.id
+          });
+        }
+      });
+    }
+
+    // =========================================================================
+    // SINKRONISASI OTOMATIS SURAT TUGAS (SURAT KELUAR -> ABSENSI PELATIH/PANITIA)
+    // =========================================================================
+    function buildDefaultCourseDetailStructure(course, profileObj) {
+      const initialPelatih = (course.pelatih || 'Kak Drs. H. Ahmad Fauzi, M.Pd.')
+        .split(',')
+        .map((n, i) => ({
+          id: `plt_${course.id}_${i + 1}`,
+          nama: n.trim(),
+          jabatan: i === 0 ? 'Pemimpin Kursus (Pinsus)' : 'Pelatih Pendamping',
+          statusHadir: 'Hadir',
+          catatan: ''
+        }))
+        .filter(x => x.nama && !x.nama.toLowerCase().includes('tim pelatih'));
+
+      const initialPanitia = (course.panitia || 'Kak Rina Wulandari, S.Pd.')
+        .split(',')
+        .map((n, i) => ({
+          id: `pnt_${course.id}_${i + 1}`,
+          nama: n.trim(),
+          jabatan: i === 0 ? 'Ketua Panitia Pelaksana' : 'Sekretaris / Anggota Panitia',
+          statusHadir: 'Hadir',
+          catatan: ''
+        }))
+        .filter(x => x.nama);
+
+      return {
+        suratTugas: {
+          nomor: `ST-${Math.floor(100 + Math.random() * 899)}/28.04-Pusdiklatcab/2026`,
+          tanggal: getTodayIsoDate(),
+          penandatangan: profileObj ? profileObj.namaKapus : 'Kak H. Bambang Sudjatmiko, M.Pd.',
+          perihal: `Penugasan Tim Pelatih & Panitia Pelaksana ${course.nama}`,
+          personel: [...initialPelatih.map(p => `${p.nama} (${p.jabatan})`), ...initialPanitia.map(p => `${p.nama} (${p.jabatan})`)].join('\n'),
+          attachments: []
+        },
+        manualParticipants: course.sourceType === 'kwarran' ? [] : [
+          {
+            id: `mp_${course.id}_1`,
+            nta: '28.04.01.000412.0001',
+            nama: 'Kak Hendra Setiawan, S.Pd.',
+            tempatLahir: 'Tangerang',
+            tanggalLahir: '1993-04-12',
+            golongan: 'Penggalang',
+            gender: 'Putra',
+            pangkalan: 'SMPN 1 Tigaraksa',
+            kwarran: 'Tigaraksa',
+            fotoUrl: '',
+            statusKelulusan: course.status === 'Selesai' ? 'Lulus' : 'Belum Lulus',
+            source: 'cabang'
+          },
+          {
+            id: `mp_${course.id}_2`,
+            nta: '28.04.05.000419.0001',
+            nama: 'Kak Dewi Anggraini, S.Pd.SD.',
+            tempatLahir: 'Tangerang',
+            tanggalLahir: '1995-09-18',
+            golongan: 'Siaga',
+            gender: 'Putri',
+            pangkalan: 'SDN Curug 01',
+            kwarran: 'Curug',
+            fotoUrl: '',
+            statusKelulusan: course.status === 'Selesai' ? 'Lulus' : 'Belum Lulus',
+            source: 'cabang'
+          }
+        ],
+        attendanceStatus: {},
+        graduationStatus: {},
+        panitiaList: initialPanitia,
+        pelatihList: initialPelatih,
+        rundown: [
+          {
+            id: `rnd_${course.id}_1`,
+            sesi: 'Hari Ke-1 / Sesi 1',
+            waktu: '08.00 - 09.30 WIB',
+            materi: 'Upacara Pembukaan, Orientasi Kursus & Kontrak Belajar',
+            narasumber: initialPelatih[0] ? initialPelatih[0].nama : 'Pinsus Pusdiklatcab',
+            keterangan: 'Pakaian Seragam Pramuka Lengkap'
+          },
+          {
+            id: `rnd_${course.id}_2`,
+            sesi: 'Hari Ke-1 / Sesi 2',
+            waktu: '09.45 - 11.45 WIB',
+            materi: 'Fundamental Gerakan Pramuka, Prinsip Dasar & Metode Kepramukaan',
+            narasumber: initialPelatih[0] ? initialPelatih[0].nama : 'Tim Pelatih',
+            keterangan: 'Diskusi Kelompok & Simulasi'
+          }
+        ],
+        rundownFiles: []
+      };
+    }
+
+    function syncSuratTugasToCourseAttendance(targetData = appData) {
+      if (!targetData || !Array.isArray(targetData.kursus)) return;
+      if (!targetData.courseDetails || typeof targetData.courseDetails !== 'object') {
+        targetData.courseDetails = {};
+      }
+
+      const activeTugasLetters = (targetData.suratKeluar || []).filter(
+        sk => sk.jenisSurat === 'Tugas' && sk.kursusId && sk.namaPelatih
+      );
+      const validTugasIds = new Set(activeTugasLetters.map(sk => sk.id));
+
+      targetData.kursus.forEach(course => {
+        if (!targetData.courseDetails[course.id]) {
+          targetData.courseDetails[course.id] = buildDefaultCourseDetailStructure(course, targetData.profile);
+        }
+        const det = targetData.courseDetails[course.id];
+        if (!Array.isArray(det.panitiaList)) det.panitiaList = [];
+        if (!Array.isArray(det.pelatihList)) det.pelatihList = [];
+
+        // Hapus entri hasil sinkronisasi ST yang suratnya sudah dihapus, diubah jenisnya, atau dipindahkan ke kursus lain
+        det.panitiaList = det.panitiaList.filter(
+          item => !item.sourceSuratTugasId || (validTugasIds.has(item.sourceSuratTugasId) && item.sourceCourseId === course.id && isPanitiaTugasRole(item.sourceRoleTugas))
+        );
+        det.pelatihList = det.pelatihList.filter(
+          item => !item.sourceSuratTugasId || (validTugasIds.has(item.sourceSuratTugasId) && item.sourceCourseId === course.id && !isPanitiaTugasRole(item.sourceRoleTugas))
+        );
+      });
+
+      // Sinkronkan setiap Surat Tugas aktif ke daftar absensi Tim Pelatih atau Panitia Pelaksana kursus tujuan
+      activeTugasLetters.forEach(sk => {
+        const targetCourse = targetData.kursus.find(c => c.id === sk.kursusId);
+        if (!targetCourse) return;
+
+        if (!targetData.courseDetails[targetCourse.id]) {
+          targetData.courseDetails[targetCourse.id] = buildDefaultCourseDetailStructure(targetCourse, targetData.profile);
+        }
+        const det = targetData.courseDetails[targetCourse.id];
+        const goesToPanitia = isPanitiaTugasRole(sk.tugasSebagai);
+        const targetList = goesToPanitia ? det.panitiaList : det.pelatihList;
+        const jabLabel = `${formatTugasRoleLabel(sk.tugasSebagai)} (ST No. ${sk.nomor})`;
+        const normNama = normalizePersonNameForMatch(sk.namaPelatih);
+
+        // Cek apakah sudah ada entri dengan sourceSuratTugasId atau nama orang yang sama pada daftar tersebut
+        let existingIdx = targetList.findIndex(item => item.sourceSuratTugasId === sk.id);
+        if (existingIdx === -1 && normNama) {
+          existingIdx = targetList.findIndex(item => normalizePersonNameForMatch(item.nama) === normNama);
+        }
+
+        if (existingIdx !== -1) {
+          const prev = targetList[existingIdx];
+          targetList[existingIdx] = {
+            ...prev,
+            nama: sk.namaPelatih.trim(),
+            jabatan: jabLabel,
+            statusHadir: prev.statusHadir || 'Hadir',
+            sourceSuratTugasId: sk.id,
+            sourceSuratNomor: sk.nomor,
+            sourceRoleTugas: sk.tugasSebagai,
+            sourceCourseId: targetCourse.id
+          };
+        } else {
+          targetList.push({
+            id: `st_sync_${sk.id}`,
+            nama: sk.namaPelatih.trim(),
+            jabatan: jabLabel,
+            statusHadir: 'Hadir',
+            catatan: '',
+            sourceSuratTugasId: sk.id,
+            sourceSuratNomor: sk.nomor,
+            sourceRoleTugas: sk.tugasSebagai,
+            sourceCourseId: targetCourse.id
           });
         }
       });
@@ -1250,12 +1508,14 @@
         const parsed = raw ? JSON.parse(raw) : null;
         const normalized = migrateAndNormalizeAppData(parsed);
         syncKwarranCoursesToAdmin(normalized);
+        syncSuratTugasToCourseAttendance(normalized);
         syncGraduatedParticipantsToPotensi(normalized);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
         return normalized;
       } catch (err) {
         const fallback = migrateAndNormalizeAppData(null);
         syncKwarranCoursesToAdmin(fallback);
+        syncSuratTugasToCourseAttendance(fallback);
         syncGraduatedParticipantsToPotensi(fallback);
         return fallback;
       }
@@ -1290,6 +1550,7 @@
       adminTab: 'masuk',
       suratSearch: '',
       suratDisposisiFilter: 'ALL',
+      suratKeluarJenisFilter: 'ALL',
       laporanType: 'potensi',
       laporanKwarran: 'ALL',
       laporanJenjang: 'ALL',
@@ -1304,6 +1565,7 @@
     function saveAppData() {
       try {
         syncKwarranCoursesToAdmin(appData);
+        syncSuratTugasToCourseAttendance(appData);
         syncGraduatedParticipantsToPotensi(appData);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
       } catch (err) {
@@ -1378,6 +1640,7 @@
       uiState.adminTab = 'masuk';
       uiState.suratSearch = '';
       uiState.suratDisposisiFilter = 'ALL';
+      uiState.suratKeluarJenisFilter = 'ALL';
       uiState.laporanType = 'potensi';
       uiState.laporanKwarran = scope.isKwarran ? scope.kwarranName : 'ALL';
       uiState.laporanJenjang = 'ALL';
@@ -1420,12 +1683,12 @@
       document.getElementById('sidebar-user-avatar').textContent = (currentUser.nama || 'U').charAt(0).toUpperCase();
       document.getElementById('sidebar-user-role').textContent = currentUser.role === 'Kwarran'
         ? `Kwarran (${currentUser.kwarranName})`
-        : (currentUser.role === 'Pelatih' ? 'Pelatih (Lihat & Unduh)' : currentUser.role);
+        : (currentUser.role === 'Pelatih' ? 'Pelatih (Tugas & Unduh)' : currentUser.role);
 
       document.getElementById('header-user-name').textContent = currentUser.nama;
       document.getElementById('header-user-role').textContent = currentUser.role === 'Kwarran'
         ? `Role: Kwarran ${currentUser.kwarranName}`
-        : (currentUser.role === 'Pelatih' ? 'Role: Pelatih (Hanya Lihat & Unduh)' : `Role: ${currentUser.role}`);
+        : (currentUser.role === 'Pelatih' ? 'Role: Pelatih (Lihat Tugas & Unduh)' : `Role: ${currentUser.role}`);
 
       document.getElementById('login-view').classList.add('hidden');
       document.getElementById('app-shell').classList.remove('hidden');
@@ -1526,7 +1789,7 @@
       }
 
       menus.push({ id: 'data-potensi', label: 'Data Potensi', icon: 'users' });
-      menus.push({ id: 'kursus', label: 'Kursus & Pelatihan', icon: 'graduation-cap' });
+      menus.push({ id: 'kursus', label: role === 'Pelatih' ? 'Kursus & Surat Tugas' : 'Kursus & Pelatihan', icon: 'graduation-cap' });
 
       if (role === 'Admin' || role === 'Panitia') {
         menus.push({ id: 'administrasi', label: 'Administrasi', icon: 'mail' });
@@ -1593,6 +1856,7 @@
       if (!currentUser) return;
       if (routeId === 'kursus') {
         syncKwarranCoursesToAdmin(appData);
+        syncSuratTugasToCourseAttendance(appData);
         uiState.selectedAdminCourseId = null;
       }
       if (routeId === 'kursus-detail' && isPelatihReadOnly()) {
@@ -1616,7 +1880,7 @@
           subtitle: scope.isKwarran
             ? `Ringkasan statistik & penyelenggaraan kursus Kwartir Ranting ${scope.kwarranName}`
             : (readOnly
-              ? 'Ringkasan statistik potensi pembina & jadwal kursus (Mode Lihat & Unduh Laporan)'
+              ? 'Ringkasan statistik potensi pembina, jadwal kursus & penugasan Surat Tugas Anda'
               : 'Ringkasan statistik potensi pembina, kegiatan kursus, dan administrasi Pusdiklatcab Tangerang')
         },
         'profile': {
@@ -1632,9 +1896,9 @@
               : 'Database potensi pembina pramuka se-Kabupaten Tangerang (NTA, Golongan, TTL, Pas Foto 4x6 & Kelulusan Kursus)')
         },
         'kursus': {
-          title: 'Manajemen Kursus & Pelatihan',
+          title: readOnly ? 'Jadwal Kursus & Penugasan Pelatih' : 'Manajemen Kursus & Pelatihan',
           subtitle: readOnly
-            ? 'Informasi jadwal kegiatan KMD, KML, KPD, KPL Cabang & Usulan Kwarran (Mode Lihat)'
+            ? 'Daftar penugasan Surat Tugas Anda, unduh surat tugas resmi, dan jadwal kursus kepramukaan'
             : 'Jadwal kegiatan KMD, KML, KPD, KPL Cabang maupun Usulan Kwartir Ranting'
         },
         'kursus-detail': {
@@ -1644,7 +1908,7 @@
         'administrasi': {
           title: 'Administrasi Persuratan',
           subtitle: isAdminUser()
-            ? 'Pencatatan arsip surat masuk, persetujuan disposisi Admin, dan pengelolaan surat keluar'
+            ? 'Pencatatan arsip surat masuk, persetujuan disposisi Admin, dan pengelolaan surat keluar (Undangan, Pemberitahuan, Tugas)'
             : 'Pencatatan arsip surat masuk (menunggu disposisi Admin) dan pengelolaan surat keluar'
         },
         'laporan': {
@@ -2039,15 +2303,364 @@
     }
 
     // =========================================================================
+    // KOMPONEN PENUGASAN & DOWNLOAD SURAT TUGAS KHUSUS ROLE PELATIH
+    // =========================================================================
+    function buildSuratTugasDocumentHtml(sk) {
+      const course = appData.kursus.find(c => c.id === sk.kursusId);
+      const pelatihPotensi = appData.potensi.find(
+        p => normalizePersonNameForMatch(p.nama) === normalizePersonNameForMatch(sk.namaPelatih)
+      );
+      const ntaPelatih = pelatihPotensi && pelatihPotensi.nta ? pelatihPotensi.nta : '-';
+      const pangkalanPelatih = pelatihPotensi && pelatihPotensi.pangkalan
+        ? `${pelatihPotensi.pangkalan} (Kwarran ${pelatihPotensi.kwarran})`
+        : 'Korps Pelatih Pusdiklatcab Tangerang';
+      const namaKursusDisplay = course ? course.nama : (sk.namaKursus || '-');
+      const angkatanDisplay = course ? course.angkatan : '-';
+      const waktuDisplay = course
+        ? `${course.hari && course.hari !== 'Sesuai Jadwal' ? course.hari + ', ' : ''}${formatDateRangeIndo(course.tanggal)}`
+        : '-';
+      const lokasiDisplay = course ? course.lokasi : '-';
+      const tanggalSuratIndo = formatDateIndo(sk.tanggalKeluar || getTodayIsoDate());
+      const peranTugasFormatted = formatTugasRoleLabel(sk.tugasSebagai);
+
+      return `
+        <div class="flex items-center gap-4 pb-4 border-b-4 border-double border-scout-dark">
+          <div class="w-16 h-16 sm:w-20 sm:h-20 shrink-0 flex items-center justify-center">
+            ${getLogoHtml()}
+          </div>
+          <div class="flex-1 text-center">
+            <p class="text-xs font-bold uppercase tracking-widest text-scout-brown">Gerakan Pramuka Kwartir Cabang Kabupaten Tangerang</p>
+            <h2 class="font-serif font-black text-base sm:text-xl text-scout-dark tracking-wide mt-0.5">
+              PUSAT PENDIDIKAN DAN PELATIHAN CABANG (PUSDIKLATCAB)
+            </h2>
+            <p class="text-[11px] text-gray-600 mt-0.5">${escapeHtml(appData.profile.alamat)}</p>
+            <p class="text-[10px] text-gray-500">Telp: ${escapeHtml(appData.profile.telepon)} • Email: ${escapeHtml(appData.profile.email)}</p>
+          </div>
+        </div>
+
+        <div class="text-center my-6">
+          <h3 class="text-base font-extrabold uppercase underline text-scout-dark">SURAT TUGAS</h3>
+          <p class="text-xs text-gray-700 font-semibold mt-1">Nomor: ${escapeHtml(sk.nomor)}</p>
+        </div>
+
+        <div class="text-xs sm:text-sm text-gray-800 space-y-4 leading-relaxed">
+          <p>
+            Kepala Pusat Pendidikan dan Pelatihan Cabang (Pusdiklatcab) Gerakan Pramuka Kabupaten Tangerang berdasarkan program kerja pendidikan dan pelatihan kepramukaan tahun 2026, dengan ini menugaskan kepada:
+          </p>
+
+          <table class="w-full text-xs sm:text-sm">
+            <tr>
+              <td class="py-1.5 w-48 font-semibold border-none">Nama Lengkap</td>
+              <td class="py-1.5 border-none">: <strong>${escapeHtml(sk.namaPelatih || sk.tujuan)}</strong></td>
+            </tr>
+            <tr>
+              <td class="py-1.5 font-semibold border-none">Nomor Tanda Anggota (NTA)</td>
+              <td class="py-1.5 border-none font-mono">: ${escapeHtml(ntaPelatih)}</td>
+            </tr>
+            <tr>
+              <td class="py-1.5 font-semibold border-none">Unit / Pangkalan</td>
+              <td class="py-1.5 border-none">: ${escapeHtml(pangkalanPelatih)}</td>
+            </tr>
+            <tr>
+              <td class="py-1.5 font-semibold border-none">Ditugaskan Sebagai</td>
+              <td class="py-1.5 border-none">: <strong class="uppercase text-scout-forest">${escapeHtml(peranTugasFormatted)}</strong></td>
+            </tr>
+          </table>
+
+          <div class="p-4 rounded-xl bg-scout-cream/80 border border-scout-sand space-y-1.5">
+            <p class="font-extrabold text-scout-dark uppercase text-xs">Rincian Kegiatan Kursus yang Ditugaskan:</p>
+            <p><strong>Nama Kursus:</strong> ${escapeHtml(namaKursusDisplay)} (${escapeHtml(angkatanDisplay)})</p>
+            <p><strong>Waktu Pelaksanaan:</strong> ${escapeHtml(waktuDisplay)}</p>
+            <p><strong>Tempat / Lokasi:</strong> ${escapeHtml(lokasiDisplay)}</p>
+            <p><strong>Perihal Surat:</strong> ${escapeHtml(sk.perihal)}</p>
+          </div>
+
+          <p>
+            Demikian Surat Tugas ini diberikan kepada yang bersangkutan untuk dilaksanakan dengan penuh rasa tanggung jawab sesuai Kode Kehormatan Gerakan Pramuka (Tri Satya dan Dasa Darma), serta melaporkan hasil pelaksanaannya kepada Kepala Pusdiklatcab Tangerang.
+          </p>
+        </div>
+
+        <div class="mt-10 flex justify-end text-xs">
+          <div class="text-center w-64">
+            <p class="text-gray-600">Dikeluarkan di: Tangerang</p>
+            <p class="text-gray-600">Pada tanggal: ${tanggalSuratIndo}</p>
+            <p class="font-bold text-scout-dark mt-1">Kepala Pusdiklatcab Tangerang,</p>
+            <div class="h-16 flex items-center justify-center text-[10px] italic text-gray-400">
+              [Tertanda & Stempel Resmi]
+            </div>
+            <p class="font-extrabold underline text-scout-dark">${escapeHtml(sk.penanggungJawab || appData.profile.namaKapus)}</p>
+            <p class="text-[11px] text-gray-600">NTA. ${escapeHtml(appData.profile.ntaKapus || '-')}</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function openPreviewSuratTugasPelatih(suratId) {
+      const sk = appData.suratKeluar.find(s => s.id === suratId);
+      if (!sk) return;
+
+      openFormModal(
+        `Pratinjau Surat Tugas — ${sk.nomor}`,
+        `
+          <div class="space-y-4">
+            <div id="print-area" class="bg-white p-6 rounded-2xl border border-scout-sand">
+              ${buildSuratTugasDocumentHtml(sk)}
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-2.5 pt-2 border-t border-gray-100 no-print">
+              <button type="button" onclick="closeFormModal()"
+                class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-bold text-gray-700">
+                Tutup
+              </button>
+              <button type="button" onclick="downloadSuratTugasPelatih('${sk.id}')"
+                class="px-4 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="download" class="w-3.5 h-3.5 text-scout-gold"></i>
+                <span>Download Surat Tugas (.doc)</span>
+              </button>
+              <button type="button" onclick="window.print()"
+                class="px-4 py-2 rounded-xl bg-scout-dark hover:bg-scout-brown text-white text-xs font-bold inline-flex items-center gap-1.5">
+                <i data-lucide="printer" class="w-3.5 h-3.5 text-scout-gold"></i>
+                <span>Cetak / Print PDF</span>
+              </button>
+            </div>
+          </div>
+        `
+      );
+    }
+
+    function downloadSuratTugasPelatih(suratId) {
+      const sk = appData.suratKeluar.find(s => s.id === suratId);
+      if (!sk) {
+        showToast('Data Surat Tugas tidak ditemukan.', 'error');
+        return;
+      }
+
+      const course = appData.kursus.find(c => c.id === sk.kursusId);
+      const pelatihPotensi = appData.potensi.find(
+        p => normalizePersonNameForMatch(p.nama) === normalizePersonNameForMatch(sk.namaPelatih)
+      );
+      const ntaPelatih = pelatihPotensi && pelatihPotensi.nta ? pelatihPotensi.nta : '-';
+      const pangkalanPelatih = pelatihPotensi && pelatihPotensi.pangkalan
+        ? `${pelatihPotensi.pangkalan} (Kwarran ${pelatihPotensi.kwarran})`
+        : 'Korps Pelatih Pusdiklatcab Tangerang';
+      const namaKursusDisplay = course ? course.nama : (sk.namaKursus || '-');
+      const angkatanDisplay = course ? course.angkatan : '-';
+      const waktuDisplay = course
+        ? `${course.hari && course.hari !== 'Sesuai Jadwal' ? course.hari + ', ' : ''}${formatDateRangeIndo(course.tanggal)}`
+        : '-';
+      const lokasiDisplay = course ? course.lokasi : '-';
+      const tanggalSuratIndo = formatDateIndo(sk.tanggalKeluar || getTodayIsoDate());
+      const peranTugasFormatted = formatTugasRoleLabel(sk.tugasSebagai);
+
+      const docHtml = `<!DOCTYPE html>
+<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+  <meta charset="utf-8" />
+  <title>Surat Tugas - ${escapeHtml(sk.nomor)}</title>
+  <style>
+    body { font-family: 'Times New Roman', serif; font-size: 12pt; color: #000000; line-height: 1.5; margin: 2cm; }
+    .kop { text-align: center; border-bottom: 3px double #000000; padding-bottom: 10px; margin-bottom: 20px; }
+    .kop h3 { margin: 0; font-size: 11pt; text-transform: uppercase; letter-spacing: 1px; }
+    .kop h2 { margin: 4px 0; font-size: 14pt; text-transform: uppercase; }
+    .kop p { margin: 2px 0; font-size: 9.5pt; }
+    .judul { text-align: center; margin: 18px 0; }
+    .judul h1 { margin: 0; font-size: 13pt; text-decoration: underline; text-transform: uppercase; }
+    .judul p { margin: 4px 0 0 0; font-size: 11pt; }
+    table.bio { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    table.bio td { padding: 4px 6px; vertical-align: top; }
+    .box-kursus { border: 1px solid #333; background: #f9f6f0; padding: 12px 14px; margin: 14px 0; }
+    .ttd-wrap { width: 100%; margin-top: 32px; }
+    .ttd-box { width: 260px; float: right; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="kop">
+    <h3>GERAKAN PRAMUKA KWARTIR CABANG KABUPATEN TANGERANG</h3>
+    <h2>PUSAT PENDIDIKAN DAN PELATIHAN CABANG (PUSDIKLATCAB)</h2>
+    <p>${escapeHtml(appData.profile.alamat)}</p>
+    <p>Telp: ${escapeHtml(appData.profile.telepon)} | Email: ${escapeHtml(appData.profile.email)}</p>
+  </div>
+
+  <div class="judul">
+    <h1>SURAT TUGAS</h1>
+    <p>Nomor: ${escapeHtml(sk.nomor)}</p>
+  </div>
+
+  <p>
+    Kepala Pusat Pendidikan dan Pelatihan Cabang (Pusdiklatcab) Gerakan Pramuka Kabupaten Tangerang berdasarkan program kerja pendidikan dan pelatihan kepramukaan tahun 2026, dengan ini menugaskan kepada:
+  </p>
+
+  <table class="bio">
+    <tr>
+      <td style="width: 195px;">Nama Lengkap</td>
+      <td>: <strong>${escapeHtml(sk.namaPelatih || sk.tujuan)}</strong></td>
+    </tr>
+    <tr>
+      <td>Nomor Tanda Anggota (NTA)</td>
+      <td>: ${escapeHtml(ntaPelatih)}</td>
+    </tr>
+    <tr>
+      <td>Unit / Pangkalan</td>
+      <td>: ${escapeHtml(pangkalanPelatih)}</td>
+    </tr>
+    <tr>
+      <td>Ditugaskan Sebagai</td>
+      <td>: <strong>${escapeHtml(peranTugasFormatted.toUpperCase())}</strong></td>
+    </tr>
+  </table>
+
+  <div class="box-kursus">
+    <p style="margin: 0 0 6px 0; font-weight: bold; text-transform: uppercase;">Rincian Kegiatan Kursus yang Ditugaskan:</p>
+    <p style="margin: 3px 0;"><strong>Nama Kursus:</strong> ${escapeHtml(namaKursusDisplay)} (${escapeHtml(angkatanDisplay)})</p>
+    <p style="margin: 3px 0;"><strong>Waktu Pelaksanaan:</strong> ${escapeHtml(waktuDisplay)}</p>
+    <p style="margin: 3px 0;"><strong>Tempat / Lokasi:</strong> ${escapeHtml(lokasiDisplay)}</p>
+    <p style="margin: 3px 0;"><strong>Perihal Surat:</strong> ${escapeHtml(sk.perihal)}</p>
+  </div>
+
+  <p>
+    Demikian Surat Tugas ini diberikan kepada yang bersangkutan untuk dilaksanakan dengan penuh rasa tanggung jawab sesuai Kode Kehormatan Gerakan Pramuka (Tri Satya dan Dasa Darma), serta melaporkan hasil pelaksanaannya kepada Kepala Pusdiklatcab Tangerang.
+  </p>
+
+  <div class="ttd-wrap">
+    <div class="ttd-box">
+      <p style="margin: 0;">Dikeluarkan di: Tangerang</p>
+      <p style="margin: 0;">Pada tanggal: ${tanggalSuratIndo}</p>
+      <p style="margin: 4px 0 0 0; font-weight: bold;">Kepala Pusdiklatcab Tangerang,</p>
+      <div style="height: 64px;"></div>
+      <p style="margin: 0; font-weight: bold; text-decoration: underline;">${escapeHtml(sk.penanggungJawab || appData.profile.namaKapus)}</p>
+      <p style="margin: 2px 0 0 0; font-size: 10.5pt;">NTA. ${escapeHtml(appData.profile.ntaKapus || '-')}</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+      const safeFileNum = String(sk.nomor || 'Surat_Tugas').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `Surat_Tugas_${safeFileNum}.doc`;
+      const blob = new Blob(['\ufeff', docHtml], { type: 'application/msword;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      showToast(`Dokumen "${filename}" berhasil diunduh!`, 'success');
+    }
+
+    function renderPelatihTugasSectionHtml(tugasList) {
+      if (!isPelatihReadOnly()) return '';
+
+      return `
+        <div class="bg-white rounded-2xl border-2 border-scout-forest/30 shadow-scout overflow-hidden mb-6">
+          <div class="p-5 bg-gradient-to-r from-scout-forest/10 via-scout-cream/80 to-white border-b border-scout-sand flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-scout-forest text-white flex items-center justify-center shrink-0 shadow-xs">
+                <i data-lucide="file-badge" class="w-5 h-5 text-scout-gold"></i>
+              </div>
+              <div>
+                <h4 class="text-sm sm:text-base font-extrabold text-scout-dark">
+                  Daftar Penugasan & Surat Tugas Pelatih (${tugasList.length})
+                </h4>
+                <p class="text-xs text-gray-600">
+                  Penugasan resmi untuk <strong>${escapeHtml(currentUser.nama)}</strong> dari Administrasi Surat Keluar Pusdiklatcab Tangerang
+                </p>
+              </div>
+            </div>
+            <span class="px-3 py-1 rounded-full bg-scout-dark text-scout-gold text-[11px] font-extrabold self-start sm:self-center">
+              Terverifikasi Pusdiklatcab
+            </span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-scout-cream text-scout-brown text-[11px] font-extrabold uppercase tracking-wider border-b border-scout-sand">
+                  <th class="py-3 px-4 w-12">No</th>
+                  <th class="py-3 px-4">Nomor & Tgl Surat</th>
+                  <th class="py-3 px-4">Tugas</th>
+                  <th class="py-3 px-4">Jadwal & Lokasi Kursus</th>
+                  <th class="py-3 px-4 text-right">Surat Tugas</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 text-xs">
+                ${tugasList.map((sk, idx) => {
+                  const targetCourse = appData.kursus.find(c => c.id === sk.kursusId);
+                  const namaKursus = targetCourse ? targetCourse.nama : (sk.namaKursus || '-');
+                  const jadwalKursus = targetCourse
+                    ? `${targetCourse.hari && targetCourse.hari !== 'Sesuai Jadwal' ? targetCourse.hari + ', ' : ''}${formatDateRangeIndo(targetCourse.tanggal)}`
+                    : '-';
+                  const lokasiKursus = targetCourse ? targetCourse.lokasi : '-';
+                  const roleLabel = formatTugasRoleLabel(sk.tugasSebagai);
+
+                  return `
+                    <tr class="hover:bg-scout-cream/40 transition">
+                      <td class="py-3.5 px-4 font-semibold text-gray-500">${idx + 1}</td>
+                      <td class="py-3.5 px-4 whitespace-nowrap">
+                        <p class="font-extrabold text-scout-dark">${escapeHtml(sk.nomor)}</p>
+                        <p class="text-[11px] text-gray-500 mt-0.5">${formatDateIndo(sk.tanggalKeluar)}</p>
+                      </td>
+                      <td class="py-3.5 px-4 max-w-md">
+                        <div class="flex flex-wrap items-center gap-1.5 mb-1">
+                          <span class="px-2.5 py-0.5 rounded-full bg-scout-forest text-white text-[10px] font-extrabold uppercase">
+                            ${escapeHtml(roleLabel)}
+                          </span>
+                          <span class="text-[11px] font-bold text-scout-brown">
+                            ${escapeHtml(sk.namaPelatih || currentUser.nama)}
+                          </span>
+                        </div>
+                        <p class="text-gray-800 leading-relaxed">
+                          Ditugaskan sebagai <strong class="text-scout-forest">${escapeHtml(roleLabel)}</strong> pada kegiatan <strong>${escapeHtml(namaKursus)}</strong>.
+                        </p>
+                      </td>
+                      <td class="py-3.5 px-4 text-gray-700">
+                        <p class="font-semibold text-scout-dark">${escapeHtml(jadwalKursus)}</p>
+                        <p class="text-[11px] text-gray-500 mt-0.5">${escapeHtml(lokasiKursus)}</p>
+                      </td>
+                      <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                        <div class="inline-flex items-center gap-1.5">
+                          <button type="button" onclick="openPreviewSuratTugasPelatih('${sk.id}')"
+                            class="px-3 py-1.5 rounded-xl bg-scout-cream hover:bg-scout-sand/70 text-scout-dark border border-scout-sand font-bold text-[11px] inline-flex items-center gap-1 transition"
+                            title="Pratinjau Dokumen Surat Tugas">
+                            <i data-lucide="eye" class="w-3.5 h-3.5 text-scout-brown"></i>
+                            <span>Lihat</span>
+                          </button>
+                          <button type="button" onclick="downloadSuratTugasPelatih('${sk.id}')"
+                            class="px-3.5 py-1.5 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white font-extrabold text-[11px] inline-flex items-center gap-1.5 shadow-xs transition"
+                            title="Download Dokumen Surat Tugas Resmi">
+                            <i data-lucide="download" class="w-3.5 h-3.5 text-scout-gold"></i>
+                            <span>Download Surat Tugas</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('') || `
+                  <tr>
+                    <td colspan="5" class="py-8 text-center text-gray-500">
+                      Belum ada Surat Tugas yang diterbitkan untuk akun <strong>${escapeHtml(currentUser.nama)}</strong>.
+                    </td>
+                  </tr>
+                `}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    // =========================================================================
     // 7. VIEW: DASHBOARD (TERFILTER KETAT SESUAI ROLE & WILAYAH KWARRAN)
     // =========================================================================
     function renderDashboardView(container) {
       syncKwarranCoursesToAdmin(appData);
+      syncSuratTugasToCourseAttendance(appData);
       syncGraduatedParticipantsToPotensi(appData);
       const scope = getActiveKwarranScope();
       const isKwarran = scope.isKwarran;
       const myKwarran = scope.kwarranName;
       const readOnly = isPelatihReadOnly();
+      const pelatihTugasList = readOnly ? getSuratTugasForCurrentPelatih() : [];
 
       const filteredPotensi = getScopedPotensiList();
 
@@ -2103,7 +2716,7 @@
               ${isKwarran
                 ? `Panel kendali <strong>Kwartir Ranting ${escapeHtml(myKwarran)}</strong>. Kelola penyelenggaraan kursus tingkat ranting, data potensi pembina, dan input data peserta secara terisolasi.`
                 : (readOnly
-                  ? 'Akses Korps Pelatih Pusdiklatcab Tangerang: pantau statistik data potensi pembina, jadwal kursus, serta unduh/cetak laporan resmi.'
+                  ? `Akses Korps Pelatih Pusdiklatcab Tangerang: Anda memiliki <strong>${pelatihTugasList.length} Surat Tugas</strong> aktif, dapat mengunduh dokumen Surat Tugas resmi, serta memantau statistik potensi pembina.`
                   : 'Sistem informasi terpadu pengelolaan data potensi pembina, jadwal kursus pendidikan & pelatihan, serta administrasi persuratan Pusdiklatcab Tangerang.')}
             </p>
           </div>
@@ -2120,20 +2733,33 @@
                 <i data-lucide="user-plus" class="w-4 h-4 text-scout-gold"></i>
                 <span>Input Data Peserta</span>
               </button>
-            ` : `
-              <button type="button" onclick="navigateTo('data-potensi')"
+            ` : (readOnly ? `
+              <button type="button" onclick="navigateTo('kursus')"
                 class="px-4 py-2.5 rounded-xl bg-scout-gold hover:bg-amber-400 text-scout-dark font-extrabold text-xs flex items-center gap-2 shadow-sm transition">
-                <i data-lucide="users" class="w-4 h-4"></i>
-                <span>${readOnly ? 'Lihat Data Potensi' : 'Kelola Data Potensi'}</span>
+                <i data-lucide="file-badge" class="w-4 h-4"></i>
+                <span>Lihat & Unduh Surat Tugas (${pelatihTugasList.length})</span>
               </button>
               <button type="button" onclick="navigateTo('laporan')"
                 class="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-bold text-xs flex items-center gap-2 transition">
                 <i data-lucide="file-spreadsheet" class="w-4 h-4 text-scout-gold"></i>
                 <span>Unduh Laporan</span>
               </button>
-            `}
+            ` : `
+              <button type="button" onclick="navigateTo('data-potensi')"
+                class="px-4 py-2.5 rounded-xl bg-scout-gold hover:bg-amber-400 text-scout-dark font-extrabold text-xs flex items-center gap-2 shadow-sm transition">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span>Kelola Data Potensi</span>
+              </button>
+              <button type="button" onclick="navigateTo('laporan')"
+                class="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-bold text-xs flex items-center gap-2 transition">
+                <i data-lucide="file-spreadsheet" class="w-4 h-4 text-scout-gold"></i>
+                <span>Unduh Laporan</span>
+              </button>
+            `)}
           </div>
         </div>
+
+        ${readOnly ? renderPelatihTugasSectionHtml(pelatihTugasList) : ''}
 
         <!-- 4 KARTU RINGKASAN STATISTIK -->
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5 mb-6">
@@ -3172,12 +3798,14 @@
     }
 
     // =========================================================================
-    // 10. VIEW: KURSUS (ADMIN, PELATIH [READ-ONLY], PANITIA) + SINKRONISASI KWARRAN
+    // 10. VIEW: KURSUS (ADMIN, PELATIH [TUGAS & READ-ONLY], PANITIA)
     // =========================================================================
     function renderKursusView(container) {
       syncKwarranCoursesToAdmin(appData);
+      syncSuratTugasToCourseAttendance(appData);
       const isAdmin = currentUser && currentUser.role === 'Admin';
       const readOnly = isPelatihReadOnly();
+      const pelatihTugasList = readOnly ? getSuratTugasForCurrentPelatih() : [];
 
       const list = appData.kursus.filter(k => {
         if (uiState.kursusStatus !== 'ALL' && k.status !== uiState.kursusStatus) return false;
@@ -3199,6 +3827,8 @@
       const usulanCount = appData.kursus.filter(k => k.sourceType === 'kwarran').length;
 
       container.innerHTML = `
+        ${readOnly ? renderPelatihTugasSectionHtml(pelatihTugasList) : ''}
+
         <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div class="flex flex-col sm:flex-row gap-3 flex-1">
             <div class="relative flex-1 max-w-md">
@@ -3241,9 +3871,13 @@
           ${list.map(k => {
             const pct = Math.min(100, Math.round((k.terdaftar / Math.max(1, k.kuota)) * 100));
             const isKwarranOrigin = k.sourceType === 'kwarran';
+            const myAssignedSurat = readOnly
+              ? pelatihTugasList.find(sk => sk.kursusId === k.id)
+              : null;
+
             return `
               <div onclick="${isAdmin ? `openAdminCourseDetail('${k.id}')` : ''}"
-                class="bg-white rounded-2xl p-5 border ${isKwarranOrigin ? 'border-teal-300/90' : 'border-scout-sand'} shadow-scout flex flex-col justify-between ${isAdmin ? 'cursor-pointer hover:border-scout-forest hover:shadow-lg transition' : ''}">
+                class="bg-white rounded-2xl p-5 border ${myAssignedSurat ? 'border-scout-forest ring-2 ring-scout-forest/15' : (isKwarranOrigin ? 'border-teal-300/90' : 'border-scout-sand')} shadow-scout flex flex-col justify-between ${isAdmin ? 'cursor-pointer hover:border-scout-forest hover:shadow-lg transition' : ''}">
                 <div>
                   <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
                     <div class="flex flex-wrap items-center gap-1.5">
@@ -3264,6 +3898,23 @@
                     ${renderStatusBadge(k.status)}
                   </div>
                   <h4 class="text-base font-extrabold text-scout-dark leading-snug">${escapeHtml(k.nama)}</h4>
+
+                  ${myAssignedSurat ? `
+                    <div class="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <p class="font-extrabold text-scout-forest flex items-center gap-1">
+                          <i data-lucide="badge-check" class="w-3.5 h-3.5"></i>
+                          <span>Tugas Anda: ${escapeHtml(formatTugasRoleLabel(myAssignedSurat.tugasSebagai))}</span>
+                        </p>
+                        <p class="text-[11px] text-gray-600 mt-0.5">ST No. ${escapeHtml(myAssignedSurat.nomor)}</p>
+                      </div>
+                      <button type="button" onclick="downloadSuratTugasPelatih('${myAssignedSurat.id}')"
+                        class="px-3 py-1.5 rounded-lg bg-scout-forest hover:bg-scout-forestDark text-white font-bold text-[11px] inline-flex items-center gap-1 self-start sm:self-center shrink-0">
+                        <i data-lucide="download" class="w-3 h-3 text-scout-gold"></i>
+                        <span>Download ST</span>
+                      </button>
+                    </div>
+                  ` : ''}
 
                   <div class="mt-4 space-y-2 text-xs text-gray-600">
                     <div class="flex items-center gap-2">
@@ -3463,6 +4114,13 @@
         }
       }
 
+      // Sinkronkan namaKursus pada surat keluar yang merujuk ke kursus ini
+      appData.suratKeluar.forEach(sk => {
+        if (sk.jenisSurat === 'Tugas' && sk.kursusId === payload.id) {
+          sk.namaKursus = newNama;
+        }
+      });
+
       if (id) {
         const idx = appData.kursus.findIndex(item => item.id === id);
         if (idx !== -1) appData.kursus[idx] = payload;
@@ -3548,91 +4206,7 @@
 
     function ensureCourseDetailRecord(course) {
       if (!appData.courseDetails[course.id]) {
-        const initialPelatih = (course.pelatih || 'Kak Drs. H. Ahmad Fauzi, M.Pd.')
-          .split(',')
-          .map((n, i) => ({
-            id: `plt_${course.id}_${i + 1}`,
-            nama: n.trim(),
-            jabatan: i === 0 ? 'Pemimpin Kursus (Pinsus)' : 'Pelatih Pendamping',
-            statusHadir: 'Hadir',
-            catatan: ''
-          }))
-          .filter(x => x.nama);
-
-        const initialPanitia = (course.panitia || 'Kak Rina Wulandari, S.Pd.')
-          .split(',')
-          .map((n, i) => ({
-            id: `pnt_${course.id}_${i + 1}`,
-            nama: n.trim(),
-            jabatan: i === 0 ? 'Ketua Panitia Pelaksana' : 'Sekretaris / Anggota Panitia',
-            statusHadir: 'Hadir',
-            catatan: ''
-          }))
-          .filter(x => x.nama);
-
-        appData.courseDetails[course.id] = {
-          suratTugas: {
-            nomor: `ST-${Math.floor(100 + Math.random() * 899)}/28.04-Pusdiklatcab/2026`,
-            tanggal: getTodayIsoDate(),
-            penandatangan: appData.profile.namaKapus,
-            perihal: `Penugasan Tim Pelatih & Panitia Pelaksana ${course.nama}`,
-            personel: [...initialPelatih.map(p => `${p.nama} (${p.jabatan})`), ...initialPanitia.map(p => `${p.nama} (${p.jabatan})`)].join('\n'),
-            attachments: []
-          },
-          manualParticipants: course.sourceType === 'kwarran' ? [] : [
-            {
-              id: `mp_${course.id}_1`,
-              nta: '28.04.01.000412.0001',
-              nama: 'Kak Hendra Setiawan, S.Pd.',
-              tempatLahir: 'Tangerang',
-              tanggalLahir: '1993-04-12',
-              golongan: 'Penggalang',
-              gender: 'Putra',
-              pangkalan: 'SMPN 1 Tigaraksa',
-              kwarran: 'Tigaraksa',
-              fotoUrl: '',
-              statusKelulusan: course.status === 'Selesai' ? 'Lulus' : 'Belum Lulus',
-              source: 'cabang'
-            },
-            {
-              id: `mp_${course.id}_2`,
-              nta: '28.04.05.000419.0001',
-              nama: 'Kak Dewi Anggraini, S.Pd.SD.',
-              tempatLahir: 'Tangerang',
-              tanggalLahir: '1995-09-18',
-              golongan: 'Siaga',
-              gender: 'Putri',
-              pangkalan: 'SDN Curug 01',
-              kwarran: 'Curug',
-              fotoUrl: '',
-              statusKelulusan: course.status === 'Selesai' ? 'Lulus' : 'Belum Lulus',
-              source: 'cabang'
-            }
-          ],
-          attendanceStatus: {},
-          graduationStatus: {},
-          panitiaList: initialPanitia,
-          pelatihList: initialPelatih,
-          rundown: [
-            {
-              id: `rnd_${course.id}_1`,
-              sesi: 'Hari Ke-1 / Sesi 1',
-              waktu: '08.00 - 09.30 WIB',
-              materi: 'Upacara Pembukaan, Orientasi Kursus & Kontrak Belajar',
-              narasumber: initialPelatih[0] ? initialPelatih[0].nama : 'Pinsus Pusdiklatcab',
-              keterangan: 'Pakaian Seragam Pramuka Lengkap'
-            },
-            {
-              id: `rnd_${course.id}_2`,
-              sesi: 'Hari Ke-1 / Sesi 2',
-              waktu: '09.45 - 11.45 WIB',
-              materi: 'Fundamental Gerakan Pramuka, Prinsip Dasar & Metode Kepramukaan',
-              narasumber: initialPelatih[0] ? initialPelatih[0].nama : 'Tim Pelatih',
-              keterangan: 'Diskusi Kelompok & Simulasi'
-            }
-          ],
-          rundownFiles: []
-        };
+        appData.courseDetails[course.id] = buildDefaultCourseDetailStructure(course, appData.profile);
       }
       const det = appData.courseDetails[course.id];
       det.suratTugas = Object.assign({ nomor: '', tanggal: '', penandatangan: appData.profile.namaKapus, perihal: '', personel: '', attachments: [] }, det.suratTugas || {});
@@ -3654,6 +4228,7 @@
     function openAdminCourseDetail(courseId, tab = 'edit') {
       if (guardPelatihWriteAction()) return;
       syncKwarranCoursesToAdmin(appData);
+      syncSuratTugasToCourseAttendance(appData);
       const course = appData.kursus.find(c => c.id === courseId);
       if (!course) {
         showToast('Data kursus tidak ditemukan.', 'error');
@@ -3677,6 +4252,7 @@
         return;
       }
       syncKwarranCoursesToAdmin(appData);
+      syncSuratTugasToCourseAttendance(appData);
       const course = appData.kursus.find(c => c.id === uiState.selectedAdminCourseId);
       if (!course) {
         navigateTo('kursus');
@@ -3854,10 +4430,11 @@
       if (idx === -1) return;
       const prev = appData.kursus[idx];
       const newStatus = document.getElementById('det-krs-status').value;
+      const newNama = document.getElementById('det-krs-nama').value.trim();
 
       const updated = {
         ...prev,
-        nama: document.getElementById('det-krs-nama').value.trim(),
+        nama: newNama,
         jenjang: document.getElementById('det-krs-jenjang').value,
         angkatan: document.getElementById('det-krs-angkatan').value.trim(),
         status: newStatus,
@@ -3885,6 +4462,12 @@
         }
       }
 
+      appData.suratKeluar.forEach(sk => {
+        if (sk.jenisSurat === 'Tugas' && sk.kursusId === courseId) {
+          sk.namaKursus = newNama;
+        }
+      });
+
       saveAppData();
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -3898,6 +4481,10 @@
 
     function renderAdminCourseTabSuratTugas(course, detail) {
       const st = detail.suratTugas;
+      const syncedTugasLetters = (appData.suratKeluar || []).filter(
+        sk => sk.jenisSurat === 'Tugas' && sk.kursusId === course.id && sk.namaPelatih
+      );
+
       return `
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div class="lg:col-span-7 bg-white rounded-2xl p-6 border border-scout-sand shadow-scout no-print">
@@ -3912,6 +4499,22 @@
                 <span>Cetak ST</span>
               </button>
             </div>
+
+            ${syncedTugasLetters.length > 0 ? `
+              <div class="mb-5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs space-y-1.5">
+                <p class="font-extrabold text-scout-forest flex items-center gap-1.5">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                  <span>Tersinkronisasi dari Administrasi Surat Keluar (${syncedTugasLetters.length} Surat Tugas):</span>
+                </p>
+                <ul class="list-disc pl-5 text-emerald-950 space-y-0.5">
+                  ${syncedTugasLetters.map(sk => `
+                    <li>
+                      <strong>${escapeHtml(sk.namaPelatih)}</strong> — <span class="font-semibold">${escapeHtml(formatTugasRoleLabel(sk.tugasSebagai))}</span> (No. ${escapeHtml(sk.nomor)})
+                    </li>
+                  `).join('')}
+                </ul>
+              </div>
+            ` : ''}
 
             <form onsubmit="saveAdminCourseSuratTugas(event, '${course.id}')" class="space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -4017,7 +4620,10 @@
             <div class="mb-4">
               <p class="font-bold text-scout-dark mb-1">Personel yang Ditugaskan:</p>
               <ol class="list-decimal pl-5 space-y-1 text-gray-800">
-                ${(st.personel || '').split('\n').filter(Boolean).map(line => `<li>${escapeHtml(line)}</li>`).join('') || '<li>Belum ada personel diinput</li>'}
+                ${[
+                  ...(st.personel || '').split('\n').filter(Boolean),
+                  ...syncedTugasLetters.map(sk => `${sk.namaPelatih} — ${formatTugasRoleLabel(sk.tugasSebagai)} (ST No. ${sk.nomor})`)
+                ].map(line => `<li>${escapeHtml(line)}</li>`).join('') || '<li>Belum ada personel diinput</li>'}
               </ol>
             </div>
 
@@ -4162,11 +4768,20 @@
         const staffList = subTab === 'panitia' ? detail.panitiaList : detail.pelatihList;
         rowsHtml = staffList.map((stf, idx) => {
           const curStatus = stf.statusHadir || 'Hadir';
+          const isFromSt = !!stf.sourceSuratTugasId;
           return `
-            <tr class="hover:bg-scout-cream/40">
+            <tr class="hover:bg-scout-cream/40 ${isFromSt ? 'bg-emerald-50/30' : ''}">
               <td class="py-3 px-4 font-semibold text-gray-500">${idx + 1}</td>
-              <td class="py-3 px-4 font-bold text-scout-dark">${escapeHtml(stf.nama)}</td>
-              <td class="py-3 px-4 text-gray-600">${escapeHtml(stf.jabatan || '-')}</td>
+              <td class="py-3 px-4">
+                <p class="font-bold text-scout-dark">${escapeHtml(stf.nama)}</p>
+                ${isFromSt ? `
+                  <span class="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded bg-emerald-100 text-scout-forest border border-emerald-200 text-[10px] font-extrabold">
+                    <i data-lucide="file-badge" class="w-3 h-3"></i>
+                    <span>Sinkron Surat Tugas (${escapeHtml(stf.sourceSuratNomor || 'Surat Keluar')})</span>
+                  </span>
+                ` : ''}
+              </td>
+              <td class="py-3 px-4 text-gray-700 font-medium">${escapeHtml(stf.jabatan || '-')}</td>
               <td class="py-3 px-4">
                 <div class="flex flex-wrap gap-1.5 no-print">
                   ${statusOptions.map(st => `
@@ -4181,10 +4796,16 @@
                 <span class="hidden print:inline font-bold">${curStatus}</span>
               </td>
               <td class="py-3 px-4 text-right no-print">
-                <button type="button" onclick="deleteCourseStaff('${course.id}', '${subTab}', '${stf.id}')"
-                  class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200">
-                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                </button>
+                ${isFromSt ? `
+                  <span class="text-[10px] font-semibold text-scout-forest italic" title="Dikelola otomatis melalui Administrasi Surat Keluar">
+                    Via Surat Keluar
+                  </span>
+                ` : `
+                  <button type="button" onclick="deleteCourseStaff('${course.id}', '${subTab}', '${stf.id}')"
+                    class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200" title="Hapus Personel">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  </button>
+                `}
               </td>
             </tr>
           `;
@@ -4245,7 +4866,9 @@
             </h4>
             <p class="text-xs text-gray-500">
               Pelaksanaan: ${escapeHtml(course.hari || '')} (${escapeHtml(formatDateRangeIndo(course.tanggal))}) • Lokasi: ${escapeHtml(course.lokasi)}
-              ${subTab === 'peserta' ? ' • Setiap peserta yang dinyatakan Lulus otomatis masuk ke database Data Potensi beserta NTA, Golongan, TTL & pas foto 4x6.' : ''}
+              ${subTab === 'peserta'
+                ? ' • Setiap peserta yang dinyatakan Lulus otomatis masuk ke database Data Potensi beserta NTA, Golongan, TTL & pas foto 4x6.'
+                : ' • Pelatih yang memperoleh Surat Tugas pada Administrasi Surat Keluar otomatis tercantum di daftar absensi ini.'}
             </p>
           </div>
 
@@ -5224,8 +5847,18 @@
     }
 
     // =========================================================================
-    // 11. VIEW: ADMINISTRASI (SURAT MASUK & SURAT KELUAR + ALUR DISPOSISI ADMIN)
+    // 11. VIEW: ADMINISTRASI (SURAT MASUK & SURAT KELUAR + JENIS SURAT TUGAS)
     // =========================================================================
+    function renderJenisSuratKeluarBadge(jenis) {
+      const val = jenis || 'Pemberitahuan';
+      const map = {
+        'Undangan': 'bg-blue-50 text-blue-800 border-blue-200',
+        'Pemberitahuan': 'bg-amber-50 text-amber-900 border-amber-300',
+        'Tugas': 'bg-scout-forest text-white border-scout-forest'
+      };
+      return `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${map[val] || map['Pemberitahuan']}">${escapeHtml(val)}</span>`;
+    }
+
     function renderAdministrasiView(container) {
       if (isPelatihReadOnly()) {
         navigateTo('dashboard');
@@ -5243,11 +5876,14 @@
         if (isMasuk && uiState.suratDisposisiFilter !== 'ALL') {
           if (normalizeDisposisiStatusLabel(s.disposisi) !== uiState.suratDisposisiFilter) return false;
         }
+        if (!isMasuk && uiState.suratKeluarJenisFilter !== 'ALL') {
+          if ((s.jenisSurat || 'Pemberitahuan') !== uiState.suratKeluarJenisFilter) return false;
+        }
         if (uiState.suratSearch) {
           const q = uiState.suratSearch.toLowerCase();
           const text = isMasuk
             ? `${s.nomor} ${s.asal} ${s.perihal} ${s.disposisi} ${s.tujuanDisposisi || ''} ${s.catatanDisposisi || ''} ${formatDateIndo(s.tanggalTerima)} ${formatDateIndo(s.tanggalSurat)}`
-            : `${s.nomor} ${s.tujuan} ${s.perihal} ${s.penanggungJawab} ${formatDateIndo(s.tanggalKeluar)}`;
+            : `${s.nomor} ${s.jenisSurat || ''} ${s.tujuan} ${s.perihal} ${s.penanggungJawab} ${s.namaPelatih || ''} ${s.tugasSebagai || ''} ${s.namaKursus || ''} ${formatDateIndo(s.tanggalKeluar)}`;
           if (!text.toLowerCase().includes(q)) return false;
         }
         return true;
@@ -5308,7 +5944,7 @@
               <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3"></i>
               <input type="text" value="${escapeHtml(uiState.suratSearch)}"
                 oninput="uiState.suratSearch = this.value; renderAdministrasiView(document.getElementById('main-content')); lucide.createIcons();"
-                placeholder="Cari nomor surat, asal/tujuan, disposisi, atau perihal..."
+                placeholder="${isMasuk ? 'Cari nomor surat, asal, disposisi, atau perihal...' : 'Cari nomor surat, jenis, tujuan, pelatih, atau kursus...'}"
                 class="w-full pl-9 pr-3 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
             </div>
 
@@ -5320,7 +5956,15 @@
                 <option value="Sudah Disposisi / Diproses" ${uiState.suratDisposisiFilter === 'Sudah Disposisi / Diproses' ? 'selected' : ''}>Sudah Disposisi / Diproses</option>
                 <option value="Selesai" ${uiState.suratDisposisiFilter === 'Selesai' ? 'selected' : ''}>Selesai</option>
               </select>
-            ` : ''}
+            ` : `
+              <select onchange="uiState.suratKeluarJenisFilter = this.value; renderAdministrasiView(document.getElementById('main-content')); lucide.createIcons();"
+                class="px-3.5 py-2 rounded-xl border border-scout-sand text-xs font-semibold text-scout-dark bg-scout-cream/40 focus:outline-none">
+                <option value="ALL" ${uiState.suratKeluarJenisFilter === 'ALL' ? 'selected' : ''}>Semua Jenis Surat (${appData.suratKeluar.length})</option>
+                ${JENIS_SURAT_KELUAR_OPTIONS.map(j => `
+                  <option value="${j}" ${uiState.suratKeluarJenisFilter === j ? 'selected' : ''}>Jenis: ${j}</option>
+                `).join('')}
+              </select>
+            `}
           </div>
 
           <div class="overflow-x-auto">
@@ -5328,9 +5972,10 @@
               <thead>
                 <tr class="bg-scout-cream text-scout-brown text-[11px] font-extrabold uppercase tracking-wider border-b border-scout-sand">
                   <th class="py-3.5 px-4">Nomor Surat</th>
+                  ${!isMasuk ? '<th class="py-3.5 px-4">Jenis Surat</th>' : ''}
                   <th class="py-3.5 px-4">${isMasuk ? 'Tgl Terima / Surat' : 'Tanggal Keluar'}</th>
                   <th class="py-3.5 px-4">${isMasuk ? 'Asal Instansi / Kwarran' : 'Tujuan Surat'}</th>
-                  <th class="py-3.5 px-4">Perihal</th>
+                  <th class="py-3.5 px-4">${isMasuk ? 'Perihal' : 'Perihal & Rincian Penugasan'}</th>
                   <th class="py-3.5 px-4">${isMasuk ? 'Status & Detail Disposisi' : 'Penanggung Jawab'}</th>
                   <th class="py-3.5 px-4">Lampiran</th>
                   <th class="py-3.5 px-4 text-right">Aksi</th>
@@ -5340,16 +5985,42 @@
                 ${filtered.map(s => {
                   const statusDisp = isMasuk ? normalizeDisposisiStatusLabel(s.disposisi) : '';
                   const isPendingDisp = statusDisp === 'Menunggu Disposisi';
+                  const jenisSk = !isMasuk ? (s.jenisSurat || 'Pemberitahuan') : '';
+                  const isTugasSk = !isMasuk && jenisSk === 'Tugas';
+                  const targetAttendTab = isPanitiaTugasRole(s.tugasSebagai) ? 'panitia' : 'pelatih';
+
                   return `
                     <tr class="hover:bg-scout-cream/40">
                       <td class="py-3.5 px-4 font-extrabold text-scout-dark whitespace-nowrap">${escapeHtml(s.nomor)}</td>
+                      ${!isMasuk ? `<td class="py-3.5 px-4 whitespace-nowrap">${renderJenisSuratKeluarBadge(jenisSk)}</td>` : ''}
                       <td class="py-3.5 px-4 whitespace-nowrap text-gray-600">
                         ${isMasuk
                           ? `<div>Terima: <strong>${formatDateIndo(s.tanggalTerima)}</strong></div><div class="text-[11px]">Surat: ${formatDateIndo(s.tanggalSurat)}</div>`
                           : `<strong>${formatDateIndo(s.tanggalKeluar)}</strong>`}
                       </td>
                       <td class="py-3.5 px-4 font-semibold text-scout-brown">${escapeHtml(isMasuk ? s.asal : s.tujuan)}</td>
-                      <td class="py-3.5 px-4 text-gray-800 max-w-xs">${escapeHtml(s.perihal)}</td>
+                      <td class="py-3.5 px-4 text-gray-800 max-w-sm">
+                        <p>${escapeHtml(s.perihal)}</p>
+                        ${isTugasSk && (s.namaPelatih || s.tugasSebagai || s.namaKursus) ? `
+                          <div class="mt-1.5 p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-950 space-y-0.5">
+                            <p><strong>Pelatih:</strong> ${escapeHtml(s.namaPelatih || '-')}</p>
+                            <p><strong>Tugas sebagai:</strong> <span class="uppercase font-extrabold text-scout-forest">${escapeHtml(s.tugasSebagai || '-')}</span></p>
+                            <p><strong>Kursus:</strong> ${escapeHtml(s.namaKursus || '-')}</p>
+                            <div class="pt-1 flex flex-wrap items-center gap-2">
+                              <span class="inline-flex items-center gap-1 text-[10px] font-bold text-scout-forest">
+                                <i data-lucide="check-circle-2" class="w-3 h-3"></i>
+                                <span>Tersinkron ke Absensi ${isPanitiaTugasRole(s.tugasSebagai) ? 'Panitia' : 'Tim Pelatih'}</span>
+                              </span>
+                              ${isAdmin && s.kursusId ? `
+                                <button type="button" onclick="uiState.adminAttendanceRoleTab = '${targetAttendTab}'; openAdminCourseDetail('${s.kursusId}', 'absensi')"
+                                  class="text-[10px] font-extrabold underline text-scout-dark hover:text-scout-forest">
+                                  Lihat Absensi Kursus &rarr;
+                                </button>
+                              ` : ''}
+                            </div>
+                          </div>
+                        ` : ''}
+                      </td>
                       <td class="py-3.5 px-4">
                         ${isMasuk ? `
                           <div class="space-y-1">
@@ -5371,11 +6042,20 @@
                         ` : `<span class="font-medium text-gray-700">${escapeHtml(s.penanggungJawab)}</span>`}
                       </td>
                       <td class="py-3.5 px-4">
-                        <button type="button" onclick="showToast('Membuka lampiran: ${escapeHtml(s.lampiran || 'Dokumen.pdf')}', 'info')"
-                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-scout-cream hover:bg-scout-sand/60 text-scout-dark text-[11px] font-semibold border border-scout-sand">
-                          <i data-lucide="paperclip" class="w-3 h-3 text-scout-forest"></i>
-                          <span class="max-w-[120px] truncate">${escapeHtml(s.lampiran || 'Lampiran.pdf')}</span>
-                        </button>
+                        <div class="flex flex-col items-start gap-1">
+                          <button type="button" onclick="showToast('Membuka lampiran: ${escapeHtml(s.lampiran || 'Dokumen.pdf')}', 'info')"
+                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-scout-cream hover:bg-scout-sand/60 text-scout-dark text-[11px] font-semibold border border-scout-sand">
+                            <i data-lucide="paperclip" class="w-3 h-3 text-scout-forest"></i>
+                            <span class="max-w-[120px] truncate">${escapeHtml(s.lampiran || 'Lampiran.pdf')}</span>
+                          </button>
+                          ${isTugasSk ? `
+                            <button type="button" onclick="downloadSuratTugasPelatih('${s.id}')"
+                              class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-scout-forest text-[10px] font-extrabold border border-emerald-200">
+                              <i data-lucide="download" class="w-3 h-3"></i>
+                              <span>Unduh ST (.doc)</span>
+                            </button>
+                          ` : ''}
+                        </div>
                       </td>
                       <td class="py-3.5 px-4 text-right whitespace-nowrap">
                         <div class="inline-flex items-center gap-1.5">
@@ -5400,7 +6080,7 @@
                     </tr>
                   `;
                 }).join('') || `
-                  <tr><td colspan="7" class="py-10 text-center text-gray-500">Belum ada arsip surat pada kategori ini.</td></tr>
+                  <tr><td colspan="${isMasuk ? 7 : 8}" class="py-10 text-center text-gray-500">Belum ada arsip surat pada kategori ini.</td></tr>
                 `}
               </tbody>
             </table>
@@ -5524,8 +6204,35 @@
       showToast(`Disposisi surat masuk "${appData.suratMasuk[idx].nomor}" berhasil disetujui (${status})!`, 'success');
     }
 
+    // Handler dinamis saat Jenis Surat Keluar diubah pada Modal Surat Keluar
+    function handleSuratKeluarJenisChange(jenisVal) {
+      const tugasFieldsBox = document.getElementById('srt-tugas-fields');
+      const pelatihInput = document.getElementById('srt-tugas-pelatih');
+      const tugasSebagaiSelect = document.getElementById('srt-tugas-sebagai');
+      const kursusSelect = document.getElementById('srt-tugas-kursus');
+      const isTugas = jenisVal === 'Tugas';
+
+      if (tugasFieldsBox) {
+        tugasFieldsBox.classList.toggle('hidden', !isTugas);
+      }
+      if (pelatihInput) pelatihInput.required = isTugas;
+      if (tugasSebagaiSelect) tugasSebagaiSelect.required = isTugas;
+      if (kursusSelect) kursusSelect.required = isTugas;
+    }
+
+    function syncTujuanFromPelatihTugas(pelatihVal) {
+      const jenisEl = document.getElementById('srt-jenis');
+      const tujuanEl = document.getElementById('srt-tujuan');
+      if (!jenisEl || jenisEl.value !== 'Tugas' || !tujuanEl) return;
+      if (!tujuanEl.value.trim() || tujuanEl.dataset.autoSynced === 'true') {
+        tujuanEl.value = pelatihVal;
+        tujuanEl.dataset.autoSynced = 'true';
+      }
+    }
+
     function openSuratModal(type, id = null) {
       if (guardPelatihWriteAction()) return;
+      syncKwarranCoursesToAdmin(appData);
       const isAdmin = isAdminUser();
       const isMasuk = type === 'masuk';
       const list = isMasuk ? appData.suratMasuk : appData.suratKeluar;
@@ -5533,16 +6240,99 @@
       const todayIso = getTodayIsoDate();
       const currentStatusLabel = s ? normalizeDisposisiStatusLabel(s.disposisi) : 'Menunggu Disposisi';
 
+      const selectedJenisSk = !isMasuk
+        ? (s && JENIS_SURAT_KELUAR_OPTIONS.includes(s.jenisSurat) ? s.jenisSurat : 'Undangan')
+        : 'Undangan';
+      const isTugasMode = !isMasuk && selectedJenisSk === 'Tugas';
+      const pelatihCandidates = getPelatihCandidateNames();
+      const selectedPelatih = s ? (s.namaPelatih || '') : '';
+      const selectedTugasSebagai = s && TUGAS_SEBAGAI_OPTIONS.includes(s.tugasSebagai)
+        ? s.tugasSebagai
+        : TUGAS_SEBAGAI_OPTIONS[0];
+      const selectedKursusId = s ? (s.kursusId || '') : (appData.kursus[0] ? appData.kursus[0].id : '');
+
       openFormModal(
         `${s ? 'Edit' : 'Catat'} ${isMasuk ? 'Surat Masuk' : 'Surat Keluar'}`,
         `
           <form onsubmit="saveSuratForm(event, '${type}', '${id || ''}')" class="space-y-4">
-            <div>
-              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nomor Surat <span class="text-red-600">*</span></label>
-              <input type="text" id="srt-nomor" required value="${s ? escapeHtml(s.nomor) : ''}"
-                placeholder="Contoh: 092/28.04-Pusdiklatcab"
-                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+            <div class="grid grid-cols-1 ${!isMasuk ? 'sm:grid-cols-2' : ''} gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nomor Surat <span class="text-red-600">*</span></label>
+                <input type="text" id="srt-nomor" required value="${s ? escapeHtml(s.nomor) : ''}"
+                  placeholder="Contoh: 092/28.04-Pusdiklatcab"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
+              </div>
+
+              ${!isMasuk ? `
+                <div>
+                  <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Jenis Surat <span class="text-red-600">*</span></label>
+                  <select id="srt-jenis" required onchange="handleSuratKeluarJenisChange(this.value)"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm font-bold text-scout-dark bg-white focus:ring-2 focus:ring-scout-forest focus:outline-none">
+                    ${JENIS_SURAT_KELUAR_OPTIONS.map(j => `
+                      <option value="${j}" ${selectedJenisSk === j ? 'selected' : ''}>${j}</option>
+                    `).join('')}
+                  </select>
+                </div>
+              ` : ''}
             </div>
+
+            ${!isMasuk ? `
+              <!-- BLOK KONDISIONAL SAAT JENIS SURAT = TUGAS -->
+              <div id="srt-tugas-fields" class="${isTugasMode ? '' : 'hidden'} p-4 rounded-2xl bg-emerald-50/80 border-2 border-scout-forest/30 space-y-3.5">
+                <div class="flex items-center gap-2 text-xs font-extrabold text-scout-forest">
+                  <i data-lucide="file-badge" class="w-4 h-4"></i>
+                  <span>Rincian Penugasan Pelatih (Otomatis Tersinkron ke Absensi Kursus)</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label class="block text-xs font-bold uppercase text-scout-brown mb-1">
+                      Nama Pelatih <span class="text-red-600">*</span>
+                    </label>
+                    <input type="text" id="srt-tugas-pelatih" list="pelatih-candidates-datalist"
+                      ${isTugasMode ? 'required' : ''}
+                      value="${escapeHtml(selectedPelatih)}"
+                      oninput="syncTujuanFromPelatihTugas(this.value)"
+                      placeholder="Pilih atau ketik nama pelatih..."
+                      class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-white text-sm font-semibold text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                    <datalist id="pelatih-candidates-datalist">
+                      ${pelatihCandidates.map(nama => `<option value="${escapeHtml(nama)}"></option>`).join('')}
+                    </datalist>
+                    <p class="text-[10px] text-gray-500 mt-1">Pilih dari daftar pelatih terdaftar atau ketik manual.</p>
+                  </div>
+
+                  <div>
+                    <label class="block text-xs font-bold uppercase text-scout-brown mb-1">
+                      Tugas Sebagai <span class="text-red-600">*</span>
+                    </label>
+                    <select id="srt-tugas-sebagai" ${isTugasMode ? 'required' : ''}
+                      class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-white text-sm font-bold text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none">
+                      ${TUGAS_SEBAGAI_OPTIONS.map(roleTugas => `
+                        <option value="${roleTugas}" ${selectedTugasSebagai === roleTugas ? 'selected' : ''}>${roleTugas}</option>
+                      `).join('')}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold uppercase text-scout-brown mb-1">
+                    Kursus Tujuan / Kursus yang Ditugaskan <span class="text-red-600">*</span>
+                  </label>
+                  <select id="srt-tugas-kursus" ${isTugasMode ? 'required' : ''}
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-white text-sm font-semibold text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none">
+                    <option value="">-- Pilih Kursus yang Tersedia --</option>
+                    ${appData.kursus.map(k => `
+                      <option value="${k.id}" ${selectedKursusId === k.id ? 'selected' : ''}>
+                        ${escapeHtml(k.nama)} (${escapeHtml(k.angkatan)} • ${escapeHtml(formatDateRangeIndo(k.tanggal))})
+                      </option>
+                    `).join('')}
+                  </select>
+                  <p class="text-[10px] text-scout-forest font-semibold mt-1">
+                    Otomatis ditambahkan ke daftar absensi Tim Pelatih / Panitia pada detail kursus terpilih.
+                  </p>
+                </div>
+              </div>
+            ` : ''}
 
             ${isMasuk ? `
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -5600,7 +6390,8 @@
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tujuan Surat <span class="text-red-600">*</span></label>
                 <input type="text" id="srt-tujuan" required value="${s ? escapeHtml(s.tujuan) : ''}"
-                  placeholder="Contoh: Kwartir Ranting se-Kabupaten Tangerang"
+                  oninput="this.dataset.autoSynced = 'false'"
+                  placeholder="Contoh: Kwartir Ranting se-Kabupaten Tangerang / Nama Pelatih"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
             `}
@@ -5636,6 +6427,9 @@
       e.preventDefault();
       if (guardPelatihWriteAction()) return;
       const isMasuk = type === 'masuk';
+      let isTugasSaved = false;
+      let savedTargetCourseName = '';
+
       if (isMasuk) {
         const existing = id ? appData.suratMasuk.find(item => item.id === id) : null;
         const payload = {
@@ -5660,13 +6454,39 @@
           appData.suratMasuk.unshift(payload);
         }
       } else {
+        const jenisSuratVal = document.getElementById('srt-jenis').value;
+        const isTugas = jenisSuratVal === 'Tugas';
+        let namaPelatihVal = '';
+        let tugasSebagaiVal = '';
+        let kursusIdVal = '';
+        let namaKursusVal = '';
+
+        if (isTugas) {
+          namaPelatihVal = document.getElementById('srt-tugas-pelatih').value.trim();
+          tugasSebagaiVal = document.getElementById('srt-tugas-sebagai').value.trim();
+          kursusIdVal = document.getElementById('srt-tugas-kursus').value;
+          const targetCourse = appData.kursus.find(c => c.id === kursusIdVal);
+          if (!namaPelatihVal || !tugasSebagaiVal || !targetCourse) {
+            showToast('Lengkapi Nama Pelatih, Tugas Sebagai, dan Kursus Tujuan untuk Surat Tugas.', 'error');
+            return;
+          }
+          namaKursusVal = targetCourse.nama;
+          isTugasSaved = true;
+          savedTargetCourseName = namaKursusVal;
+        }
+
         const payload = {
           id: id || generateId('sk'),
           nomor: document.getElementById('srt-nomor').value.trim(),
+          jenisSurat: jenisSuratVal,
           tanggalKeluar: document.getElementById('srt-tgl-keluar').value,
           tujuan: document.getElementById('srt-tujuan').value.trim(),
           perihal: document.getElementById('srt-perihal').value.trim(),
           penanggungJawab: document.getElementById('srt-pj').value.trim(),
+          namaPelatih: namaPelatihVal,
+          tugasSebagai: tugasSebagaiVal,
+          kursusId: kursusIdVal,
+          namaKursus: namaKursusVal,
           lampiran: document.getElementById('srt-lampiran').value.trim() || 'Lampiran.pdf'
         };
         if (id) {
@@ -5684,7 +6504,9 @@
       showToast(
         isMasuk && !id
           ? 'Surat masuk berhasil dicatat dengan status "Menunggu Disposisi".'
-          : 'Arsip persuratan berhasil disimpan.',
+          : (isTugasSaved
+            ? `Surat Tugas tersimpan & otomatis disinkronkan ke daftar absensi kursus "${savedTargetCourseName}"!`
+            : 'Arsip persuratan berhasil disimpan.'),
         'success'
       );
     }
@@ -5922,9 +6744,10 @@
               <tr class="bg-scout-forest text-white">
                 <th class="border border-gray-300 py-2 px-3 w-10">No</th>
                 <th class="border border-gray-300 py-2 px-3">Nomor Surat</th>
+                <th class="border border-gray-300 py-2 px-3">Jenis</th>
                 <th class="border border-gray-300 py-2 px-3">Tgl Keluar</th>
                 <th class="border border-gray-300 py-2 px-3">Tujuan Surat</th>
-                <th class="border border-gray-300 py-2 px-3">Perihal</th>
+                <th class="border border-gray-300 py-2 px-3">Perihal / Rincian Penugasan</th>
                 <th class="border border-gray-300 py-2 px-3">Penanggung Jawab</th>
               </tr>
             </thead>
@@ -5933,9 +6756,13 @@
                 <tr>
                   <td class="border border-gray-300 py-2 px-3 text-center">${i + 1}</td>
                   <td class="border border-gray-300 py-2 px-3 font-semibold">${escapeHtml(s.nomor)}</td>
+                  <td class="border border-gray-300 py-2 px-3 font-bold">${escapeHtml(s.jenisSurat || 'Pemberitahuan')}</td>
                   <td class="border border-gray-300 py-2 px-3">${formatDateIndo(s.tanggalKeluar)}</td>
                   <td class="border border-gray-300 py-2 px-3">${escapeHtml(s.tujuan)}</td>
-                  <td class="border border-gray-300 py-2 px-3">${escapeHtml(s.perihal)}</td>
+                  <td class="border border-gray-300 py-2 px-3">
+                    ${escapeHtml(s.perihal)}
+                    ${s.jenisSurat === 'Tugas' && s.namaPelatih ? `<br/><strong>Pelatih:</strong> ${escapeHtml(s.namaPelatih)} (${escapeHtml(s.tugasSebagai)}) — ${escapeHtml(s.namaKursus)}` : ''}
+                  </td>
                   <td class="border border-gray-300 py-2 px-3">${escapeHtml(s.penanggungJawab)}</td>
                 </tr>
               `).join('')}
@@ -6091,29 +6918,32 @@
         }
       } else {
         filename = 'Laporan_Administrasi_Surat_Kab_Tangerang.csv';
-        csvRows.push(['Jenis', 'Nomor Surat', 'Tanggal', 'Asal / Tujuan', 'Perihal', 'Status Disposisi / PJ', 'Tujuan Disposisi', 'Catatan Disposisi']);
+        csvRows.push(['Jenis', 'Nomor Surat', 'Kategori Surat', 'Tanggal', 'Asal / Tujuan', 'Perihal', 'Status Disposisi / PJ', 'Rincian Tugas Pelatih']);
         appData.suratMasuk.forEach(s => {
           csvRows.push([
             'Surat Masuk',
             `"${s.nomor}"`,
+            'Surat Masuk',
             `"${formatDateIndo(s.tanggalTerima)}"`,
             `"${s.asal}"`,
             `"${s.perihal}"`,
-            `"${normalizeDisposisiStatusLabel(s.disposisi)}"`,
-            `"${s.tujuanDisposisi || '-'}"`,
-            `"${s.catatanDisposisi || '-'}"`
+            `"${normalizeDisposisiStatusLabel(s.disposisi)} ${s.tujuanDisposisi ? '(' + s.tujuanDisposisi + ')' : ''}"`,
+            '-'
           ]);
         });
         appData.suratKeluar.forEach(s => {
+          const tugasInfo = s.jenisSurat === 'Tugas' && s.namaPelatih
+            ? `${s.namaPelatih} sebagai ${s.tugasSebagai} pada ${s.namaKursus}`
+            : '-';
           csvRows.push([
             'Surat Keluar',
             `"${s.nomor}"`,
+            `"${s.jenisSurat || 'Pemberitahuan'}"`,
             `"${formatDateIndo(s.tanggalKeluar)}"`,
             `"${s.tujuan}"`,
             `"${s.perihal}"`,
             `"${s.penanggungJawab}"`,
-            '-',
-            '-'
+            `"${tugasInfo}"`
           ]);
         });
       }
@@ -6269,7 +7099,7 @@
               <select id="usr-role" onchange="handleUserRoleSelectChange(this.value)"
                 class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white focus:ring-2 focus:ring-scout-forest focus:outline-none">
                 <option value="Admin" ${initialRole === 'Admin' ? 'selected' : ''}>Admin (Akses Penuh)</option>
-                <option value="Pelatih" ${initialRole === 'Pelatih' ? 'selected' : ''}>Pelatih (Hanya Lihat & Unduh)</option>
+                <option value="Pelatih" ${initialRole === 'Pelatih' ? 'selected' : ''}>Pelatih (Lihat Tugas & Unduh)</option>
                 <option value="Panitia" ${initialRole === 'Panitia' ? 'selected' : ''}>Panitia</option>
                 <option value="Kwarran" ${initialRole === 'Kwarran' ? 'selected' : ''}>Kwarran (Kwartir Ranting)</option>
               </select>
@@ -7113,6 +7943,7 @@
     // =========================================================================
     window.addEventListener('DOMContentLoaded', () => {
       syncKwarranCoursesToAdmin(appData);
+      syncSuratTugasToCourseAttendance(appData);
       syncGraduatedParticipantsToPotensi(appData);
       renderBrandLogos();
       restorePersistedSession();
