@@ -496,6 +496,65 @@
     }
 
     // =========================================================================
+    // UTILITAS LAMPIRAN SURAT (DATA URL & DIRECT DOWNLOAD)
+    // =========================================================================
+    function createTextAttachmentDataUrl(lines) {
+      const content = Array.isArray(lines) ? lines.join('\r\n') : String(lines || '');
+      return 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
+    }
+
+    function inferMimeFromFilename(filename) {
+      const lower = String(filename || '').toLowerCase();
+      if (lower.endsWith('.pdf')) return 'application/pdf';
+      if (lower.endsWith('.png')) return 'image/png';
+      if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+      if (lower.endsWith('.webp')) return 'image/webp';
+      if (lower.endsWith('.doc')) return 'application/msword';
+      if (lower.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      return 'application/octet-stream';
+    }
+
+    function buildFallbackSuratAttachmentDataUrl(type, surat) {
+      const isMasuk = type === 'masuk';
+      const lines = [
+        'GERAKAN PRAMUKA KWARTIR CABANG KABUPATEN TANGERANG',
+        'PUSAT PENDIDIKAN DAN PELATIHAN CABANG (PUSDIKLATCAB)',
+        '====================================================================',
+        isMasuk ? 'ARSIP LAMPIRAN SURAT MASUK' : 'ARSIP LAMPIRAN SURAT KELUAR',
+        `Nomor Surat     : ${surat.nomor || '-'}`,
+        isMasuk
+          ? `Tanggal Terima  : ${formatDateIndo(surat.tanggalTerima)} (Tgl Surat: ${formatDateIndo(surat.tanggalSurat)})`
+          : `Jenis Surat     : ${surat.jenisSurat || 'Pemberitahuan'} | Tgl Keluar: ${formatDateIndo(surat.tanggalKeluar)}`,
+        isMasuk
+          ? `Asal Surat      : ${surat.asal || '-'}`
+          : `Tujuan Surat    : ${surat.tujuan || '-'}`,
+        `Perihal         : ${surat.perihal || '-'}`,
+        isMasuk
+          ? `Status Disposisi: ${normalizeDisposisiStatusLabel(surat.disposisi)}${surat.tujuanDisposisi ? ' -> ' + surat.tujuanDisposisi : ''}`
+          : `Penanggung Jawab: ${surat.penanggungJawab || '-'}`,
+        ...(isMasuk && surat.catatanDisposisi ? [`Catatan Admin   : ${surat.catatanDisposisi}`] : []),
+        ...(!isMasuk && surat.jenisSurat === 'Tugas' && surat.namaPelatih
+          ? [
+              `Nama Pelatih    : ${surat.namaPelatih}`,
+              `Tugas Sebagai   : ${formatTugasRoleLabel(surat.tugasSebagai)}`,
+              `Kursus Tujuan   : ${surat.namaKursus || '-'}`
+            ]
+          : []),
+        '====================================================================',
+        `Berkas Lampiran : ${surat.lampiran || 'Lampiran_Surat.txt'}`
+      ];
+      return createTextAttachmentDataUrl(lines);
+    }
+
+    function resolveDownloadFilenameForDataUrl(rawName, dataUrl) {
+      let name = String(rawName || 'Lampiran_Surat').trim() || 'Lampiran_Surat';
+      if (typeof dataUrl === 'string' && dataUrl.startsWith('data:text/plain') && name.toLowerCase().endsWith('.pdf')) {
+        name = name.replace(/\.pdf$/i, '.txt');
+      }
+      return name;
+    }
+
+    // =========================================================================
     // UTILITAS INPUT MASKING & VALIDASI FORMAT NTA (##.##.##.######.####)
     // =========================================================================
     const NTA_PATTERN_REGEX = /^\d{2}\.\d{2}\.\d{2}\.\d{6}\.\d{4}$/;
@@ -742,6 +801,78 @@
     // 2. STATE & DATA AWAL (SEED DATA REALISTIS KABUPATEN TANGERANG)
     // =========================================================================
     function createInitialSeedData() {
+      const sm1Seed = {
+        id: 'sm_1',
+        nomor: '045/28.04.05-B',
+        tanggalTerima: '2026-11-18',
+        tanggalSurat: '2026-11-17',
+        asal: 'Kwartir Ranting Curug',
+        perihal: 'Permohonan Rekomendasi & Tim Pelatih KMD Mandiri Kwarran Curug',
+        disposisi: 'Sudah Disposisi / Diproses',
+        tujuanDisposisi: 'Koordinator Pelatih',
+        catatanDisposisi: 'Segera koordinasikan susunan tim pelatih KMD mandiri Kwarran Curug.',
+        disposisiApprovedAt: '19 November 2026, 09:30 WIB',
+        disposisiApprovedBy: 'Admin Utama',
+        lampiran: 'Surat_Permohonan_KMD_Curug.txt',
+        lampiranMime: 'text/plain',
+        lampiranSize: '2 KB'
+      };
+      sm1Seed.lampiranDataUrl = buildFallbackSuratAttachmentDataUrl('masuk', sm1Seed);
+
+      const sm2Seed = {
+        id: 'sm_2',
+        nomor: '112/28.04.01-A',
+        tanggalTerima: '2026-11-20',
+        tanggalSurat: '2026-11-19',
+        asal: 'Kwartir Ranting Tigaraksa',
+        perihal: 'Pengiriman Daftar Calon Peserta KML Tahun 2026',
+        disposisi: 'Menunggu Disposisi',
+        tujuanDisposisi: '',
+        catatanDisposisi: '',
+        disposisiApprovedAt: '',
+        disposisiApprovedBy: '',
+        lampiran: 'Daftar_Peserta_Tigaraksa.txt',
+        lampiranMime: 'text/plain',
+        lampiranSize: '2 KB'
+      };
+      sm2Seed.lampiranDataUrl = buildFallbackSuratAttachmentDataUrl('masuk', sm2Seed);
+
+      const sk1Seed = {
+        id: 'sk_1',
+        nomor: '088/28.04-Pusdiklatcab',
+        jenisSurat: 'Pemberitahuan',
+        tanggalKeluar: '2026-11-15',
+        tujuan: 'Seluruh Kwartir Ranting se-Kabupaten Tangerang',
+        perihal: 'Edaran Pemutakhiran Data Potensi Pembina & Jadwal KMD/KML Akhir Tahun',
+        penanggungJawab: 'Kak H. Bambang Sudjatmiko, M.Pd.',
+        namaPelatih: '',
+        tugasSebagai: '',
+        kursusId: '',
+        namaKursus: '',
+        lampiran: 'Edaran_Pusdiklatcab_2026.txt',
+        lampiranMime: 'text/plain',
+        lampiranSize: '2 KB'
+      };
+      sk1Seed.lampiranDataUrl = buildFallbackSuratAttachmentDataUrl('keluar', sk1Seed);
+
+      const sk2Seed = {
+        id: 'sk_2',
+        nomor: '091/28.04-Pusdiklatcab',
+        jenisSurat: 'Tugas',
+        tanggalKeluar: '2026-11-21',
+        tujuan: 'Kak Drs. H. Ahmad Fauzi, M.Pd.',
+        perihal: 'Surat Tugas Pemimpin Kursus (Pinsus) KMD Angkatan XLI / 2026',
+        penanggungJawab: 'Kak H. Bambang Sudjatmiko, M.Pd.',
+        namaPelatih: 'Kak Drs. H. Ahmad Fauzi, M.Pd.',
+        tugasSebagai: 'pinsus',
+        kursusId: 'krs_1',
+        namaKursus: 'Kursus Pembina Pramuka Mahir Tingkat Dasar (KMD)',
+        lampiran: 'ST_Pinsus_KMD_XLI_2026.txt',
+        lampiranMime: 'text/plain',
+        lampiranSize: '2 KB'
+      };
+      sk2Seed.lampiranDataUrl = buildFallbackSuratAttachmentDataUrl('keluar', sk2Seed);
+
       return {
         profile: {
           namaKapus: 'Kak H. Bambang Sudjatmiko, M.Pd.',
@@ -866,66 +997,8 @@
           }
         ],
         courseDetails: {},
-        suratMasuk: [
-          {
-            id: 'sm_1',
-            nomor: '045/28.04.05-B',
-            tanggalTerima: '2026-11-18',
-            tanggalSurat: '2026-11-17',
-            asal: 'Kwartir Ranting Curug',
-            perihal: 'Permohonan Rekomendasi & Tim Pelatih KMD Mandiri Kwarran Curug',
-            disposisi: 'Sudah Disposisi / Diproses',
-            tujuanDisposisi: 'Koordinator Pelatih',
-            catatanDisposisi: 'Segera koordinasikan susunan tim pelatih KMD mandiri Kwarran Curug.',
-            disposisiApprovedAt: '19 November 2026, 09:30 WIB',
-            disposisiApprovedBy: 'Admin Utama',
-            lampiran: 'Surat_Permohonan_KMD_Curug.pdf'
-          },
-          {
-            id: 'sm_2',
-            nomor: '112/28.04.01-A',
-            tanggalTerima: '2026-11-20',
-            tanggalSurat: '2026-11-19',
-            asal: 'Kwartir Ranting Tigaraksa',
-            perihal: 'Pengiriman Daftar Calon Peserta KML Tahun 2026',
-            disposisi: 'Menunggu Disposisi',
-            tujuanDisposisi: '',
-            catatanDisposisi: '',
-            disposisiApprovedAt: '',
-            disposisiApprovedBy: '',
-            lampiran: 'Daftar_Peserta_Tigaraksa.pdf'
-          }
-        ],
-        suratKeluar: [
-          {
-            id: 'sk_1',
-            nomor: '088/28.04-Pusdiklatcab',
-            jenisSurat: 'Pemberitahuan',
-            tanggalKeluar: '2026-11-15',
-            tujuan: 'Seluruh Kwartir Ranting se-Kabupaten Tangerang',
-            perihal: 'Edaran Pemutakhiran Data Potensi Pembina & Jadwal KMD/KML Akhir Tahun',
-            penanggungJawab: 'Kak H. Bambang Sudjatmiko, M.Pd.',
-            namaPelatih: '',
-            tugasSebagai: '',
-            kursusId: '',
-            namaKursus: '',
-            lampiran: 'Edaran_Pusdiklatcab_2026.pdf'
-          },
-          {
-            id: 'sk_2',
-            nomor: '091/28.04-Pusdiklatcab',
-            jenisSurat: 'Tugas',
-            tanggalKeluar: '2026-11-21',
-            tujuan: 'Kak Drs. H. Ahmad Fauzi, M.Pd.',
-            perihal: 'Surat Tugas Pemimpin Kursus (Pinsus) KMD Angkatan XLI / 2026',
-            penanggungJawab: 'Kak H. Bambang Sudjatmiko, M.Pd.',
-            namaPelatih: 'Kak Drs. H. Ahmad Fauzi, M.Pd.',
-            tugasSebagai: 'pinsus',
-            kursusId: 'krs_1',
-            namaKursus: 'Kursus Pembina Pramuka Mahir Tingkat Dasar (KMD)',
-            lampiran: 'ST_Pinsus_KMD_XLI_2026.pdf'
-          }
-        ],
+        suratMasuk: [sm1Seed, sm2Seed],
+        suratKeluar: [sk1Seed, sk2Seed],
         kwarranCourses: [
           {
             id: 'kc_tigaraksa_1',
@@ -1014,27 +1087,47 @@
       data.kwarranCourses = Array.isArray(data.kwarranCourses) ? data.kwarranCourses : seed.kwarranCourses;
       data.kwarranParticipants = Array.isArray(data.kwarranParticipants) ? data.kwarranParticipants : seed.kwarranParticipants;
 
-      // Normalisasi struktur disposisi Surat Masuk
-      data.suratMasuk = data.suratMasuk.map(sm => ({
-        ...sm,
-        disposisi: normalizeDisposisiStatusLabel(sm.disposisi),
-        tujuanDisposisi: String(sm.tujuanDisposisi || '').trim(),
-        catatanDisposisi: String(sm.catatanDisposisi || '').trim(),
-        disposisiApprovedAt: String(sm.disposisiApprovedAt || '').trim(),
-        disposisiApprovedBy: String(sm.disposisiApprovedBy || '').trim()
-      }));
+      // Normalisasi struktur disposisi & lampiran Surat Masuk
+      data.suratMasuk = data.suratMasuk.map(sm => {
+        const cleanLampiran = String(sm.lampiran || '').trim();
+        const normalizedItem = {
+          ...sm,
+          disposisi: normalizeDisposisiStatusLabel(sm.disposisi),
+          tujuanDisposisi: String(sm.tujuanDisposisi || '').trim(),
+          catatanDisposisi: String(sm.catatanDisposisi || '').trim(),
+          disposisiApprovedAt: String(sm.disposisiApprovedAt || '').trim(),
+          disposisiApprovedBy: String(sm.disposisiApprovedBy || '').trim(),
+          lampiran: cleanLampiran,
+          lampiranMime: cleanLampiran ? (sm.lampiranMime || inferMimeFromFilename(cleanLampiran)) : '',
+          lampiranSize: cleanLampiran ? (sm.lampiranSize || '') : '',
+          lampiranDataUrl: cleanLampiran ? (sm.lampiranDataUrl || '') : ''
+        };
+        if (cleanLampiran && !normalizedItem.lampiranDataUrl) {
+          normalizedItem.lampiranDataUrl = buildFallbackSuratAttachmentDataUrl('masuk', normalizedItem);
+        }
+        return normalizedItem;
+      });
 
-      // Normalisasi struktur jenis surat & penugasan pelatih pada Surat Keluar
+      // Normalisasi struktur jenis surat, penugasan pelatih & lampiran pada Surat Keluar
       data.suratKeluar = data.suratKeluar.map(sk => {
         const validJenis = JENIS_SURAT_KELUAR_OPTIONS.includes(sk.jenisSurat) ? sk.jenisSurat : 'Pemberitahuan';
-        return {
+        const cleanLampiran = String(sk.lampiran || '').trim();
+        const normalizedItem = {
           ...sk,
           jenisSurat: validJenis,
           namaPelatih: validJenis === 'Tugas' ? String(sk.namaPelatih || '').trim() : '',
           tugasSebagai: validJenis === 'Tugas' ? String(sk.tugasSebagai || '').trim() : '',
           kursusId: validJenis === 'Tugas' ? String(sk.kursusId || '').trim() : '',
-          namaKursus: validJenis === 'Tugas' ? String(sk.namaKursus || '').trim() : ''
+          namaKursus: validJenis === 'Tugas' ? String(sk.namaKursus || '').trim() : '',
+          lampiran: cleanLampiran,
+          lampiranMime: cleanLampiran ? (sk.lampiranMime || inferMimeFromFilename(cleanLampiran)) : '',
+          lampiranSize: cleanLampiran ? (sk.lampiranSize || '') : '',
+          lampiranDataUrl: cleanLampiran ? (sk.lampiranDataUrl || '') : ''
         };
+        if (cleanLampiran && !normalizedItem.lampiranDataUrl) {
+          normalizedItem.lampiranDataUrl = buildFallbackSuratAttachmentDataUrl('keluar', normalizedItem);
+        }
+        return normalizedItem;
       });
 
       data.users = data.users.map(u => {
@@ -1297,7 +1390,6 @@
         if (!Array.isArray(det.panitiaList)) det.panitiaList = [];
         if (!Array.isArray(det.pelatihList)) det.pelatihList = [];
 
-        // Hapus entri hasil sinkronisasi ST yang suratnya sudah dihapus, diubah jenisnya, atau dipindahkan ke kursus lain
         det.panitiaList = det.panitiaList.filter(
           item => !item.sourceSuratTugasId || (validTugasIds.has(item.sourceSuratTugasId) && item.sourceCourseId === course.id && isPanitiaTugasRole(item.sourceRoleTugas))
         );
@@ -1306,7 +1398,6 @@
         );
       });
 
-      // Sinkronkan setiap Surat Tugas aktif ke daftar absensi Tim Pelatih atau Panitia Pelaksana kursus tujuan
       activeTugasLetters.forEach(sk => {
         const targetCourse = targetData.kursus.find(c => c.id === sk.kursusId);
         if (!targetCourse) return;
@@ -1320,7 +1411,6 @@
         const jabLabel = `${formatTugasRoleLabel(sk.tugasSebagai)} (ST No. ${sk.nomor})`;
         const normNama = normalizePersonNameForMatch(sk.namaPelatih);
 
-        // Cek apakah sudah ada entri dengan sourceSuratTugasId atau nama orang yang sama pada daftar tersebut
         let existingIdx = targetList.findIndex(item => item.sourceSuratTugasId === sk.id);
         if (existingIdx === -1 && normNama) {
           existingIdx = targetList.findIndex(item => normalizePersonNameForMatch(item.nama) === normNama);
@@ -1551,6 +1641,7 @@
       suratSearch: '',
       suratDisposisiFilter: 'ALL',
       suratKeluarJenisFilter: 'ALL',
+      suratDraftAttachment: null,
       laporanType: 'potensi',
       laporanKwarran: 'ALL',
       laporanJenjang: 'ALL',
@@ -1641,6 +1732,7 @@
       uiState.suratSearch = '';
       uiState.suratDisposisiFilter = 'ALL';
       uiState.suratKeluarJenisFilter = 'ALL';
+      uiState.suratDraftAttachment = null;
       uiState.laporanType = 'potensi';
       uiState.laporanKwarran = scope.isKwarran ? scope.kwarranName : 'ALL';
       uiState.laporanJenjang = 'ALL';
@@ -1908,8 +2000,8 @@
         'administrasi': {
           title: 'Administrasi Persuratan',
           subtitle: isAdminUser()
-            ? 'Pencatatan arsip surat masuk, persetujuan disposisi Admin, dan pengelolaan surat keluar (Undangan, Pemberitahuan, Tugas)'
-            : 'Pencatatan arsip surat masuk (menunggu disposisi Admin) dan pengelolaan surat keluar'
+            ? 'Pencatatan ringkas surat masuk & surat keluar, lampiran langsung download, serta disposisi Admin'
+            : 'Pencatatan ringkas surat masuk & surat keluar beserta lampiran dokumen siap download'
         },
         'laporan': {
           title: 'Pusat Laporan & Rekapitulasi',
@@ -4114,7 +4206,6 @@
         }
       }
 
-      // Sinkronkan namaKursus pada surat keluar yang merujuk ke kursus ini
       appData.suratKeluar.forEach(sk => {
         if (sk.jenisSurat === 'Tugas' && sk.kursusId === payload.id) {
           sk.namaKursus = newNama;
@@ -5847,7 +5938,7 @@
     }
 
     // =========================================================================
-    // 11. VIEW: ADMINISTRASI (SURAT MASUK & SURAT KELUAR + JENIS SURAT TUGAS)
+    // 11. VIEW: ADMINISTRASI (PENYEDERHANAAN: RINGKAS & LAMPIRAN LANGSUNG DOWNLOAD)
     // =========================================================================
     function renderJenisSuratKeluarBadge(jenis) {
       const val = jenis || 'Pemberitahuan';
@@ -5857,6 +5948,114 @@
         'Tugas': 'bg-scout-forest text-white border-scout-forest'
       };
       return `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${map[val] || map['Pemberitahuan']}">${escapeHtml(val)}</span>`;
+    }
+
+    function downloadSuratAttachment(type, suratId) {
+      const isMasuk = type === 'masuk';
+      const list = isMasuk ? appData.suratMasuk : appData.suratKeluar;
+      const surat = list.find(item => item.id === suratId);
+
+      if (!surat) {
+        showToast('Data surat tidak ditemukan.', 'error');
+        return;
+      }
+
+      const rawFilename = String(surat.lampiran || '').trim();
+      if (!rawFilename && !surat.lampiranDataUrl) {
+        showToast('Lampiran surat belum tersedia / belum dilampirkan pada surat ini.', 'info');
+        return;
+      }
+
+      const effectiveDataUrl = surat.lampiranDataUrl || buildFallbackSuratAttachmentDataUrl(type, surat);
+      const downloadName = resolveDownloadFilenameForDataUrl(rawFilename || `Lampiran_${surat.nomor}.txt`, effectiveDataUrl);
+
+      const link = document.createElement('a');
+      link.href = effectiveDataUrl;
+      link.download = downloadName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast(`Mengunduh lampiran "${downloadName}"...`, 'success');
+    }
+
+    function handleSuratAttachmentFileChange(event) {
+      if (guardPelatihWriteAction()) return;
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (file.size > 3 * 1024 * 1024) {
+        showToast('Ukuran file lampiran maksimal 3 MB agar penyimpanan browser tetap optimal.', 'error');
+        event.target.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        const sizeLabel = file.size >= 1024 * 1024
+          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+          : `${Math.max(1, Math.round(file.size / 1024))} KB`;
+
+        uiState.suratDraftAttachment = {
+          name: file.name,
+          mime: file.type || inferMimeFromFilename(file.name),
+          sizeLabel: sizeLabel,
+          dataUrl: ev.target.result
+        };
+        updateSuratAttachmentPreviewUI();
+        showToast(`Lampiran "${file.name}" (${sizeLabel}) siap disimpan.`, 'info');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeSuratDraftAttachment() {
+      if (guardPelatihWriteAction()) return;
+      uiState.suratDraftAttachment = null;
+      const fileInput = document.getElementById('srt-lampiran-file');
+      if (fileInput) fileInput.value = '';
+      updateSuratAttachmentPreviewUI();
+      showToast('Lampiran pada form dihapus.', 'info');
+    }
+
+    function updateSuratAttachmentPreviewUI() {
+      const box = document.getElementById('srt-lampiran-preview-box');
+      if (!box) return;
+      const att = uiState.suratDraftAttachment;
+      if (att && att.name) {
+        box.innerHTML = `
+          <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-white border border-scout-forest/40 text-xs">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-8 h-8 rounded-lg bg-emerald-50 text-scout-forest flex items-center justify-center shrink-0">
+                <i data-lucide="file-check-2" class="w-4 h-4"></i>
+              </div>
+              <div class="min-w-0">
+                <p class="font-extrabold text-scout-dark truncate">${escapeHtml(att.name)}</p>
+                <p class="text-[10px] text-scout-forest font-semibold">Berkas siap diunduh${att.sizeLabel ? ` • ${escapeHtml(att.sizeLabel)}` : ''}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              ${att.dataUrl ? `
+                <a href="${att.dataUrl}" download="${escapeHtml(resolveDownloadFilenameForDataUrl(att.name, att.dataUrl))}"
+                  class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-scout-forest border border-emerald-200 font-bold text-[11px] inline-flex items-center gap-1">
+                  <i data-lucide="download" class="w-3 h-3"></i>
+                  <span>Cek Unduh</span>
+                </a>
+              ` : ''}
+              <button type="button" onclick="removeSuratDraftAttachment()"
+                class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200" title="Hapus Lampiran">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        box.innerHTML = `
+          <p class="text-[11px] text-gray-500 italic">
+            Belum ada file lampiran dipilih (opsional — jika belum dilampirkan, sistem menampilkan indikator belum ada lampiran).
+          </p>
+        `;
+      }
+      lucide.createIcons();
     }
 
     function renderAdministrasiView(container) {
@@ -5882,8 +6081,8 @@
         if (uiState.suratSearch) {
           const q = uiState.suratSearch.toLowerCase();
           const text = isMasuk
-            ? `${s.nomor} ${s.asal} ${s.perihal} ${s.disposisi} ${s.tujuanDisposisi || ''} ${s.catatanDisposisi || ''} ${formatDateIndo(s.tanggalTerima)} ${formatDateIndo(s.tanggalSurat)}`
-            : `${s.nomor} ${s.jenisSurat || ''} ${s.tujuan} ${s.perihal} ${s.penanggungJawab} ${s.namaPelatih || ''} ${s.tugasSebagai || ''} ${s.namaKursus || ''} ${formatDateIndo(s.tanggalKeluar)}`;
+            ? `${s.nomor} ${s.asal} ${s.perihal} ${s.disposisi} ${s.tujuanDisposisi || ''} ${s.catatanDisposisi || ''} ${s.lampiran || ''} ${formatDateIndo(s.tanggalTerima)} ${formatDateIndo(s.tanggalSurat)}`
+            : `${s.nomor} ${s.jenisSurat || ''} ${s.tujuan} ${s.perihal} ${s.penanggungJawab} ${s.namaPelatih || ''} ${s.tugasSebagai || ''} ${s.namaKursus || ''} ${s.lampiran || ''} ${formatDateIndo(s.tanggalKeluar)}`;
           if (!text.toLowerCase().includes(q)) return false;
         }
         return true;
@@ -5931,8 +6130,8 @@
               <i data-lucide="${isAdmin ? 'shield-check' : 'lock'}" class="w-4 h-4 ${isAdmin ? 'text-scout-forest' : 'text-amber-700'} shrink-0 mt-0.5 sm:mt-0"></i>
               <span>
                 ${isAdmin
-                  ? '<strong>Hak Akses Admin Aktif:</strong> Klik tombol <strong>Approve / Disposisi</strong> pada baris Surat Masuk untuk menetapkan tujuan disposisi, instruksi, dan memperbarui status tindak lanjut.'
-                  : '<strong>Alur Disposisi Persuratan:</strong> Setiap Surat Masuk baru otomatis berstatus <strong>Menunggu Disposisi Admin</strong>. Persetujuan & penetapan tujuan disposisi dilakukan oleh <strong>Admin</strong>.'}
+                  ? '<strong>Hak Akses Admin Aktif:</strong> Klik tombol <strong>Approve / Disposisi</strong> untuk menetapkan disposisi surat masuk, atau klik <strong>Download</strong> untuk mengunduh berkas lampiran surat.'
+                  : '<strong>Alur Disposisi Persuratan:</strong> Setiap Surat Masuk baru otomatis berstatus <strong>Menunggu Disposisi Admin</strong>. Berkas lampiran surat dapat langsung diunduh pada kolom Lampiran.'}
               </span>
             </div>
           </div>
@@ -5944,7 +6143,7 @@
               <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3"></i>
               <input type="text" value="${escapeHtml(uiState.suratSearch)}"
                 oninput="uiState.suratSearch = this.value; renderAdministrasiView(document.getElementById('main-content')); lucide.createIcons();"
-                placeholder="${isMasuk ? 'Cari nomor surat, asal, disposisi, atau perihal...' : 'Cari nomor surat, jenis, tujuan, pelatih, atau kursus...'}"
+                placeholder="${isMasuk ? 'Cari nomor surat, asal, disposisi, lampiran, atau perihal...' : 'Cari nomor surat, jenis, tujuan, pelatih, atau lampiran...'}"
                 class="w-full pl-9 pr-3 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
             </div>
 
@@ -5977,7 +6176,7 @@
                   <th class="py-3.5 px-4">${isMasuk ? 'Asal Instansi / Kwarran' : 'Tujuan Surat'}</th>
                   <th class="py-3.5 px-4">${isMasuk ? 'Perihal' : 'Perihal & Rincian Penugasan'}</th>
                   <th class="py-3.5 px-4">${isMasuk ? 'Status & Detail Disposisi' : 'Penanggung Jawab'}</th>
-                  <th class="py-3.5 px-4">Lampiran</th>
+                  <th class="py-3.5 px-4">Lampiran Surat</th>
                   <th class="py-3.5 px-4 text-right">Aksi</th>
                 </tr>
               </thead>
@@ -5988,6 +6187,8 @@
                   const jenisSk = !isMasuk ? (s.jenisSurat || 'Pemberitahuan') : '';
                   const isTugasSk = !isMasuk && jenisSk === 'Tugas';
                   const targetAttendTab = isPanitiaTugasRole(s.tugasSebagai) ? 'panitia' : 'pelatih';
+                  const hasAttachment = Boolean(String(s.lampiran || '').trim() || s.lampiranDataUrl);
+                  const displayAttachmentName = s.lampiran || `Lampiran_${s.nomor}.txt`;
 
                   return `
                     <tr class="hover:bg-scout-cream/40">
@@ -6042,20 +6243,24 @@
                         ` : `<span class="font-medium text-gray-700">${escapeHtml(s.penanggungJawab)}</span>`}
                       </td>
                       <td class="py-3.5 px-4">
-                        <div class="flex flex-col items-start gap-1">
-                          <button type="button" onclick="showToast('Membuka lampiran: ${escapeHtml(s.lampiran || 'Dokumen.pdf')}', 'info')"
-                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-scout-cream hover:bg-scout-sand/60 text-scout-dark text-[11px] font-semibold border border-scout-sand">
-                            <i data-lucide="paperclip" class="w-3 h-3 text-scout-forest"></i>
-                            <span class="max-w-[120px] truncate">${escapeHtml(s.lampiran || 'Lampiran.pdf')}</span>
-                          </button>
-                          ${isTugasSk ? `
-                            <button type="button" onclick="downloadSuratTugasPelatih('${s.id}')"
-                              class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-scout-forest text-[10px] font-extrabold border border-emerald-200">
-                              <i data-lucide="download" class="w-3 h-3"></i>
-                              <span>Unduh ST (.doc)</span>
+                        ${hasAttachment ? `
+                          <div class="flex flex-col items-start gap-1">
+                            <span class="text-[11px] font-semibold text-scout-dark max-w-[165px] truncate" title="${escapeHtml(displayAttachmentName)}">
+                              ${escapeHtml(displayAttachmentName)}
+                            </span>
+                            <button type="button" onclick="downloadSuratAttachment('${uiState.adminTab}', '${s.id}')"
+                              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-scout-forest hover:bg-scout-forestDark text-white text-[11px] font-extrabold shadow-xs transition"
+                              title="Download file lampiran surat">
+                              <i data-lucide="download" class="w-3.5 h-3.5 text-scout-gold"></i>
+                              <span>Download</span>
                             </button>
-                          ` : ''}
-                        </div>
+                          </div>
+                        ` : `
+                          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 border border-gray-200 text-[11px] font-semibold">
+                            <i data-lucide="file-x" class="w-3 h-3"></i>
+                            <span>Belum ada lampiran</span>
+                          </span>
+                        `}
                       </td>
                       <td class="py-3.5 px-4 text-right whitespace-nowrap">
                         <div class="inline-flex items-center gap-1.5">
@@ -6104,6 +6309,7 @@
         : 'Sudah Disposisi / Diproses';
       const selectedTujuan = s.tujuanDisposisi || TUJUAN_DISPOSISI_OPTIONS[0];
       const isCustomTujuan = selectedTujuan && !TUJUAN_DISPOSISI_OPTIONS.includes(selectedTujuan);
+      const hasAttachment = Boolean(String(s.lampiran || '').trim() || s.lampiranDataUrl);
 
       openFormModal(
         'Approve & Disposisi Surat Masuk (Admin)',
@@ -6119,6 +6325,16 @@
               <p class="text-scout-brown font-bold pt-1">Asal Surat: ${escapeHtml(s.asal)}</p>
               <p class="text-gray-600">Tgl Surat: ${formatDateIndo(s.tanggalSurat)} • Diterima: ${formatDateIndo(s.tanggalTerima)}</p>
               <p class="text-gray-800 font-semibold pt-1 border-t border-scout-sand/60">Perihal: ${escapeHtml(s.perihal)}</p>
+              <div class="pt-2 flex items-center justify-between border-t border-scout-sand/60">
+                <span class="text-[11px] font-bold text-scout-brown">Lampiran Surat:</span>
+                ${hasAttachment ? `
+                  <button type="button" onclick="downloadSuratAttachment('masuk', '${s.id}')"
+                    class="px-3 py-1 rounded-lg bg-scout-forest hover:bg-scout-forestDark text-white font-bold text-[11px] inline-flex items-center gap-1.5">
+                    <i data-lucide="download" class="w-3.5 h-3.5 text-scout-gold"></i>
+                    <span>Download (${escapeHtml(s.lampiran || 'Lampiran')})</span>
+                  </button>
+                ` : '<span class="text-[11px] text-gray-500 italic">Belum ada lampiran</span>'}
+              </div>
             </div>
 
             <div>
@@ -6239,6 +6455,15 @@
       const s = id ? list.find(item => item.id === id) : null;
       const todayIso = getTodayIsoDate();
       const currentStatusLabel = s ? normalizeDisposisiStatusLabel(s.disposisi) : 'Menunggu Disposisi';
+
+      uiState.suratDraftAttachment = (s && (s.lampiran || s.lampiranDataUrl))
+        ? {
+            name: s.lampiran || `Lampiran_${s.nomor}.txt`,
+            mime: s.lampiranMime || inferMimeFromFilename(s.lampiran),
+            sizeLabel: s.lampiranSize || '',
+            dataUrl: s.lampiranDataUrl || buildFallbackSuratAttachmentDataUrl(type, s)
+          }
+        : null;
 
       const selectedJenisSk = !isMasuk
         ? (s && JENIS_SURAT_KELUAR_OPTIONS.includes(s.jenisSurat) ? s.jenisSurat : 'Undangan')
@@ -6397,21 +6622,28 @@
             `}
 
             <div>
-              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Perihal Surat <span class="text-red-600">*</span></label>
-              <textarea id="srt-perihal" required rows="2"
-                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm">${s ? escapeHtml(s.perihal) : ''}</textarea>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Perihal / Ringkasan Surat <span class="text-red-600">*</span></label>
+              <input type="text" id="srt-perihal" required value="${s ? escapeHtml(s.perihal) : ''}"
+                placeholder="Tuliskan perihal singkat surat..."
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
             </div>
 
-            <div>
-              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nama File / Unggah Lampiran Dokumen</label>
-              <div class="flex gap-2">
-                <input type="text" id="srt-lampiran" value="${s ? escapeHtml(s.lampiran || '') : 'Dokumen_Surat.pdf'}"
-                  class="flex-1 px-3.5 py-2 rounded-xl border border-scout-sand text-xs" />
-                <label class="px-3.5 py-2 rounded-xl bg-scout-cream hover:bg-scout-sand/60 border border-scout-sand text-xs font-bold text-scout-dark cursor-pointer">
-                  Pilih File
-                  <input type="file" class="hidden" onchange="if(this.files[0]) document.getElementById('srt-lampiran').value = this.files[0].name" />
+            <!-- LAMPIRAN BERKAS SURAT SIAP DOWNLOAD -->
+            <div class="p-4 rounded-2xl bg-scout-cream/70 border border-dashed border-scout-khaki space-y-2.5">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <label class="block text-xs font-extrabold uppercase text-scout-dark">
+                    Lampiran File Surat (PDF / Gambar / Dokumen)
+                  </label>
+                  <p class="text-[11px] text-gray-500">Unggah file surat agar tersedia tombol langsung download di tabel.</p>
+                </div>
+                <label class="px-3.5 py-2 rounded-xl bg-scout-dark hover:bg-scout-brown text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer self-start shrink-0 transition">
+                  <i data-lucide="upload" class="w-3.5 h-3.5 text-scout-gold"></i>
+                  <span>Unggah File Lampiran</span>
+                  <input type="file" id="srt-lampiran-file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.txt" class="hidden" onchange="handleSuratAttachmentFileChange(event)" />
                 </label>
               </div>
+              <div id="srt-lampiran-preview-box"></div>
             </div>
 
             <div class="pt-3 flex justify-end gap-2 border-t border-gray-100">
@@ -6421,6 +6653,7 @@
           </form>
         `
       );
+      updateSuratAttachmentPreviewUI();
     }
 
     function saveSuratForm(e, type, id) {
@@ -6429,6 +6662,12 @@
       const isMasuk = type === 'masuk';
       let isTugasSaved = false;
       let savedTargetCourseName = '';
+
+      const draftAtt = uiState.suratDraftAttachment;
+      const lampiranName = draftAtt && draftAtt.name ? draftAtt.name.trim() : '';
+      const lampiranMime = draftAtt && draftAtt.mime ? draftAtt.mime : (lampiranName ? inferMimeFromFilename(lampiranName) : '');
+      const lampiranSize = draftAtt && draftAtt.sizeLabel ? draftAtt.sizeLabel : '';
+      const lampiranDataUrl = draftAtt && draftAtt.dataUrl ? draftAtt.dataUrl : '';
 
       if (isMasuk) {
         const existing = id ? appData.suratMasuk.find(item => item.id === id) : null;
@@ -6445,7 +6684,10 @@
           catatanDisposisi: existing ? (existing.catatanDisposisi || '') : '',
           disposisiApprovedAt: existing ? (existing.disposisiApprovedAt || '') : '',
           disposisiApprovedBy: existing ? (existing.disposisiApprovedBy || '') : '',
-          lampiran: document.getElementById('srt-lampiran').value.trim() || 'Lampiran.pdf'
+          lampiran: lampiranName,
+          lampiranMime: lampiranMime,
+          lampiranSize: lampiranSize,
+          lampiranDataUrl: lampiranDataUrl
         };
         if (id) {
           const idx = appData.suratMasuk.findIndex(item => item.id === id);
@@ -6487,7 +6729,10 @@
           tugasSebagai: tugasSebagaiVal,
           kursusId: kursusIdVal,
           namaKursus: namaKursusVal,
-          lampiran: document.getElementById('srt-lampiran').value.trim() || 'Lampiran.pdf'
+          lampiran: lampiranName,
+          lampiranMime: lampiranMime,
+          lampiranSize: lampiranSize,
+          lampiranDataUrl: lampiranDataUrl
         };
         if (id) {
           const idx = appData.suratKeluar.findIndex(item => item.id === id);
@@ -6497,6 +6742,7 @@
         }
       }
 
+      uiState.suratDraftAttachment = null;
       saveAppData();
       closeFormModal();
       renderAdministrasiView(document.getElementById('main-content'));
