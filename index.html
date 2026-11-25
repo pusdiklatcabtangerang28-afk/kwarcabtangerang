@@ -440,9 +440,52 @@
     const GOLONGAN_OPTIONS = ['Siaga', 'Penggalang', 'Penegak', 'Pandega'];
     const KUALIFIKASI_OPTIONS = ['Sangat Memuaskan', 'Memuaskan', 'Baik', 'Cukup'];
 
+    // Konstanta Disposisi Surat Masuk
+    const TUJUAN_DISPOSISI_OPTIONS = [
+      'Kapusdiklatcab',
+      'Wakil Kapusdiklatcab',
+      'Sekretaris',
+      'Koordinator Pelatih',
+      'Panitia Kursus'
+    ];
+    const STATUS_DISPOSISI_APPROVAL_OPTIONS = [
+      'Sudah Disposisi / Diproses',
+      'Selesai'
+    ];
+
+    function isAdminUser() {
+      return !!(currentUser && currentUser.role === 'Admin');
+    }
+
+    function normalizeDisposisiStatusLabel(rawStatus) {
+      const val = String(rawStatus || '').trim();
+      if (!val || val === 'Menunggu Disposisi' || val === 'Menunggu Disposisi Admin') {
+        return 'Menunggu Disposisi';
+      }
+      if (val === 'Ditindaklanjuti' || val === 'Sudah Disposisi / Diproses') {
+        return 'Sudah Disposisi / Diproses';
+      }
+      if (val === 'Selesai') {
+        return 'Selesai';
+      }
+      return val;
+    }
+
+    function getTodayIsoDate() {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+
+    function formatDateTimeIndoNow() {
+      const now = new Date();
+      const datePart = formatDateIndo(getTodayIsoDate(), false);
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      return `${datePart}, ${hh}:${mm} WIB`;
+    }
+
     // =========================================================================
     // UTILITAS INPUT MASKING & VALIDASI FORMAT NTA (##.##.##.######.####)
-    // Pola: 2 digit - titik - 2 digit - titik - 2 digit - titik - 6 digit - titik - 4 digit (Total 16 digit)
     // =========================================================================
     const NTA_PATTERN_REGEX = /^\d{2}\.\d{2}\.\d{2}\.\d{6}\.\d{4}$/;
 
@@ -486,7 +529,6 @@
       }
     }
 
-    // Parser tanggal aman ke format baku Indonesia (contoh: "24 November 2026" atau "Selasa, 24 November 2026")
     function formatDateIndo(dateStr, includeDay = false) {
       if (!dateStr || dateStr === '-') return '-';
       const raw = String(dateStr).trim();
@@ -525,7 +567,6 @@
       return baseFormatted;
     }
 
-    // Konversi otomatis seluruh tanggal YYYY-MM-DD di dalam string atau rentang tanggal (mis. "2026-11-27 s.d. 2026-12-02")
     function formatDateRangeIndo(text) {
       if (!text || text === '-') return '-';
       const raw = String(text).trim();
@@ -534,12 +575,9 @@
     }
 
     function getTodayDateIndo(includeDay = false) {
-      const now = new Date();
-      const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      return formatDateIndo(iso, includeDay);
+      return formatDateIndo(getTodayIsoDate(), includeDay);
     }
 
-    // Format tampilan gabungan "Tempat, Tanggal Lahir" (contoh: "Tangerang, 17 Agustus 1995")
     function formatTempatTanggalLahir(tempatLahir, tanggalLahir) {
       const tempat = String(tempatLahir || '').trim();
       const tglFormatted = tanggalLahir ? formatDateIndo(tanggalLahir) : '';
@@ -551,7 +589,6 @@
       return '-';
     }
 
-    // Utilitas pengecekan hak akses read-only untuk role Pelatih
     function isPelatihReadOnly() {
       return !!(currentUser && currentUser.role === 'Pelatih');
     }
@@ -564,7 +601,6 @@
       return false;
     }
 
-    // Utilitas normalisasi & resolusi identitas Kwarran secara deterministik
     function normalizeKwarranName(rawValue) {
       if (!rawValue || typeof rawValue !== 'string') return '';
       const cleaned = rawValue
@@ -779,7 +815,11 @@
             tanggalSurat: '2026-11-17',
             asal: 'Kwartir Ranting Curug',
             perihal: 'Permohonan Rekomendasi & Tim Pelatih KMD Mandiri Kwarran Curug',
-            disposisi: 'Ditindaklanjuti',
+            disposisi: 'Sudah Disposisi / Diproses',
+            tujuanDisposisi: 'Koordinator Pelatih',
+            catatanDisposisi: 'Segera koordinasikan susunan tim pelatih KMD mandiri Kwarran Curug.',
+            disposisiApprovedAt: '19 November 2026, 09:30 WIB',
+            disposisiApprovedBy: 'Admin Utama',
             lampiran: 'Surat_Permohonan_KMD_Curug.pdf'
           },
           {
@@ -790,6 +830,10 @@
             asal: 'Kwartir Ranting Tigaraksa',
             perihal: 'Pengiriman Daftar Calon Peserta KML Tahun 2026',
             disposisi: 'Menunggu Disposisi',
+            tujuanDisposisi: '',
+            catatanDisposisi: '',
+            disposisiApprovedAt: '',
+            disposisiApprovedBy: '',
             lampiran: 'Daftar_Peserta_Tigaraksa.pdf'
           }
         ],
@@ -892,7 +936,16 @@
       data.kwarranCourses = Array.isArray(data.kwarranCourses) ? data.kwarranCourses : seed.kwarranCourses;
       data.kwarranParticipants = Array.isArray(data.kwarranParticipants) ? data.kwarranParticipants : seed.kwarranParticipants;
 
-      // Pastikan setiap user Kwarran memiliki metadata wilayah eksplisit
+      // Normalisasi struktur disposisi Surat Masuk
+      data.suratMasuk = data.suratMasuk.map(sm => ({
+        ...sm,
+        disposisi: normalizeDisposisiStatusLabel(sm.disposisi),
+        tujuanDisposisi: String(sm.tujuanDisposisi || '').trim(),
+        catatanDisposisi: String(sm.catatanDisposisi || '').trim(),
+        disposisiApprovedAt: String(sm.disposisiApprovedAt || '').trim(),
+        disposisiApprovedBy: String(sm.disposisiApprovedBy || '').trim()
+      }));
+
       data.users = data.users.map(u => {
         if (u.role === 'Kwarran') {
           const explicitKw = resolveExplicitUserKwarran(u);
@@ -922,7 +975,6 @@
         data.kwarranParticipants.push(...seed.kwarranParticipants.filter(pt => isSameKwarran(pt.kwarran, 'Curug')));
       }
 
-      // Normalisasi properti nta (format ##.##.##.######.####), kwarran, golongan, tahunLulus, TTL & fotoUrl pada entitas potensi
       const seedPotMap = Object.fromEntries(seed.potensi.map(sp => [sp.id, sp]));
       data.potensi = data.potensi.map(p => {
         const seedRef = seedPotMap[p.id] || {};
@@ -1046,7 +1098,6 @@
 
     // =========================================================================
     // SINKRONISASI OTOMATIS PESERTA LULUS (KWARRAN / KWARCAB -> DATA POTENSI)
-    // TERMASUK MEMBAWA DATA NTA (##.##.##.######.####), GOLONGAN, TTL & FOTO 4x6
     // =========================================================================
     function upsertGraduateIntoPotensi(targetData, course, participant) {
       if (!targetData || !course || !participant) return false;
@@ -1238,6 +1289,7 @@
       adminPrintGolonganShb: 'Penggalang',
       adminTab: 'masuk',
       suratSearch: '',
+      suratDisposisiFilter: 'ALL',
       laporanType: 'potensi',
       laporanKwarran: 'ALL',
       laporanJenjang: 'ALL',
@@ -1325,6 +1377,7 @@
       uiState.adminPrintTargetId = '';
       uiState.adminTab = 'masuk';
       uiState.suratSearch = '';
+      uiState.suratDisposisiFilter = 'ALL';
       uiState.laporanType = 'potensi';
       uiState.laporanKwarran = scope.isKwarran ? scope.kwarranName : 'ALL';
       uiState.laporanJenjang = 'ALL';
@@ -1590,7 +1643,9 @@
         },
         'administrasi': {
           title: 'Administrasi Persuratan',
-          subtitle: 'Pencatatan arsip surat masuk, surat keluar, dan disposisi kegiatan'
+          subtitle: isAdminUser()
+            ? 'Pencatatan arsip surat masuk, persetujuan disposisi Admin, dan pengelolaan surat keluar'
+            : 'Pencatatan arsip surat masuk (menunggu disposisi Admin) dan pengelolaan surat keluar'
         },
         'laporan': {
           title: 'Pusat Laporan & Rekapitulasi',
@@ -1681,7 +1736,6 @@
       return cleaned.slice(0, 2).toUpperCase();
     }
 
-    // Kompresi & crop otomatis presisi ukuran pas foto 4x6 (rasio 2:3 -> 240x360px)
     function processImageFileTo4x6DataUrl(file, callback) {
       if (!file) return;
       if (!file.type.startsWith('image/')) {
@@ -2412,7 +2466,6 @@
       const formattedNtaKapus = p.ntaKapus ? formatNtaMask(p.ntaKapus) : '';
       container.innerHTML = `
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <!-- Kartu Upload Logo -->
           <div class="lg:col-span-5 bg-white rounded-2xl p-6 border border-scout-sand shadow-scout flex flex-col justify-between">
             <div>
               <h3 class="text-base font-extrabold text-scout-dark flex items-center gap-2">
@@ -2450,7 +2503,6 @@
             </div>
           </div>
 
-          <!-- Form Identitas Kapusdiklatcab -->
           <div class="lg:col-span-7 bg-white rounded-2xl p-6 border border-scout-sand shadow-scout">
             <h3 class="text-base font-extrabold text-scout-dark flex items-center gap-2">
               <i data-lucide="award" class="w-5 h-5 text-scout-gold"></i>
@@ -2624,7 +2676,6 @@
       const paginated = list.slice(startIdx, startIdx + uiState.potensiPerPage);
 
       container.innerHTML = `
-        <!-- Summary Pills Rekap Cepat -->
         <div class="flex flex-wrap items-center gap-2 mb-5">
           <button type="button" onclick="setPotensiQuickJenjang('ALL')"
             class="px-3.5 py-2 rounded-xl text-xs font-bold border transition ${uiState.potensiJenjang === 'ALL' ? 'bg-scout-dark text-white border-scout-dark' : 'bg-white text-scout-dark border-scout-sand hover:bg-scout-cream'}">
@@ -2643,7 +2694,6 @@
         </div>
 
         <div class="bg-white rounded-2xl border border-scout-sand shadow-scout overflow-hidden">
-          <!-- Toolbar Search, Filter & Tombol Tambah/Unduh -->
           <div class="p-5 border-b border-scout-sand/70 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 flex-1">
               <div class="relative sm:col-span-2 lg:col-span-1">
@@ -2702,7 +2752,6 @@
             `}
           </div>
 
-          <!-- Tabel Data Potensi (Dengan Kolom Pas Foto 4x6, NTA, Tempat Tanggal Lahir, Golongan & Tahun Lulus) -->
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
@@ -2780,7 +2829,6 @@
             </table>
           </div>
 
-          <!-- Pagination Footer -->
           <div class="px-5 py-3.5 bg-scout-cream/40 border-t border-scout-sand/70 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
             <span class="text-gray-600">
               Menampilkan <strong>${list.length ? startIdx + 1 : 0}</strong> - <strong>${Math.min(startIdx + uiState.potensiPerPage, list.length)}</strong> dari <strong>${list.length}</strong> data pembina
@@ -2849,7 +2897,6 @@
         existing ? 'Edit Data Potensi Pembina' : 'Tambah Data Potensi Pembina',
         `
           <form onsubmit="savePotensiForm(event, '${id || ''}')" class="space-y-4">
-            <!-- Upload Foto Pembina 4x6 -->
             <div class="p-4 rounded-2xl bg-scout-cream/70 border border-dashed border-scout-khaki flex flex-col sm:flex-row items-center gap-4">
               <div id="pot-photo-preview" class="w-16 h-24 rounded-xl bg-white border-2 border-scout-gold/70 shadow-sm overflow-hidden flex flex-col items-center justify-center shrink-0">
                 ${uiState.potensiDraftPhoto
@@ -2873,7 +2920,6 @@
               </div>
             </div>
 
-            <!-- Input NTA & Nama Lengkap Pembina -->
             <div class="grid grid-cols-1 sm:grid-cols-12 gap-4">
               <div class="sm:col-span-5">
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">
@@ -2899,7 +2945,6 @@
               </div>
             </div>
 
-            <!-- Input Tempat, Tanggal Lahir (TTL) -->
             <div class="p-3.5 rounded-xl bg-scout-cream/50 border border-scout-sand/80 space-y-2.5">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
@@ -3461,7 +3506,6 @@
 
     // =========================================================================
     // 10B. HALAMAN DETAIL PENGELOLAAN KURSUS PADA ROLE ADMIN
-    //      (Edit Kursus, Surat Tugas & Lampiran, Absensi & Kelulusan, Rundown, Cetak Resmi)
     // =========================================================================
     function getCourseParticipantsForAdmin(course) {
       if (!course) return [];
@@ -3529,7 +3573,7 @@
         appData.courseDetails[course.id] = {
           suratTugas: {
             nomor: `ST-${Math.floor(100 + Math.random() * 899)}/28.04-Pusdiklatcab/2026`,
-            tanggal: new Date().toISOString().split('T')[0],
+            tanggal: getTodayIsoDate(),
             penandatangan: appData.profile.namaKapus,
             perihal: `Penugasan Tim Pelatih & Panitia Pelaksana ${course.nama}`,
             personel: [...initialPelatih.map(p => `${p.nama} (${p.jabatan})`), ...initialPanitia.map(p => `${p.nama} (${p.jabatan})`)].join('\n'),
@@ -3654,7 +3698,6 @@
       ];
 
       container.innerHTML = `
-        <!-- HEADER NAVIGASI DETAIL KURSUS -->
         <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout mb-6 no-print">
           <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-scout-sand/70">
             <div class="flex items-start gap-3.5">
@@ -3687,7 +3730,6 @@
             </div>
           </div>
 
-          <!-- 5 TAB UTAMA DETAIL MANAJEMEN KURSUS -->
           <div class="mt-4 flex flex-wrap gap-2">
             ${tabs.map(t => {
               const isAct = activeTab === t.id;
@@ -3706,7 +3748,6 @@
           </div>
         </div>
 
-        <!-- AREA KONTEN TAB TERPILIH -->
         <div id="admin-course-detail-panel">
           ${activeTab === 'edit' ? renderAdminCourseTabEdit(course) : ''}
           ${activeTab === 'surat-tugas' ? renderAdminCourseTabSuratTugas(course, detail) : ''}
@@ -3717,7 +3758,6 @@
       `;
     }
 
-    // --- TAB 1: EDIT DATA KURSUS ---
     function renderAdminCourseTabEdit(course) {
       return `
         <div class="bg-white rounded-2xl p-6 border border-scout-sand shadow-scout max-w-4xl">
@@ -3856,7 +3896,6 @@
       );
     }
 
-    // --- TAB 2: SURAT TUGAS & UPLOAD LAMPIRAN ---
     function renderAdminCourseTabSuratTugas(course, detail) {
       const st = detail.suratTugas;
       return `
@@ -3951,7 +3990,6 @@
             </form>
           </div>
 
-          <!-- PRATINJAU SURAT TUGAS SIAP CETAK -->
           <div id="print-area" class="lg:col-span-5 bg-white rounded-2xl p-6 border border-scout-sand shadow-scout text-xs">
             <div class="flex items-center gap-3 pb-3 border-b-2 border-scout-dark">
               <div class="w-12 h-12 shrink-0">${getLogoHtml()}</div>
@@ -4052,7 +4090,6 @@
       showToast('Lampiran surat tugas dihapus.', 'info');
     }
 
-    // --- TAB 3: ABSENSI & KELULUSAN PESERTA (NTA ##.##.##.######.#### + TTL + AUTO-SYNC KE DATA POTENSI + PAS FOTO 4x6) ---
     function renderAdminCourseTabAbsensi(course, detail, pesertaList) {
       const subTab = uiState.adminAttendanceRoleTab || 'peserta';
       const statusOptions = ['Hadir', 'Izin', 'Sakit', 'Alpa'];
@@ -4156,7 +4193,6 @@
 
       return `
         <div id="print-area" class="bg-white rounded-2xl border border-scout-sand shadow-scout overflow-hidden">
-          <!-- Sub-Tab Absensi & Kelulusan: Peserta, Panitia, Pelatih -->
           <div class="p-5 border-b border-scout-sand/70 flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
             <div class="inline-flex flex-wrap p-1.5 rounded-2xl bg-scout-cream border border-scout-sand gap-1">
               <button type="button" onclick="uiState.adminAttendanceRoleTab = 'peserta'; renderAdminCourseDetailView(document.getElementById('main-content')); lucide.createIcons();"
@@ -4316,7 +4352,6 @@
         existing ? 'Edit Peserta Kursus Cabang (Kwarcab)' : 'Tambah Peserta Kursus Cabang (Kwarcab)',
         `
           <form onsubmit="saveCabangParticipantModal(event, '${courseId}', '${participantId || ''}')" class="space-y-4">
-            <!-- Input Pas Foto 4x6 Peserta Cabang -->
             <div class="p-3.5 rounded-2xl bg-scout-cream/70 border border-dashed border-scout-khaki flex items-center gap-4">
               <div id="cb-p-photo-preview" class="w-16 h-24 rounded-xl bg-white border-2 border-scout-gold/80 shadow-xs overflow-hidden flex flex-col items-center justify-center shrink-0">
                 ${uiState.cabangParticipantDraftPhoto
@@ -4359,7 +4394,6 @@
               </div>
             </div>
 
-            <!-- Input Tempat, Tanggal Lahir (TTL) -->
             <div class="p-3.5 rounded-xl bg-scout-cream/50 border border-scout-sand/80 space-y-2">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
@@ -4607,11 +4641,9 @@
       showToast('Personel dihapus dari daftar.', 'info');
     }
 
-    // --- TAB 4: JADWAL / RUNDOWN ACARA + UPLOAD FILE ---
     function renderAdminCourseTabRundown(course, detail) {
       return `
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <!-- Form Tambah Sesi & Upload File Jadwal -->
           <div class="lg:col-span-4 space-y-5 no-print">
             <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout">
               <h4 class="text-sm font-extrabold text-scout-dark mb-3 flex items-center gap-2">
@@ -4650,7 +4682,6 @@
               </form>
             </div>
 
-            <!-- Upload File Jadwal / Rundown -->
             <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout">
               <h4 class="text-sm font-extrabold text-scout-dark mb-1">Upload Berkas Jadwal (PDF/Excel/Doc)</h4>
               <p class="text-[11px] text-gray-500 mb-3">Unggah dokumen jadwal resmi yang siap dibagikan</p>
@@ -4676,7 +4707,6 @@
             </div>
           </div>
 
-          <!-- Tabel Rundown Interaktif Siap Cetak -->
           <div id="print-area" class="lg:col-span-8 bg-white rounded-2xl border border-scout-sand shadow-scout overflow-hidden">
             <div class="p-5 border-b border-scout-sand/70 flex items-center justify-between">
               <div>
@@ -4795,7 +4825,6 @@
       lucide.createIcons();
     }
 
-    // --- TAB 5: PUSAT CETAK DOKUMEN RESMI KURSUS (PAKTA INTEGRITAS, SKL, IJAZAH, SHB) ---
     function handleOfficialDocPrint(courseId) {
       const docType = uiState.adminPrintDocType || 'pakta';
       const targetId = uiState.adminPrintTargetId;
@@ -5102,7 +5131,6 @@
 
       return `
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <!-- Panel Pengaturan Dokumen Cetak -->
           <div class="lg:col-span-4 bg-white rounded-2xl p-5 border border-scout-sand shadow-scout h-fit space-y-4 no-print">
             <div>
               <h4 class="text-base font-extrabold text-scout-dark">Pusat Cetak Dokumen Resmi</h4>
@@ -5188,7 +5216,6 @@
             </button>
           </div>
 
-          <!-- Area Pratinjau Dokumen Resmi -->
           <div id="print-area" class="lg:col-span-8 bg-white rounded-2xl p-6 sm:p-10 border border-scout-sand shadow-scout ${docType === 'ijazah' ? 'ijazah-frame' : ''}">
             ${documentBodyHtml}
           </div>
@@ -5197,21 +5224,29 @@
     }
 
     // =========================================================================
-    // 11. VIEW: ADMINISTRASI (SURAT MASUK & SURAT KELUAR - ADMIN & PANITIA)
+    // 11. VIEW: ADMINISTRASI (SURAT MASUK & SURAT KELUAR + ALUR DISPOSISI ADMIN)
     // =========================================================================
     function renderAdministrasiView(container) {
       if (isPelatihReadOnly()) {
         navigateTo('dashboard');
         return;
       }
+      const isAdmin = isAdminUser();
       const isMasuk = uiState.adminTab === 'masuk';
       const sourceList = isMasuk ? appData.suratMasuk : appData.suratKeluar;
 
+      const menungguCount = appData.suratMasuk.filter(
+        s => normalizeDisposisiStatusLabel(s.disposisi) === 'Menunggu Disposisi'
+      ).length;
+
       const filtered = sourceList.filter(s => {
+        if (isMasuk && uiState.suratDisposisiFilter !== 'ALL') {
+          if (normalizeDisposisiStatusLabel(s.disposisi) !== uiState.suratDisposisiFilter) return false;
+        }
         if (uiState.suratSearch) {
           const q = uiState.suratSearch.toLowerCase();
           const text = isMasuk
-            ? `${s.nomor} ${s.asal} ${s.perihal} ${formatDateIndo(s.tanggalTerima)} ${formatDateIndo(s.tanggalSurat)}`
+            ? `${s.nomor} ${s.asal} ${s.perihal} ${s.disposisi} ${s.tujuanDisposisi || ''} ${s.catatanDisposisi || ''} ${formatDateIndo(s.tanggalTerima)} ${formatDateIndo(s.tanggalSurat)}`
             : `${s.nomor} ${s.tujuan} ${s.perihal} ${s.penanggungJawab} ${formatDateIndo(s.tanggalKeluar)}`;
           if (!text.toLowerCase().includes(q)) return false;
         }
@@ -5226,6 +5261,11 @@
               class="px-5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition ${isMasuk ? 'bg-scout-dark text-white shadow-sm' : 'text-scout-brown hover:bg-scout-cream'}">
               <i data-lucide="inbox" class="w-4 h-4 ${isMasuk ? 'text-scout-gold' : ''}"></i>
               <span>Surat Masuk (${appData.suratMasuk.length})</span>
+              ${menungguCount > 0 ? `
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${isMasuk ? 'bg-amber-400 text-scout-dark' : 'bg-amber-100 text-amber-900'}">
+                  ${menungguCount} Menunggu
+                </span>
+              ` : ''}
             </button>
             <button type="button" onclick="uiState.adminTab = 'keluar'; renderAdministrasiView(document.getElementById('main-content')); lucide.createIcons();"
               class="px-5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition ${!isMasuk ? 'bg-scout-dark text-white shadow-sm' : 'text-scout-brown hover:bg-scout-cream'}">
@@ -5248,15 +5288,39 @@
           </div>
         </div>
 
+        ${isMasuk ? `
+          <!-- Banner Informasi Alur Disposisi -->
+          <div class="mb-4 p-3.5 rounded-2xl ${isAdmin ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950' : 'bg-amber-50/90 border-amber-200 text-amber-950'} border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div class="flex items-start sm:items-center gap-2.5">
+              <i data-lucide="${isAdmin ? 'shield-check' : 'lock'}" class="w-4 h-4 ${isAdmin ? 'text-scout-forest' : 'text-amber-700'} shrink-0 mt-0.5 sm:mt-0"></i>
+              <span>
+                ${isAdmin
+                  ? '<strong>Hak Akses Admin Aktif:</strong> Klik tombol <strong>Approve / Disposisi</strong> pada baris Surat Masuk untuk menetapkan tujuan disposisi, instruksi, dan memperbarui status tindak lanjut.'
+                  : '<strong>Alur Disposisi Persuratan:</strong> Setiap Surat Masuk baru otomatis berstatus <strong>Menunggu Disposisi Admin</strong>. Persetujuan & penetapan tujuan disposisi dilakukan oleh <strong>Admin</strong>.'}
+              </span>
+            </div>
+          </div>
+        ` : ''}
+
         <div class="bg-white rounded-2xl border border-scout-sand shadow-scout overflow-hidden">
-          <div class="p-4 border-b border-scout-sand/70">
-            <div class="relative max-w-md">
+          <div class="p-4 border-b border-scout-sand/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="relative flex-1 max-w-md">
               <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3"></i>
               <input type="text" value="${escapeHtml(uiState.suratSearch)}"
                 oninput="uiState.suratSearch = this.value; renderAdministrasiView(document.getElementById('main-content')); lucide.createIcons();"
-                placeholder="Cari nomor surat, asal/tujuan, tanggal, atau perihal..."
+                placeholder="Cari nomor surat, asal/tujuan, disposisi, atau perihal..."
                 class="w-full pl-9 pr-3 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
             </div>
+
+            ${isMasuk ? `
+              <select onchange="uiState.suratDisposisiFilter = this.value; renderAdministrasiView(document.getElementById('main-content')); lucide.createIcons();"
+                class="px-3.5 py-2 rounded-xl border border-scout-sand text-xs font-semibold text-scout-dark bg-scout-cream/40 focus:outline-none">
+                <option value="ALL" ${uiState.suratDisposisiFilter === 'ALL' ? 'selected' : ''}>Semua Status Disposisi (${appData.suratMasuk.length})</option>
+                <option value="Menunggu Disposisi" ${uiState.suratDisposisiFilter === 'Menunggu Disposisi' ? 'selected' : ''}>Menunggu Disposisi (${menungguCount})</option>
+                <option value="Sudah Disposisi / Diproses" ${uiState.suratDisposisiFilter === 'Sudah Disposisi / Diproses' ? 'selected' : ''}>Sudah Disposisi / Diproses</option>
+                <option value="Selesai" ${uiState.suratDisposisiFilter === 'Selesai' ? 'selected' : ''}>Selesai</option>
+              </select>
+            ` : ''}
           </div>
 
           <div class="overflow-x-auto">
@@ -5267,46 +5331,75 @@
                   <th class="py-3.5 px-4">${isMasuk ? 'Tgl Terima / Surat' : 'Tanggal Keluar'}</th>
                   <th class="py-3.5 px-4">${isMasuk ? 'Asal Instansi / Kwarran' : 'Tujuan Surat'}</th>
                   <th class="py-3.5 px-4">Perihal</th>
-                  <th class="py-3.5 px-4">${isMasuk ? 'Disposisi / Status' : 'Penanggung Jawab'}</th>
+                  <th class="py-3.5 px-4">${isMasuk ? 'Status & Detail Disposisi' : 'Penanggung Jawab'}</th>
                   <th class="py-3.5 px-4">Lampiran</th>
                   <th class="py-3.5 px-4 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 text-xs">
-                ${filtered.map(s => `
-                  <tr class="hover:bg-scout-cream/40">
-                    <td class="py-3.5 px-4 font-extrabold text-scout-dark whitespace-nowrap">${escapeHtml(s.nomor)}</td>
-                    <td class="py-3.5 px-4 whitespace-nowrap text-gray-600">
-                      ${isMasuk
-                        ? `<div>Terima: <strong>${formatDateIndo(s.tanggalTerima)}</strong></div><div class="text-[11px]">Surat: ${formatDateIndo(s.tanggalSurat)}</div>`
-                        : `<strong>${formatDateIndo(s.tanggalKeluar)}</strong>`}
-                    </td>
-                    <td class="py-3.5 px-4 font-semibold text-scout-brown">${escapeHtml(isMasuk ? s.asal : s.tujuan)}</td>
-                    <td class="py-3.5 px-4 text-gray-800 max-w-xs">${escapeHtml(s.perihal)}</td>
-                    <td class="py-3.5 px-4">
-                      ${isMasuk
-                        ? renderStatusBadge(s.disposisi)
-                        : `<span class="font-medium text-gray-700">${escapeHtml(s.penanggungJawab)}</span>`}
-                    </td>
-                    <td class="py-3.5 px-4">
-                      <button type="button" onclick="showToast('Membuka lampiran: ${escapeHtml(s.lampiran || 'Dokumen.pdf')}', 'info')"
-                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-scout-cream hover:bg-scout-sand/60 text-scout-dark text-[11px] font-semibold border border-scout-sand">
-                        <i data-lucide="paperclip" class="w-3 h-3 text-scout-forest"></i>
-                        <span class="max-w-[120px] truncate">${escapeHtml(s.lampiran || 'Lampiran.pdf')}</span>
-                      </button>
-                    </td>
-                    <td class="py-3.5 px-4 text-right whitespace-nowrap">
-                      <button type="button" onclick="openSuratModal('${uiState.adminTab}', '${s.id}')"
-                        class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 mr-1">
-                        <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                      </button>
-                      <button type="button" onclick="deleteSurat('${uiState.adminTab}', '${s.id}')"
-                        class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                      </button>
-                    </td>
-                  </tr>
-                `).join('') || `
+                ${filtered.map(s => {
+                  const statusDisp = isMasuk ? normalizeDisposisiStatusLabel(s.disposisi) : '';
+                  const isPendingDisp = statusDisp === 'Menunggu Disposisi';
+                  return `
+                    <tr class="hover:bg-scout-cream/40">
+                      <td class="py-3.5 px-4 font-extrabold text-scout-dark whitespace-nowrap">${escapeHtml(s.nomor)}</td>
+                      <td class="py-3.5 px-4 whitespace-nowrap text-gray-600">
+                        ${isMasuk
+                          ? `<div>Terima: <strong>${formatDateIndo(s.tanggalTerima)}</strong></div><div class="text-[11px]">Surat: ${formatDateIndo(s.tanggalSurat)}</div>`
+                          : `<strong>${formatDateIndo(s.tanggalKeluar)}</strong>`}
+                      </td>
+                      <td class="py-3.5 px-4 font-semibold text-scout-brown">${escapeHtml(isMasuk ? s.asal : s.tujuan)}</td>
+                      <td class="py-3.5 px-4 text-gray-800 max-w-xs">${escapeHtml(s.perihal)}</td>
+                      <td class="py-3.5 px-4">
+                        ${isMasuk ? `
+                          <div class="space-y-1">
+                            <div>${renderStatusBadge(isAdmin ? statusDisp : (isPendingDisp ? 'Menunggu Disposisi Admin' : statusDisp))}</div>
+                            ${s.tujuanDisposisi ? `
+                              <p class="text-[11px] font-bold text-scout-dark">
+                                Tujuan: <span class="text-scout-forest">${escapeHtml(s.tujuanDisposisi)}</span>
+                              </p>
+                            ` : ''}
+                            ${s.catatanDisposisi ? `
+                              <p class="text-[11px] text-gray-600 italic max-w-xs leading-snug">"${escapeHtml(s.catatanDisposisi)}"</p>
+                            ` : ''}
+                            ${s.disposisiApprovedAt ? `
+                              <p class="text-[10px] text-gray-400">
+                                Disetujui: ${escapeHtml(s.disposisiApprovedAt)}${s.disposisiApprovedBy ? ` (${escapeHtml(s.disposisiApprovedBy)})` : ''}
+                              </p>
+                            ` : ''}
+                          </div>
+                        ` : `<span class="font-medium text-gray-700">${escapeHtml(s.penanggungJawab)}</span>`}
+                      </td>
+                      <td class="py-3.5 px-4">
+                        <button type="button" onclick="showToast('Membuka lampiran: ${escapeHtml(s.lampiran || 'Dokumen.pdf')}', 'info')"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-scout-cream hover:bg-scout-sand/60 text-scout-dark text-[11px] font-semibold border border-scout-sand">
+                          <i data-lucide="paperclip" class="w-3 h-3 text-scout-forest"></i>
+                          <span class="max-w-[120px] truncate">${escapeHtml(s.lampiran || 'Lampiran.pdf')}</span>
+                        </button>
+                      </td>
+                      <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                        <div class="inline-flex items-center gap-1.5">
+                          ${isMasuk && isAdmin ? `
+                            <button type="button" onclick="openDisposisiModal('${s.id}')"
+                              class="px-3 py-1.5 rounded-lg ${isPendingDisp ? 'bg-scout-forest hover:bg-scout-forestDark text-white shadow-xs' : 'bg-emerald-50 hover:bg-emerald-100 text-scout-forest border border-emerald-300'} font-bold text-[11px] inline-flex items-center gap-1 transition"
+                              title="Approve & Tetapkan Disposisi Surat Masuk">
+                              <i data-lucide="stamp" class="w-3.5 h-3.5 ${isPendingDisp ? 'text-scout-gold' : ''}"></i>
+                              <span>Approve / Disposisi</span>
+                            </button>
+                          ` : ''}
+                          <button type="button" onclick="openSuratModal('${uiState.adminTab}', '${s.id}')"
+                            class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition" title="Edit Surat">
+                            <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                          </button>
+                          <button type="button" onclick="deleteSurat('${uiState.adminTab}', '${s.id}')"
+                            class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition" title="Hapus Surat">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('') || `
                   <tr><td colspan="7" class="py-10 text-center text-gray-500">Belum ada arsip surat pada kategori ini.</td></tr>
                 `}
               </tbody>
@@ -5316,11 +5409,129 @@
       `;
     }
 
+    // Modal Khusus Role Admin: Approve & Isi Disposisi Surat Masuk
+    function openDisposisiModal(id) {
+      if (!isAdminUser()) {
+        showToast('Hanya pengguna dengan role Admin yang dapat menyetujui disposisi surat masuk.', 'error');
+        return;
+      }
+      const s = appData.suratMasuk.find(item => item.id === id);
+      if (!s) return;
+
+      const currentStatus = normalizeDisposisiStatusLabel(s.disposisi);
+      const selectedStatus = STATUS_DISPOSISI_APPROVAL_OPTIONS.includes(currentStatus)
+        ? currentStatus
+        : 'Sudah Disposisi / Diproses';
+      const selectedTujuan = s.tujuanDisposisi || TUJUAN_DISPOSISI_OPTIONS[0];
+      const isCustomTujuan = selectedTujuan && !TUJUAN_DISPOSISI_OPTIONS.includes(selectedTujuan);
+
+      openFormModal(
+        'Approve & Disposisi Surat Masuk (Admin)',
+        `
+          <form onsubmit="saveDisposisiApprovalForm(event, '${s.id}')" class="space-y-4">
+            <div class="p-4 rounded-2xl bg-scout-cream/80 border border-scout-sand space-y-1.5 text-xs">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="px-2.5 py-0.5 rounded-md bg-scout-dark text-scout-gold font-extrabold">
+                  No. Surat: ${escapeHtml(s.nomor)}
+                </span>
+                ${renderStatusBadge(currentStatus)}
+              </div>
+              <p class="text-scout-brown font-bold pt-1">Asal Surat: ${escapeHtml(s.asal)}</p>
+              <p class="text-gray-600">Tgl Surat: ${formatDateIndo(s.tanggalSurat)} • Diterima: ${formatDateIndo(s.tanggalTerima)}</p>
+              <p class="text-gray-800 font-semibold pt-1 border-t border-scout-sand/60">Perihal: ${escapeHtml(s.perihal)}</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1.5">
+                Tujuan Disposisi <span class="text-red-600">*</span>
+              </label>
+              <select id="disp-tujuan" required
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm font-semibold text-scout-dark bg-white focus:ring-2 focus:ring-scout-forest focus:outline-none">
+                ${TUJUAN_DISPOSISI_OPTIONS.map(t => `
+                  <option value="${t}" ${selectedTujuan === t ? 'selected' : ''}>${t}</option>
+                `).join('')}
+                ${isCustomTujuan ? `<option value="${escapeHtml(selectedTujuan)}" selected>${escapeHtml(selectedTujuan)}</option>` : ''}
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1.5">
+                Status Tindak Lanjut Disposisi <span class="text-red-600">*</span>
+              </label>
+              <select id="disp-status" required
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm font-bold text-scout-dark bg-white focus:ring-2 focus:ring-scout-forest focus:outline-none">
+                ${STATUS_DISPOSISI_APPROVAL_OPTIONS.map(st => `
+                  <option value="${st}" ${selectedStatus === st ? 'selected' : ''}>${st}</option>
+                `).join('')}
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1.5">
+                Catatan / Instruksi Disposisi Admin <span class="text-red-600">*</span>
+              </label>
+              <textarea id="disp-catatan" required rows="3"
+                placeholder="Tuliskan arahan atau instruksi tindak lanjut surat masuk ini..."
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none">${escapeHtml(s.catatanDisposisi || '')}</textarea>
+            </div>
+
+            <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900 flex items-center gap-2">
+              <i data-lucide="clock" class="w-4 h-4 text-scout-forest shrink-0"></i>
+              <span>Waktu persetujuan & nama Admin (${escapeHtml(currentUser.nama)}) akan dicatat secara otomatis.</span>
+            </div>
+
+            <div class="pt-3 flex justify-end gap-2.5 border-t border-gray-100">
+              <button type="button" onclick="closeFormModal()" class="px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-bold text-gray-700">
+                Batal
+              </button>
+              <button type="submit" class="px-5 py-2.5 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="check-circle-2" class="w-4 h-4 text-scout-gold"></i>
+                <span>Simpan & Approve Disposisi</span>
+              </button>
+            </div>
+          </form>
+        `
+      );
+    }
+
+    function saveDisposisiApprovalForm(e, id) {
+      e.preventDefault();
+      if (!isAdminUser()) {
+        showToast('Akses ditolak: Hanya Admin yang dapat menyetujui disposisi.', 'error');
+        return;
+      }
+      const idx = appData.suratMasuk.findIndex(item => item.id === id);
+      if (idx === -1) return;
+
+      const tujuan = document.getElementById('disp-tujuan').value.trim();
+      const status = document.getElementById('disp-status').value;
+      const catatan = document.getElementById('disp-catatan').value.trim();
+      const approvedTimestamp = formatDateTimeIndoNow();
+
+      appData.suratMasuk[idx] = {
+        ...appData.suratMasuk[idx],
+        disposisi: status,
+        tujuanDisposisi: tujuan,
+        catatanDisposisi: catatan,
+        disposisiApprovedAt: approvedTimestamp,
+        disposisiApprovedBy: currentUser.nama
+      };
+
+      saveAppData();
+      closeFormModal();
+      renderAdministrasiView(document.getElementById('main-content'));
+      lucide.createIcons();
+      showToast(`Disposisi surat masuk "${appData.suratMasuk[idx].nomor}" berhasil disetujui (${status})!`, 'success');
+    }
+
     function openSuratModal(type, id = null) {
       if (guardPelatihWriteAction()) return;
+      const isAdmin = isAdminUser();
       const isMasuk = type === 'masuk';
       const list = isMasuk ? appData.suratMasuk : appData.suratKeluar;
       const s = id ? list.find(item => item.id === id) : null;
+      const todayIso = getTodayIsoDate();
+      const currentStatusLabel = s ? normalizeDisposisiStatusLabel(s.disposisi) : 'Menunggu Disposisi';
 
       openFormModal(
         `${s ? 'Edit' : 'Catat'} ${isMasuk ? 'Surat Masuk' : 'Surat Keluar'}`,
@@ -5337,12 +5548,12 @@
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Terima <span class="text-red-600">*</span></label>
-                  <input type="date" id="srt-tgl-terima" required value="${s ? s.tanggalTerima : '2026-11-24'}"
+                  <input type="date" id="srt-tgl-terima" required value="${s ? s.tanggalTerima : todayIso}"
                     class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
                 </div>
                 <div>
                   <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Surat <span class="text-red-600">*</span></label>
-                  <input type="date" id="srt-tgl-surat" required value="${s ? s.tanggalSurat : '2026-11-24'}"
+                  <input type="date" id="srt-tgl-surat" required value="${s ? s.tanggalSurat : todayIso}"
                     class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
                 </div>
               </div>
@@ -5352,19 +5563,32 @@
                   placeholder="Contoh: Kwartir Ranting Balaraja"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
-              <div>
-                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Disposisi / Status</label>
-                <select id="srt-disposisi" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
-                  <option value="Menunggu Disposisi" ${s && s.disposisi === 'Menunggu Disposisi' ? 'selected' : ''}>Menunggu Disposisi</option>
-                  <option value="Ditindaklanjuti" ${s && s.disposisi === 'Ditindaklanjuti' ? 'selected' : ''}>Ditindaklanjuti</option>
-                  <option value="Selesai" ${s && s.disposisi === 'Selesai' ? 'selected' : ''}>Selesai</option>
-                </select>
+
+              <div class="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200">
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">
+                  Status Disposisi Surat Masuk
+                </label>
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-xs font-extrabold text-amber-900">
+                    ${isAdmin
+                      ? escapeHtml(currentStatusLabel)
+                      : (currentStatusLabel === 'Menunggu Disposisi' ? 'Menunggu Disposisi Admin' : escapeHtml(currentStatusLabel))}
+                  </span>
+                  <span class="px-2 py-0.5 rounded bg-amber-200/70 text-amber-950 text-[10px] font-bold">
+                    ${isAdmin ? 'Kelola via tombol Approve / Disposisi' : 'Terkunci (Khusus Admin)'}
+                  </span>
+                </div>
+                ${s && s.tujuanDisposisi ? `
+                  <p class="text-[11px] text-gray-700 mt-1.5">
+                    Tujuan Disposisi: <strong>${escapeHtml(s.tujuanDisposisi)}</strong>
+                  </p>
+                ` : ''}
               </div>
             ` : `
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Keluar <span class="text-red-600">*</span></label>
-                  <input type="date" id="srt-tgl-keluar" required value="${s ? s.tanggalKeluar : '2026-11-24'}"
+                  <input type="date" id="srt-tgl-keluar" required value="${s ? s.tanggalKeluar : todayIso}"
                     class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
                 </div>
                 <div>
@@ -5413,14 +5637,20 @@
       if (guardPelatihWriteAction()) return;
       const isMasuk = type === 'masuk';
       if (isMasuk) {
+        const existing = id ? appData.suratMasuk.find(item => item.id === id) : null;
         const payload = {
+          ...(existing || {}),
           id: id || generateId('sm'),
           nomor: document.getElementById('srt-nomor').value.trim(),
           tanggalTerima: document.getElementById('srt-tgl-terima').value,
           tanggalSurat: document.getElementById('srt-tgl-surat').value,
           asal: document.getElementById('srt-asal').value.trim(),
           perihal: document.getElementById('srt-perihal').value.trim(),
-          disposisi: document.getElementById('srt-disposisi').value,
+          disposisi: existing ? normalizeDisposisiStatusLabel(existing.disposisi) : 'Menunggu Disposisi',
+          tujuanDisposisi: existing ? (existing.tujuanDisposisi || '') : '',
+          catatanDisposisi: existing ? (existing.catatanDisposisi || '') : '',
+          disposisiApprovedAt: existing ? (existing.disposisiApprovedAt || '') : '',
+          disposisiApprovedBy: existing ? (existing.disposisiApprovedBy || '') : '',
           lampiran: document.getElementById('srt-lampiran').value.trim() || 'Lampiran.pdf'
         };
         if (id) {
@@ -5451,14 +5681,23 @@
       closeFormModal();
       renderAdministrasiView(document.getElementById('main-content'));
       lucide.createIcons();
-      showToast('Arsip persuratan berhasil disimpan.', 'success');
+      showToast(
+        isMasuk && !id
+          ? 'Surat masuk berhasil dicatat dengan status "Menunggu Disposisi".'
+          : 'Arsip persuratan berhasil disimpan.',
+        'success'
+      );
     }
 
     function deleteSurat(type, id) {
       if (guardPelatihWriteAction()) return;
+      const target = type === 'masuk'
+        ? appData.suratMasuk.find(s => s.id === id)
+        : appData.suratKeluar.find(s => s.id === id);
+      const labelNomor = target ? ` (${target.nomor})` : '';
       openConfirmModal(
         'Hapus Arsip Surat?',
-        'Data surat yang dihapus tidak dapat dikembalikan. Lanjutkan?',
+        `Data surat${labelNomor} yang dihapus tidak dapat dikembalikan. Lanjutkan?`,
         () => {
           if (type === 'masuk') {
             appData.suratMasuk = appData.suratMasuk.filter(s => s.id !== id);
@@ -5647,7 +5886,7 @@
       } else {
         reportTitle = 'LAPORAN ADMINISTRASI SURAT MASUK & SURAT KELUAR';
         tableHtml = `
-          <h4 class="font-bold text-xs uppercase text-scout-dark mb-2">A. Rekapitulasi Surat Masuk</h4>
+          <h4 class="font-bold text-xs uppercase text-scout-dark mb-2">A. Rekapitulasi Surat Masuk & Disposisi</h4>
           <table class="w-full text-left border-collapse border border-gray-300 text-xs mb-6">
             <thead>
               <tr class="bg-scout-dark text-white">
@@ -5656,7 +5895,7 @@
                 <th class="border border-gray-300 py-2 px-3">Tgl Terima</th>
                 <th class="border border-gray-300 py-2 px-3">Asal Instansi / Kwarran</th>
                 <th class="border border-gray-300 py-2 px-3">Perihal</th>
-                <th class="border border-gray-300 py-2 px-3">Status</th>
+                <th class="border border-gray-300 py-2 px-3">Status & Tujuan Disposisi</th>
               </tr>
             </thead>
             <tbody>
@@ -5667,7 +5906,11 @@
                   <td class="border border-gray-300 py-2 px-3">${formatDateIndo(s.tanggalTerima)}</td>
                   <td class="border border-gray-300 py-2 px-3">${escapeHtml(s.asal)}</td>
                   <td class="border border-gray-300 py-2 px-3">${escapeHtml(s.perihal)}</td>
-                  <td class="border border-gray-300 py-2 px-3">${escapeHtml(s.disposisi)}</td>
+                  <td class="border border-gray-300 py-2 px-3">
+                    <strong>${escapeHtml(normalizeDisposisiStatusLabel(s.disposisi))}</strong>
+                    ${s.tujuanDisposisi ? `<br/>Tujuan: ${escapeHtml(s.tujuanDisposisi)}` : ''}
+                    ${s.catatanDisposisi ? `<br/>Catatan: ${escapeHtml(s.catatanDisposisi)}` : ''}
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
@@ -5705,7 +5948,6 @@
       const todayShortIndo = getTodayDateIndo(false);
 
       container.innerHTML = `
-        <!-- Kontrol Filter & Tombol Export / Cetak -->
         <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
           <div class="flex flex-wrap items-center gap-3">
             <select onchange="uiState.laporanType = this.value; renderLaporanView(document.getElementById('main-content')); lucide.createIcons();"
@@ -5745,9 +5987,7 @@
           </div>
         </div>
 
-        <!-- AREA DOKUMEN LAPORAN BERKOP RESMI -->
         <div id="print-area" class="bg-white rounded-2xl p-6 sm:p-10 border border-scout-sand shadow-scout">
-          <!-- KOP SURAT RESMI PUSDIKLATCAB TANGERANG -->
           <div class="flex items-center gap-4 pb-5 border-b-4 border-double border-scout-dark">
             <div class="w-16 h-16 sm:w-20 sm:h-20 shrink-0 flex items-center justify-center">
               ${getLogoHtml()}
@@ -5770,12 +6010,10 @@
             </p>
           </div>
 
-          <!-- ISI TABEL LAPORAN -->
           <div class="overflow-x-auto">
             ${tableHtml}
           </div>
 
-          <!-- TANDA TANGAN KAPUSDIKLATCAB -->
           <div class="mt-10 flex justify-end">
             <div class="text-center text-xs w-64">
               <p class="text-gray-600">Tangerang, ${todayShortIndo}</p>
@@ -5853,12 +6091,30 @@
         }
       } else {
         filename = 'Laporan_Administrasi_Surat_Kab_Tangerang.csv';
-        csvRows.push(['Jenis', 'Nomor Surat', 'Tanggal', 'Asal / Tujuan', 'Perihal', 'Status / PJ']);
+        csvRows.push(['Jenis', 'Nomor Surat', 'Tanggal', 'Asal / Tujuan', 'Perihal', 'Status Disposisi / PJ', 'Tujuan Disposisi', 'Catatan Disposisi']);
         appData.suratMasuk.forEach(s => {
-          csvRows.push(['Surat Masuk', `"${s.nomor}"`, `"${formatDateIndo(s.tanggalTerima)}"`, `"${s.asal}"`, `"${s.perihal}"`, s.disposisi]);
+          csvRows.push([
+            'Surat Masuk',
+            `"${s.nomor}"`,
+            `"${formatDateIndo(s.tanggalTerima)}"`,
+            `"${s.asal}"`,
+            `"${s.perihal}"`,
+            `"${normalizeDisposisiStatusLabel(s.disposisi)}"`,
+            `"${s.tujuanDisposisi || '-'}"`,
+            `"${s.catatanDisposisi || '-'}"`
+          ]);
         });
         appData.suratKeluar.forEach(s => {
-          csvRows.push(['Surat Keluar', `"${s.nomor}"`, `"${formatDateIndo(s.tanggalKeluar)}"`, `"${s.tujuan}"`, `"${s.perihal}"`, `"${s.penanggungJawab}"`]);
+          csvRows.push([
+            'Surat Keluar',
+            `"${s.nomor}"`,
+            `"${formatDateIndo(s.tanggalKeluar)}"`,
+            `"${s.tujuan}"`,
+            `"${s.perihal}"`,
+            `"${s.penanggungJawab}"`,
+            '-',
+            '-'
+          ]);
         });
       }
 
@@ -6116,8 +6372,6 @@
 
     // =========================================================================
     // 14. ATURAN KHUSUS ROLE KWARRAN: MANAJEMEN KURSUS
-    //     - Sub-Menu 1: Daftar Kursus (Auto-sync ke Admin & Auto-redirect ke Input Data Peserta)
-    //     - Sub-Menu 2: Input Data Peserta (NTA ##.##.##.######.#### + TTL + Pas Foto 4x6 + Edit & Hapus + Auto-sync)
     // =========================================================================
     function renderKwarranDaftarKursusView(container) {
       const scope = getActiveKwarranScope();
@@ -6126,7 +6380,6 @@
 
       container.innerHTML = `
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <!-- FORM PENDAFTARAN / PENYELENGGARAAN KURSUS OLEH KWARRAN -->
           <div class="lg:col-span-5 bg-white rounded-2xl p-6 border border-scout-sand shadow-scout h-fit">
             <div class="flex items-center gap-3 pb-4 border-b border-scout-sand/70">
               <div class="w-10 h-10 rounded-xl bg-scout-forest text-white flex items-center justify-center shrink-0">
@@ -6188,7 +6441,6 @@
             </form>
           </div>
 
-          <!-- DAFTAR KURSUS YANG TELAH DIINPUT KWARRAN -->
           <div class="lg:col-span-7 space-y-4">
             <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout flex items-center justify-between">
               <div>
@@ -6284,7 +6536,7 @@
         hari,
         tanggal,
         lokasi,
-        createdAt: new Date().toISOString().split('T')[0]
+        createdAt: getTodayIsoDate()
       };
 
       appData.kwarranCourses.unshift(newCourse);
@@ -6425,7 +6677,6 @@
       const initialTanggal = editingParticipant ? (editingParticipant.tanggalLahir || '') : '';
 
       container.innerHTML = `
-        <!-- PEMILIH KURSUS & BANNER INFORMASI RINGKAS KURSUS TERPILIH -->
         <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout mb-6">
           <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-scout-sand/70">
             <div class="flex-1 max-w-xl">
@@ -6448,7 +6699,6 @@
             </button>
           </div>
 
-          <!-- Ringkasan Info Kursus Terpilih (Hari, Tanggal, Lokasi) -->
           <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div class="p-3 rounded-xl bg-scout-cream/70 border border-scout-sand/70 flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-scout-dark text-scout-gold flex items-center justify-center shrink-0">
@@ -6483,7 +6733,6 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <!-- FORM INPUT / EDIT DATA PESERTA (DENGAN PAS FOTO 4x6, NTA ##.##.##.######.#### & TTL) -->
           <div class="lg:col-span-5 bg-white rounded-2xl p-6 border ${editingParticipant ? 'border-amber-400 ring-2 ring-amber-200' : 'border-scout-sand'} shadow-scout h-fit">
             <div class="flex items-center justify-between pb-4 border-b border-scout-sand/70">
               <div class="flex items-center gap-2.5">
@@ -6506,7 +6755,6 @@
             </div>
 
             <form onsubmit="saveKwarranParticipant(event)" class="mt-4 space-y-3.5">
-              <!-- Input & Edit Pas Foto Ukuran 4x6 -->
               <div class="p-3.5 rounded-2xl bg-scout-cream/70 border border-dashed border-scout-khaki flex items-center gap-4">
                 <div id="kp-photo-preview" class="w-16 h-24 rounded-xl bg-white border-2 border-scout-gold/80 shadow-xs overflow-hidden flex flex-col items-center justify-center shrink-0">
                   ${activeDraftPhoto
@@ -6554,7 +6802,6 @@
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
               </div>
 
-              <!-- Input Tempat, Tanggal Lahir (TTL) -->
               <div class="p-3 rounded-xl bg-scout-cream/50 border border-scout-sand/80 space-y-2">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
@@ -6617,7 +6864,6 @@
             </form>
           </div>
 
-          <!-- TABEL DAFTAR PESERTA TERSIMPAN (DENGAN KOLOM PAS FOTO 4x6, NTA & TTL) -->
           <div class="lg:col-span-7 bg-white rounded-2xl border border-scout-sand shadow-scout overflow-hidden flex flex-col">
             <div class="p-5 border-b border-scout-sand/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -6844,7 +7090,9 @@
         'Berlangsung': 'bg-emerald-100 text-emerald-900 border-emerald-300',
         'Aktif Kwarran': 'bg-emerald-100 text-emerald-900 border-emerald-300',
         'Selesai': 'bg-gray-100 text-gray-700 border-gray-300',
-        'Menunggu Disposisi': 'bg-amber-50 text-amber-800 border-amber-200',
+        'Menunggu Disposisi': 'bg-amber-100 text-amber-900 border-amber-300',
+        'Menunggu Disposisi Admin': 'bg-amber-100 text-amber-900 border-amber-300',
+        'Sudah Disposisi / Diproses': 'bg-emerald-50 text-emerald-800 border-emerald-300',
         'Ditindaklanjuti': 'bg-emerald-50 text-emerald-800 border-emerald-200'
       };
       return `<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${map[status] || 'bg-gray-100 text-gray-700'}">${escapeHtml(status)}</span>`;
