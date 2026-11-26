@@ -875,13 +875,14 @@
 
       return {
         profile: {
-          namaKapus: 'Kak H. Bambang Sudjatmiko, M.Pd.',
-          ntaKapus: '28.04.00.000001.0001',
-          masaBakti: '2024 - 2029',
-          telepon: '(021) 5991234',
+          namaKapus: 'H. Mohamad Tarlan, S.Sos., S.IP',
+          ntaKapus: '28.04.00.160468.0001',
+          masaBakti: '2026 - 2031',
+          telepon: '081905637437',
           email: 'pusdiklatcab@pramukatangerang.or.id',
-          alamat: 'Gedung Kwartir Cabang Gerakan Pramuka Kabupaten Tangerang, Jl. Raya Tigaraksa - Cisoka, Kab. Tangerang',
-          logoUrl: ''
+          alamat: 'Jl. Diklaat Pemda / Kitri Bakti Ds. Curug Wetan RT 04/06 Kec. Curug - Tangerang',
+          logoUrl: '',
+          spreadsheetUrl: ''
         },
         users: [
           {
@@ -3266,6 +3267,36 @@
 
               <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
+                  URL Google Spreadsheet (Integrasi Database / Sinkronisasi)
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-scout-forest pointer-events-none">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                  </span>
+                  <input
+                    type="password"
+                    id="prof-spreadsheet-url"
+                    value="${escapeHtml(p.spreadsheetUrl || '')}"
+                    placeholder="https://docs.google.com/spreadsheets/d/..."
+                    autocomplete="off"
+                    class="w-full pl-10 pr-11 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm font-mono font-medium text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none transition"
+                  />
+                  <button
+                    type="button"
+                    onclick="toggleProfileSpreadsheetUrl()"
+                    class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-500 hover:text-scout-dark transition"
+                    title="Tampilkan / Sembunyikan URL Spreadsheet"
+                  >
+                    <i id="prof-spreadsheet-eye-icon" data-lucide="eye" class="w-4 h-4"></i>
+                  </button>
+                </div>
+                <p class="text-[10px] text-gray-500 mt-1">
+                  Tautan disembunyikan secara default demi menjaga keamanan akses spreadsheet. Klik ikon mata di kanan untuk melihat atau menyembunyikan URL.
+                </p>
+              </div>
+              
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
                   Alamat Sanggar Bakti / Sekretariat Pusdiklatcab
                 </label>
                 <textarea id="prof-alamat" rows="2"
@@ -3314,6 +3345,20 @@
       showToast('Logo dikembalikan ke lambang default Pramuka Tangerang.', 'info');
     }
 
+    function toggleProfileSpreadsheetUrl() {
+      const input = document.getElementById('prof-spreadsheet-url');
+      const icon = document.getElementById('prof-spreadsheet-eye-icon');
+      if (!input || !icon) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.setAttribute('data-lucide', 'eye-off');
+      } else {
+        input.type = 'password';
+        icon.setAttribute('data-lucide', 'eye');
+      }
+      lucide.createIcons();
+    }
+
     function saveProfileForm(e) {
       e.preventDefault();
       if (guardPelatihWriteAction()) return;
@@ -3328,11 +3373,12 @@
       appData.profile.telepon = document.getElementById('prof-telepon').value.trim();
       appData.profile.email = document.getElementById('prof-email').value.trim();
       appData.profile.alamat = document.getElementById('prof-alamat').value.trim();
+      appData.profile.spreadsheetUrl = (document.getElementById('prof-spreadsheet-url')?.value || '').trim();
       saveAppData();
       renderBrandLogos();
       renderProfileView(document.getElementById('main-content'));
       lucide.createIcons();
-      showToast('Profil Kapusdiklatcab Tangerang berhasil disimpan!', 'success');
+      showToast('Profil Kapusdiklatcab Tangerang & URL Spreadsheet berhasil disimpan!', 'success');
     }
 
     // =========================================================================
