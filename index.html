@@ -456,12 +456,13 @@
     // Konstanta Jenis Surat Keluar & Tugas Pelatih
     const JENIS_SURAT_KELUAR_OPTIONS = ['Undangan', 'Pemberitahuan', 'Tugas'];
     const TUGAS_SEBAGAI_OPTIONS = [
-      'panitia',
-      'pinsus',
-      'sekretaris kursus',
-      'narasumber',
-      'pelatih',
-      'asisten pelatih'
+      'Panitia',
+      'Pinsus',
+      'Sekretaris Kursus',
+      'Narasumber',
+      'Pelatih',
+      'Asisten Pelatih'
+      'Peserta'
     ];
 
     function isAdminUser() {
@@ -1398,7 +1399,8 @@
         );
       });
 
-      activeTugasLetters.forEach(sk => {
+   activeTugasLetters.forEach(sk => {
+        if (String(sk.tugasSebagai || '').trim().toLowerCase() === 'peserta') return;
         const targetCourse = targetData.kursus.find(c => c.id === sk.kursusId);
         if (!targetCourse) return;
 
