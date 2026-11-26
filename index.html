@@ -393,8 +393,8 @@
     // =========================================================================
     // 1. KONSTANTA, UTILITAS TANGGAL INDONESIA, NTA MASKING & 29 KWARRAN KAB. TANGERANG
     // =========================================================================
-    const STORAGE_KEY = 'pusdiklatcab_tangerang_v1';
-    const SESSION_STORAGE_KEY = 'pusdiklatcab_tangerang_session_v1';
+    const STORAGE_KEY = 'pusdiklatcab_tangerang_v2';
+    const SESSION_STORAGE_KEY = 'pusdiklatcab_tangerang_session_v2';
 
     const BULAN_INDO = [
       'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -798,7 +798,7 @@
     }
 
     // =========================================================================
-    // 2. STATE & DATA AWAL (SEED DATA REALISTIS KABUPATEN TANGERANG)
+    // 2. STATE & DATA AWAL (JADWAL KURSUS KOSONG SIAP INPUT BARU)
     // =========================================================================
     function createInitialSeedData() {
       const sm1Seed = {
@@ -843,7 +843,7 @@
         jenisSurat: 'Pemberitahuan',
         tanggalKeluar: '2026-11-15',
         tujuan: 'Seluruh Kwartir Ranting se-Kabupaten Tangerang',
-        perihal: 'Edaran Pemutakhiran Data Potensi Pembina & Jadwal KMD/KML Akhir Tahun',
+        perihal: 'Edaran Pemutakhiran Data Potensi Pembina & Jadwal KMD/KML/KPD/KPL',
         penanggungJawab: 'Kak H. Bambang Sudjatmiko, M.Pd.',
         namaPelatih: '',
         tugasSebagai: '',
@@ -854,24 +854,6 @@
         lampiranSize: '2 KB'
       };
       sk1Seed.lampiranDataUrl = buildFallbackSuratAttachmentDataUrl('keluar', sk1Seed);
-
-      const sk2Seed = {
-        id: 'sk_2',
-        nomor: '091/28.04-Pusdiklatcab',
-        jenisSurat: 'Tugas',
-        tanggalKeluar: '2026-11-21',
-        tujuan: 'Kak Drs. H. Ahmad Fauzi, M.Pd.',
-        perihal: 'Surat Tugas Pemimpin Kursus (Pinsus) KMD Angkatan XLI / 2026',
-        penanggungJawab: 'Kak H. Bambang Sudjatmiko, M.Pd.',
-        namaPelatih: 'Kak Drs. H. Ahmad Fauzi, M.Pd.',
-        tugasSebagai: 'pinsus',
-        kursusId: 'krs_1',
-        namaKursus: 'Kursus Pembina Pramuka Mahir Tingkat Dasar (KMD)',
-        lampiran: 'ST_Pinsus_KMD_XLI_2026.txt',
-        lampiranMime: 'text/plain',
-        lampiranSize: '2 KB'
-      };
-      sk2Seed.lampiranDataUrl = buildFallbackSuratAttachmentDataUrl('keluar', sk2Seed);
 
       return {
         profile: {
@@ -943,131 +925,13 @@
           { id: 'pot_11', nta: '28.04.06.000601.0001', nama: 'Kak Fitria Handayani, S.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1994-03-28', golongan: 'Siaga', jenjang: 'KMD', tahunLulus: '2024', gender: 'Putri', kwarran: 'Kelapa Dua', pangkalan: 'SDN Kelapa Dua 02', fotoUrl: '' },
           { id: 'pot_12', nta: '28.04.07.000701.0001', nama: 'Kak Rahmat Hidayat, S.T.', tempatLahir: 'Lebak', tanggalLahir: '1995-10-11', golongan: 'Penegak', jenjang: 'Belum Kursus', tahunLulus: '-', gender: 'Putra', kwarran: 'Legok', pangkalan: 'SMKN 12 Kab. Tangerang', fotoUrl: '' }
         ],
-        kursus: [
-          {
-            id: 'krs_1',
-            nama: 'Kursus Pembina Pramuka Mahir Tingkat Dasar (KMD)',
-            jenjang: 'KMD',
-            angkatan: 'Angkatan XLI / 2026',
-            hari: 'Senin - Sabtu',
-            tanggal: '2026-11-27 s.d. 2026-12-02',
-            lokasi: 'Bumi Perkemahan Kitri Bakti, Curug',
-            kuota: 60,
-            terdaftar: 54,
-            status: 'Akan Datang',
-            pelatih: 'Kak Drs. H. Ahmad Fauzi, M.Pd.',
-            panitia: 'Kak Rina Wulandari, S.Pd.',
-            sourceType: 'cabang',
-            sourceKwarran: '',
-            sourceCourseId: ''
-          },
-          {
-            id: 'krs_2',
-            nama: 'Kursus Pembina Pramuka Mahir Tingkat Lanjutan (KML) Golongan Penggalang',
-            jenjang: 'KML',
-            angkatan: 'Angkatan XXVIII / 2026',
-            hari: 'Jumat - Rabu',
-            tanggal: '2026-11-20 s.d. 2026-11-25',
-            lokasi: 'Sanggar Bakti Kwarcab Tangerang, Tigaraksa',
-            kuota: 45,
-            terdaftar: 45,
-            status: 'Berlangsung',
-            pelatih: 'Kak Hj. Nurhayati, S.Pd., M.M.',
-            panitia: 'Kak Rina Wulandari, S.Pd.',
-            sourceType: 'cabang',
-            sourceKwarran: '',
-            sourceCourseId: ''
-          },
-          {
-            id: 'krs_3',
-            nama: 'Kursus Pelatih Pembina Pramuka Tingkat Dasar (KPD)',
-            jenjang: 'KPD',
-            angkatan: 'Angkatan IX / 2026',
-            hari: 'Kamis - Rabu',
-            tanggal: '2026-09-10 s.d. 2026-09-16',
-            lokasi: 'Bumi Perkemahan Kitri Bakti, Curug',
-            kuota: 40,
-            terdaftar: 38,
-            status: 'Selesai',
-            pelatih: 'Kak Agus Salim, M.Pd.',
-            panitia: 'Kak Rina Wulandari, S.Pd.',
-            sourceType: 'cabang',
-            sourceKwarran: '',
-            sourceCourseId: ''
-          }
-        ],
+        // Seluruh jadwal kursus (KMD, KML, KPD, KPL) dikosongkan agar siap diisi baru
+        kursus: [],
         courseDetails: {},
         suratMasuk: [sm1Seed, sm2Seed],
-        suratKeluar: [sk1Seed, sk2Seed],
-        kwarranCourses: [
-          {
-            id: 'kc_tigaraksa_1',
-            kwarran: 'Tigaraksa',
-            kwarran_id: 'kwarran_tigaraksa',
-            namaKursus: 'KMD Golongan Siaga & Penggalang Kwarran Tigaraksa',
-            hari: 'Jumat - Minggu',
-            tanggal: '2026-12-11 s.d. 2026-12-13',
-            lokasi: 'SDN Tigaraksa 01 & Bumi Perkemahan Mini Tigaraksa',
-            createdAt: '2026-11-18'
-          },
-          {
-            id: 'kc_curug_1',
-            kwarran: 'Curug',
-            kwarran_id: 'kwarran_curug',
-            namaKursus: 'KMD Mandiri Kwartir Ranting Curug Tahun 2026',
-            hari: 'Sabtu - Minggu',
-            tanggal: '2026-12-19 s.d. 2026-12-20',
-            lokasi: 'Bumi Perkemahan Kitri Bakti, Curug',
-            createdAt: '2026-11-20'
-          }
-        ],
-        kwarranParticipants: [
-          {
-            id: 'kp_tig_1',
-            courseId: 'kc_tigaraksa_1',
-            kwarran: 'Tigaraksa',
-            kwarran_id: 'kwarran_tigaraksa',
-            nta: '28.04.01.000142.0001',
-            namaGelar: 'Ahmad Subagja, S.Pd.',
-            tempatLahir: 'Tangerang',
-            tanggalLahir: '1992-05-14',
-            golongan: 'Penggalang',
-            namaPangkalan: 'SDN Tigaraksa 01',
-            gender: 'Putra',
-            fotoUrl: '',
-            statusKelulusan: 'Belum Lulus'
-          },
-          {
-            id: 'kp_crg_1',
-            courseId: 'kc_curug_1',
-            kwarran: 'Curug',
-            kwarran_id: 'kwarran_curug',
-            nta: '28.04.05.000218.0001',
-            namaGelar: 'Nurlaila Sari, S.Pd.SD.',
-            tempatLahir: 'Tangerang',
-            tanggalLahir: '1994-08-21',
-            golongan: 'Siaga',
-            namaPangkalan: 'SDN Curug 01',
-            gender: 'Putri',
-            fotoUrl: '',
-            statusKelulusan: 'Belum Lulus'
-          },
-          {
-            id: 'kp_crg_2',
-            courseId: 'kc_curug_1',
-            kwarran: 'Curug',
-            kwarran_id: 'kwarran_curug',
-            nta: '28.04.05.000309.0001',
-            namaGelar: 'Rizky Ramadhan, S.Pd.',
-            tempatLahir: 'Serang',
-            tanggalLahir: '1991-03-10',
-            golongan: 'Penggalang',
-            namaPangkalan: 'SMPN 1 Curug',
-            gender: 'Putra',
-            fotoUrl: '',
-            statusKelulusan: 'Belum Lulus'
-          }
-        ]
+        suratKeluar: [sk1Seed],
+        kwarranCourses: [],
+        kwarranParticipants: []
       };
     }
 
@@ -1080,12 +944,12 @@
       }
       data.users = Array.isArray(data.users) && data.users.length ? data.users : seed.users;
       data.potensi = Array.isArray(data.potensi) ? data.potensi : seed.potensi;
-      data.kursus = Array.isArray(data.kursus) ? data.kursus : seed.kursus;
+      data.kursus = Array.isArray(data.kursus) ? data.kursus : [];
       data.courseDetails = (data.courseDetails && typeof data.courseDetails === 'object') ? data.courseDetails : {};
       data.suratMasuk = Array.isArray(data.suratMasuk) ? data.suratMasuk : seed.suratMasuk;
       data.suratKeluar = Array.isArray(data.suratKeluar) ? data.suratKeluar : seed.suratKeluar;
-      data.kwarranCourses = Array.isArray(data.kwarranCourses) ? data.kwarranCourses : seed.kwarranCourses;
-      data.kwarranParticipants = Array.isArray(data.kwarranParticipants) ? data.kwarranParticipants : seed.kwarranParticipants;
+      data.kwarranCourses = Array.isArray(data.kwarranCourses) ? data.kwarranCourses : [];
+      data.kwarranParticipants = Array.isArray(data.kwarranParticipants) ? data.kwarranParticipants : [];
 
       // Normalisasi struktur disposisi & lampiran Surat Masuk
       data.suratMasuk = data.suratMasuk.map(sm => {
@@ -1154,10 +1018,6 @@
       if (!data.potensi.some(p => isSameKwarran(p.kwarran, 'Curug'))) {
         data.potensi.push(...seed.potensi.filter(p => isSameKwarran(p.kwarran, 'Curug')));
       }
-      if (!data.kwarranCourses.some(c => isSameKwarran(c.kwarran, 'Curug'))) {
-        data.kwarranCourses.push(...seed.kwarranCourses.filter(c => isSameKwarran(c.kwarran, 'Curug')));
-        data.kwarranParticipants.push(...seed.kwarranParticipants.filter(pt => isSameKwarran(pt.kwarran, 'Curug')));
-      }
 
       const seedPotMap = Object.fromEntries(seed.potensi.map(sp => [sp.id, sp]));
       data.potensi = data.potensi.map(p => {
@@ -1189,12 +1049,10 @@
         };
       });
 
-      const seedKpMap = Object.fromEntries(seed.kwarranParticipants.map(skp => [skp.id, skp]));
       data.kwarranParticipants = data.kwarranParticipants.map(pt => {
         const parentCourse = data.kwarranCourses.find(c => c.id === pt.courseId);
         const kw = normalizeKwarranName(pt.kwarran || (parentCourse ? parentCourse.kwarran : ''));
-        const seedKpRef = seedKpMap[pt.id] || {};
-        const rawNta = (pt.nta !== undefined && pt.nta !== null) ? String(pt.nta).trim() : (seedKpRef.nta || '');
+        const rawNta = (pt.nta !== undefined && pt.nta !== null) ? String(pt.nta).trim() : '';
         return {
           ...pt,
           nta: rawNta ? normalizeExistingNta(rawNta) : '',
@@ -1212,6 +1070,7 @@
         ...k,
         jenjang: k.jenjang || inferJenjangFromName(k.nama),
         hari: k.hari || 'Sesuai Jadwal',
+        keterangan: k.keterangan || '',
         sourceType: k.sourceType || (k.sourceCourseId ? 'kwarran' : 'cabang'),
         sourceKwarran: k.sourceKwarran || '',
         sourceCourseId: k.sourceCourseId || ''
@@ -1263,15 +1122,16 @@
             id: linkedAdminId,
             nama: defaultName,
             jenjang: inferJenjangFromName(defaultName),
-            angkatan: `Usulan Kwarran ${kc.kwarran} / 2026`,
+            angkatan: `Usulan Kwarran ${kc.kwarran}`,
             hari: kc.hari || 'Sesuai Jadwal',
             tanggal: kc.tanggal,
             lokasi: kc.lokasi,
             kuota: Math.max(40, participantCount),
             terdaftar: participantCount,
             status: 'Akan Datang',
-            pelatih: 'Tim Pelatih Pusdiklatcab Tangerang',
+            pelatih: '',
             panitia: `Panitia Pelaksana Kwarran ${kc.kwarran}`,
+            keterangan: kc.keterangan || '',
             sourceType: 'kwarran',
             sourceKwarran: kc.kwarran,
             sourceCourseId: kc.id
@@ -1284,7 +1144,7 @@
     // SINKRONISASI OTOMATIS SURAT TUGAS (SURAT KELUAR -> ABSENSI PELATIH/PANITIA)
     // =========================================================================
     function buildDefaultCourseDetailStructure(course, profileObj) {
-      const initialPelatih = (course.pelatih || 'Kak Drs. H. Ahmad Fauzi, M.Pd.')
+      const initialPelatih = (course.pelatih || '')
         .split(',')
         .map((n, i) => ({
           id: `plt_${course.id}_${i + 1}`,
@@ -1295,7 +1155,7 @@
         }))
         .filter(x => x.nama && !x.nama.toLowerCase().includes('tim pelatih'));
 
-      const initialPanitia = (course.panitia || 'Kak Rina Wulandari, S.Pd.')
+      const initialPanitia = (course.panitia || '')
         .split(',')
         .map((n, i) => ({
           id: `pnt_${course.id}_${i + 1}`,
@@ -1308,65 +1168,19 @@
 
       return {
         suratTugas: {
-          nomor: `ST-${Math.floor(100 + Math.random() * 899)}/28.04-Pusdiklatcab/2026`,
+          nomor: '',
           tanggal: getTodayIsoDate(),
           penandatangan: profileObj ? profileObj.namaKapus : 'Kak H. Bambang Sudjatmiko, M.Pd.',
-          perihal: `Penugasan Tim Pelatih & Panitia Pelaksana ${course.nama}`,
+          perihal: course.nama ? `Penugasan Tim Pelatih & Panitia Pelaksana ${course.nama}` : '',
           personel: [...initialPelatih.map(p => `${p.nama} (${p.jabatan})`), ...initialPanitia.map(p => `${p.nama} (${p.jabatan})`)].join('\n'),
           attachments: []
         },
-        manualParticipants: course.sourceType === 'kwarran' ? [] : [
-          {
-            id: `mp_${course.id}_1`,
-            nta: '28.04.01.000412.0001',
-            nama: 'Kak Hendra Setiawan, S.Pd.',
-            tempatLahir: 'Tangerang',
-            tanggalLahir: '1993-04-12',
-            golongan: 'Penggalang',
-            gender: 'Putra',
-            pangkalan: 'SMPN 1 Tigaraksa',
-            kwarran: 'Tigaraksa',
-            fotoUrl: '',
-            statusKelulusan: course.status === 'Selesai' ? 'Lulus' : 'Belum Lulus',
-            source: 'cabang'
-          },
-          {
-            id: `mp_${course.id}_2`,
-            nta: '28.04.05.000419.0001',
-            nama: 'Kak Dewi Anggraini, S.Pd.SD.',
-            tempatLahir: 'Tangerang',
-            tanggalLahir: '1995-09-18',
-            golongan: 'Siaga',
-            gender: 'Putri',
-            pangkalan: 'SDN Curug 01',
-            kwarran: 'Curug',
-            fotoUrl: '',
-            statusKelulusan: course.status === 'Selesai' ? 'Lulus' : 'Belum Lulus',
-            source: 'cabang'
-          }
-        ],
+        manualParticipants: [],
         attendanceStatus: {},
         graduationStatus: {},
         panitiaList: initialPanitia,
         pelatihList: initialPelatih,
-        rundown: [
-          {
-            id: `rnd_${course.id}_1`,
-            sesi: 'Hari Ke-1 / Sesi 1',
-            waktu: '08.00 - 09.30 WIB',
-            materi: 'Upacara Pembukaan, Orientasi Kursus & Kontrak Belajar',
-            narasumber: initialPelatih[0] ? initialPelatih[0].nama : 'Pinsus Pusdiklatcab',
-            keterangan: 'Pakaian Seragam Pramuka Lengkap'
-          },
-          {
-            id: `rnd_${course.id}_2`,
-            sesi: 'Hari Ke-1 / Sesi 2',
-            waktu: '09.45 - 11.45 WIB',
-            materi: 'Fundamental Gerakan Pramuka, Prinsip Dasar & Metode Kepramukaan',
-            narasumber: initialPelatih[0] ? initialPelatih[0].nama : 'Tim Pelatih',
-            keterangan: 'Diskusi Kelompok & Simulasi'
-          }
-        ],
+        rundown: [],
         rundownFiles: []
       };
     }
@@ -1634,7 +1448,7 @@
       adminPrintDocType: 'pakta',
       adminPrintTargetRole: 'Peserta',
       adminPrintTargetId: '',
-      adminPrintNomorSurat: '001/28.04-Pusdiklatcab/2026',
+      adminPrintNomorSurat: '',
       adminPrintKualifikasi: 'Sangat Memuaskan',
       adminPrintGolonganShb: 'Penggalang',
       adminTab: 'masuk',
@@ -2407,7 +2221,7 @@
         ? `${pelatihPotensi.pangkalan} (Kwarran ${pelatihPotensi.kwarran})`
         : 'Korps Pelatih Pusdiklatcab Tangerang';
       const namaKursusDisplay = course ? course.nama : (sk.namaKursus || '-');
-      const angkatanDisplay = course ? course.angkatan : '-';
+      const angkatanDisplay = course && course.angkatan ? course.angkatan : '-';
       const waktuDisplay = course
         ? `${course.hari && course.hari !== 'Sesuai Jadwal' ? course.hari + ', ' : ''}${formatDateRangeIndo(course.tanggal)}`
         : '-';
@@ -2535,7 +2349,7 @@
         ? `${pelatihPotensi.pangkalan} (Kwarran ${pelatihPotensi.kwarran})`
         : 'Korps Pelatih Pusdiklatcab Tangerang';
       const namaKursusDisplay = course ? course.nama : (sk.namaKursus || '-');
-      const angkatanDisplay = course ? course.angkatan : '-';
+      const angkatanDisplay = course && course.angkatan ? course.angkatan : '-';
       const waktuDisplay = course
         ? `${course.hari && course.hari !== 'Sesuai Jadwal' ? course.hari + ', ' : ''}${formatDateRangeIndo(course.tanggal)}`
         : '-';
@@ -2837,15 +2651,15 @@
                 <span>Unduh Laporan</span>
               </button>
             ` : `
-              <button type="button" onclick="navigateTo('data-potensi')"
+              <button type="button" onclick="navigateTo('kursus')"
                 class="px-4 py-2.5 rounded-xl bg-scout-gold hover:bg-amber-400 text-scout-dark font-extrabold text-xs flex items-center gap-2 shadow-sm transition">
-                <i data-lucide="users" class="w-4 h-4"></i>
-                <span>Kelola Data Potensi</span>
+                <i data-lucide="calendar-plus" class="w-4 h-4"></i>
+                <span>Input Jadwal Kursus</span>
               </button>
-              <button type="button" onclick="navigateTo('laporan')"
+              <button type="button" onclick="navigateTo('data-potensi')"
                 class="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-bold text-xs flex items-center gap-2 transition">
-                <i data-lucide="file-spreadsheet" class="w-4 h-4 text-scout-gold"></i>
-                <span>Unduh Laporan</span>
+                <i data-lucide="users" class="w-4 h-4 text-scout-gold"></i>
+                <span>Kelola Data Potensi</span>
               </button>
             `)}
           </div>
@@ -2978,7 +2792,7 @@
               </div>
               ${!isKwarran ? `
                 <button type="button" onclick="navigateTo('kursus')" class="text-xs font-bold text-scout-forest hover:underline">
-                  Lihat Semua &rarr;
+                  Kelola Jadwal &rarr;
                 </button>
               ` : `
                 <button type="button" onclick="navigateTo('kwarran-daftar-kursus')" class="text-xs font-bold text-scout-forest hover:underline">
@@ -3010,8 +2824,10 @@
                     </tr>
                   `).join('') || `
                     <tr>
-                      <td colspan="4" class="py-6 text-center text-gray-500">
-                        Belum ada jadwal kursus terdaftar untuk Kwarran ${escapeHtml(myKwarran)}.
+                      <td colspan="4" class="py-8 text-center text-gray-500">
+                        ${isKwarran
+                          ? `Belum ada jadwal kursus terdaftar untuk Kwarran ${escapeHtml(myKwarran)}.`
+                          : 'Belum ada jadwal kursus (KMD, KML, KPD, KPL) yang diinput. Silakan tambah jadwal kursus baru.'}
                       </td>
                     </tr>
                   `}
@@ -3065,7 +2881,7 @@
                     </span>
                   </div>
                 `;
-              }).join('') || '<p class="text-xs text-gray-500 py-6 text-center">Belum ada data kursus Kwarran.</p>'}
+              }).join('') || '<p class="text-xs text-gray-500 py-8 text-center">Belum ada data kursus Kwarran yang diinput.</p>'}
             </div>
           </div>
         </div>
@@ -3908,7 +3724,8 @@
           return (
             k.nama.toLowerCase().includes(q) ||
             k.lokasi.toLowerCase().includes(q) ||
-            k.angkatan.toLowerCase().includes(q) ||
+            (k.angkatan || '').toLowerCase().includes(q) ||
+            (k.keterangan || '').toLowerCase().includes(q) ||
             formatDateRangeIndo(k.tanggal).toLowerCase().includes(q) ||
             (k.sourceKwarran || '').toLowerCase().includes(q)
           );
@@ -3984,7 +3801,7 @@
                         </span>
                       `}
                       <span class="px-2.5 py-1 rounded-lg bg-scout-cream border border-scout-sand text-[11px] font-bold text-scout-brown">
-                        ${escapeHtml(k.angkatan)}
+                        ${escapeHtml(k.jenjang || 'KMD')}${k.angkatan ? ` • ${escapeHtml(k.angkatan)}` : ''}
                       </span>
                     </div>
                     ${renderStatusBadge(k.status)}
@@ -4017,14 +3834,24 @@
                       <i data-lucide="map-pin" class="w-4 h-4 text-scout-forest shrink-0"></i>
                       <span>${escapeHtml(k.lokasi)}</span>
                     </div>
-                    <div class="flex items-center gap-2">
-                      <i data-lucide="award" class="w-4 h-4 text-amber-700 shrink-0"></i>
-                      <span><strong>Pelatih:</strong> ${escapeHtml(k.pelatih)}</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <i data-lucide="clipboard-list" class="w-4 h-4 text-scout-medium shrink-0"></i>
-                      <span><strong>Panitia:</strong> ${escapeHtml(k.panitia)}</span>
-                    </div>
+                    ${k.pelatih ? `
+                      <div class="flex items-center gap-2">
+                        <i data-lucide="award" class="w-4 h-4 text-amber-700 shrink-0"></i>
+                        <span><strong>Pelatih:</strong> ${escapeHtml(k.pelatih)}</span>
+                      </div>
+                    ` : ''}
+                    ${k.panitia ? `
+                      <div class="flex items-center gap-2">
+                        <i data-lucide="clipboard-list" class="w-4 h-4 text-scout-medium shrink-0"></i>
+                        <span><strong>Panitia:</strong> ${escapeHtml(k.panitia)}</span>
+                      </div>
+                    ` : ''}
+                    ${k.keterangan ? `
+                      <div class="flex items-start gap-2 pt-1 text-gray-500">
+                        <i data-lucide="file-text" class="w-4 h-4 text-scout-medium shrink-0 mt-0.5"></i>
+                        <span><strong>Keterangan:</strong> ${escapeHtml(k.keterangan)}</span>
+                      </div>
+                    ` : ''}
                   </div>
                 </div>
 
@@ -4066,7 +3893,24 @@
                 </div>
               </div>
             `;
-          }).join('') || '<div class="col-span-2 bg-white rounded-2xl p-10 text-center text-sm text-gray-500 border border-scout-sand">Belum ada jadwal kursus yang sesuai pencarian.</div>'}
+          }).join('') || `
+            <div class="col-span-2 bg-white rounded-2xl p-10 text-center border border-dashed border-scout-sand">
+              <div class="w-12 h-12 rounded-2xl bg-scout-cream text-scout-brown flex items-center justify-center mx-auto mb-3">
+                <i data-lucide="calendar-plus" class="w-6 h-6"></i>
+              </div>
+              <p class="text-sm font-extrabold text-scout-dark">Belum Ada Jadwal Kursus (KMD, KML, KPD, KPL)</p>
+              <p class="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                Semua jadwal kursus terdahulu telah dibersihkan. Silakan gunakan tombol <strong>Tambah Jadwal Kursus</strong> untuk menginput jadwal kursus baru.
+              </p>
+              ${!readOnly ? `
+                <button type="button" onclick="openKursusModal()"
+                  class="mt-4 px-4 py-2.5 rounded-xl bg-scout-dark hover:bg-scout-brown text-white font-bold text-xs inline-flex items-center gap-2 shadow-sm transition">
+                  <i data-lucide="plus-circle" class="w-4 h-4 text-scout-gold"></i>
+                  <span>Input Jadwal Kursus Baru</span>
+                </button>
+              ` : ''}
+            </div>
+          `}
         </div>
       `;
     }
@@ -4075,7 +3919,7 @@
       if (guardPelatihWriteAction()) return;
       const k = id ? appData.kursus.find(item => item.id === id) : null;
       openFormModal(
-        k ? 'Edit Jadwal Kursus & Pelatihan' : 'Tambah Jadwal Kursus Baru',
+        k ? 'Edit Jadwal Kursus & Pelatihan' : 'Input Jadwal Kursus Baru',
         `
           <form onsubmit="saveKursusForm(event, '${id || ''}')" class="space-y-4">
             <div>
@@ -4087,20 +3931,22 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Jenjang Kursus</label>
-                <select id="krs-jenjang" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Jenjang Kursus <span class="text-red-600">*</span></label>
+                <select id="krs-jenjang" required class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
+                  <option value="" ${!k ? 'selected' : ''} disabled>-- Pilih Jenjang --</option>
                   ${['KMD', 'KML', 'KPD', 'KPL', 'Orientasi'].map(j => `<option value="${j}" ${k && k.jenjang === j ? 'selected' : ''}>${j}</option>`).join('')}
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Angkatan / Tahun <span class="text-red-600">*</span></label>
-                <input type="text" id="krs-angkatan" required value="${k ? escapeHtml(k.angkatan) : 'Angkatan XLIII / 2026'}"
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Angkatan / Tahun</label>
+                <input type="text" id="krs-angkatan" value="${k ? escapeHtml(k.angkatan || '') : ''}"
+                  placeholder="Contoh: Angkatan I / 2026"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
               </div>
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Status Kegiatan <span class="text-red-600">*</span></label>
                 <select id="krs-status" class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm bg-white">
-                  <option value="Akan Datang" ${k && k.status === 'Akan Datang' ? 'selected' : ''}>Akan Datang</option>
+                  <option value="Akan Datang" ${!k || k.status === 'Akan Datang' ? 'selected' : ''}>Akan Datang</option>
                   <option value="Berlangsung" ${k && k.status === 'Berlangsung' ? 'selected' : ''}>Berlangsung</option>
                   <option value="Selesai" ${k && k.status === 'Selesai' ? 'selected' : ''}>Selesai (Otomatis Luluskan Peserta)</option>
                 </select>
@@ -4110,7 +3956,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Hari Pelaksanaan</label>
-                <input type="text" id="krs-hari" value="${k ? escapeHtml(k.hari || '') : 'Jumat - Minggu'}"
+                <input type="text" id="krs-hari" value="${k ? escapeHtml(k.hari || '') : ''}"
                   placeholder="Contoh: Jumat - Minggu"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
@@ -4123,7 +3969,7 @@
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Lokasi Kegiatan <span class="text-red-600">*</span></label>
                 <input type="text" id="krs-lokasi" required value="${k ? escapeHtml(k.lokasi) : ''}"
-                  placeholder="Contoh: Buper Kitri Bakti"
+                  placeholder="Contoh: Bumi Perkemahan Kitri Bakti"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none" />
               </div>
             </div>
@@ -4131,12 +3977,14 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Kuota Maksimal <span class="text-red-600">*</span></label>
-                <input type="number" id="krs-kuota" required min="1" value="${k ? k.kuota : 60}"
+                <input type="number" id="krs-kuota" required min="1" value="${k ? k.kuota : ''}"
+                  placeholder="Contoh: 60"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
               <div>
-                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Peserta Terdaftar <span class="text-red-600">*</span></label>
-                <input type="number" id="krs-terdaftar" required min="0" value="${k ? k.terdaftar : 0}"
+                <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Peserta Terdaftar</label>
+                <input type="number" id="krs-terdaftar" min="0" value="${k ? k.terdaftar : ''}"
+                  placeholder="0"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
             </div>
@@ -4144,14 +3992,23 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Penugasan Pelatih / Pinsus</label>
-                <input type="text" id="krs-pelatih" value="${k ? escapeHtml(k.pelatih) : 'Kak Drs. H. Ahmad Fauzi, M.Pd.'}"
+                <input type="text" id="krs-pelatih" value="${k ? escapeHtml(k.pelatih || '') : ''}"
+                  placeholder="Masukkan nama Pinsus / Tim Pelatih"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Penanggung Jawab Panitia</label>
-                <input type="text" id="krs-panitia" value="${k ? escapeHtml(k.panitia) : 'Kak Rina Wulandari, S.Pd.'}"
+                <input type="text" id="krs-panitia" value="${k ? escapeHtml(k.panitia || '') : ''}"
+                  placeholder="Masukkan nama Ketua / Panitia"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Keterangan</label>
+              <textarea id="krs-keterangan" rows="2"
+                placeholder="Catatan tambahan, persyaratan peserta, atau informasi teknis kursus..."
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none">${k ? escapeHtml(k.keterangan || '') : ''}</textarea>
             </div>
 
             <div class="pt-3 flex justify-end gap-2.5 border-t border-gray-100">
@@ -4172,21 +4029,23 @@
       const newTanggal = document.getElementById('krs-tanggal').value.trim();
       const newLokasi = document.getElementById('krs-lokasi').value.trim();
       const newStatus = document.getElementById('krs-status').value;
+      const newKeterangan = (document.getElementById('krs-keterangan')?.value || '').trim();
 
       const payload = {
         ...(prev || {}),
         id: id || generateId('krs'),
         nama: newNama,
-        jenjang: document.getElementById('krs-jenjang').value,
+        jenjang: document.getElementById('krs-jenjang').value || inferJenjangFromName(newNama),
         angkatan: document.getElementById('krs-angkatan').value.trim(),
         status: newStatus,
         hari: newHari,
         tanggal: newTanggal,
         lokasi: newLokasi,
-        kuota: parseInt(document.getElementById('krs-kuota').value, 10) || 50,
+        kuota: parseInt(document.getElementById('krs-kuota').value, 10) || 40,
         terdaftar: parseInt(document.getElementById('krs-terdaftar').value, 10) || 0,
         pelatih: document.getElementById('krs-pelatih').value.trim(),
         panitia: document.getElementById('krs-panitia').value.trim(),
+        keterangan: newKeterangan,
         sourceType: prev ? (prev.sourceType || 'cabang') : 'cabang',
         sourceKwarran: prev ? (prev.sourceKwarran || '') : '',
         sourceCourseId: prev ? (prev.sourceCourseId || '') : '',
@@ -4201,7 +4060,8 @@
             namaKursus: newNama,
             hari: newHari,
             tanggal: newTanggal,
-            lokasi: newLokasi
+            lokasi: newLokasi,
+            keterangan: newKeterangan
           };
         }
       }
@@ -4237,7 +4097,7 @@
       if (!k) return;
       openConfirmModal(
         'Hapus Jadwal Kursus?',
-        `Yakin menghapus kegiatan "${k.nama}" (${k.angkatan})?`,
+        `Yakin menghapus kegiatan "${k.nama}"${k.angkatan ? ` (${k.angkatan})` : ''}?`,
         () => {
           if (k.sourceType === 'kwarran' && k.sourceCourseId) {
             appData.kwarranCourses = appData.kwarranCourses.filter(kc => kc.id !== k.sourceCourseId);
@@ -4385,7 +4245,7 @@
                     </span>
                   `}
                   <span class="px-2.5 py-0.5 rounded-md bg-scout-cream border border-scout-sand text-[11px] font-bold text-scout-brown">
-                    ${escapeHtml(course.jenjang || 'KMD')} • ${escapeHtml(course.angkatan)}
+                    ${escapeHtml(course.jenjang || 'KMD')}${course.angkatan ? ` • ${escapeHtml(course.angkatan)}` : ''}
                   </span>
                   ${renderStatusBadge(course.status)}
                 </div>
@@ -4441,6 +4301,7 @@
             <div>
               <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nama Kursus / Kegiatan <span class="text-red-600">*</span></label>
               <input type="text" id="det-krs-nama" required value="${escapeHtml(course.nama)}"
+                placeholder="Contoh: Kursus Pembina Pramuka Mahir Tingkat Dasar (KMD)"
                 class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm font-semibold text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none" />
             </div>
 
@@ -4453,7 +4314,8 @@
               </div>
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Angkatan / Tahun</label>
-                <input type="text" id="det-krs-angkatan" required value="${escapeHtml(course.angkatan)}"
+                <input type="text" id="det-krs-angkatan" value="${escapeHtml(course.angkatan || '')}"
+                  placeholder="Contoh: Angkatan I / 2026"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
               <div>
@@ -4469,17 +4331,20 @@
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Hari Pelaksanaan</label>
-                <input type="text" id="det-krs-hari" required value="${escapeHtml(course.hari || '')}"
+                <input type="text" id="det-krs-hari" value="${escapeHtml(course.hari || '')}"
+                  placeholder="Contoh: Jumat - Minggu"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Tanggal Mulai & Selesai</label>
                 <input type="text" id="det-krs-tanggal" required value="${escapeHtml(course.tanggal)}"
+                  placeholder="Contoh: 15 Desember 2026 s.d. 20 Desember 2026"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Kuota Maksimal Peserta</label>
                 <input type="number" id="det-krs-kuota" required min="1" value="${course.kuota}"
+                  placeholder="Contoh: 60"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
             </div>
@@ -4487,20 +4352,30 @@
             <div>
               <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Lokasi / Tempat Pelaksanaan</label>
               <input type="text" id="det-krs-lokasi" required value="${escapeHtml(course.lokasi)}"
+                placeholder="Contoh: Bumi Perkemahan Kitri Bakti"
                 class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Pemimpin Kursus / Tim Pelatih</label>
-                <input type="text" id="det-krs-pelatih" value="${escapeHtml(course.pelatih)}"
+                <input type="text" id="det-krs-pelatih" value="${escapeHtml(course.pelatih || '')}"
+                  placeholder="Masukkan nama Pinsus / Tim Pelatih"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Penanggung Jawab Panitia</label>
-                <input type="text" id="det-krs-panitia" value="${escapeHtml(course.panitia)}"
+                <input type="text" id="det-krs-panitia" value="${escapeHtml(course.panitia || '')}"
+                  placeholder="Masukkan nama Ketua / Panitia"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Keterangan</label>
+              <textarea id="det-krs-keterangan" rows="2"
+                placeholder="Catatan tambahan atau keterangan pelaksanaan kursus..."
+                class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm focus:ring-2 focus:ring-scout-forest focus:outline-none">${escapeHtml(course.keterangan || '')}</textarea>
             </div>
 
             <div class="pt-3 flex justify-end border-t border-gray-100">
@@ -4522,6 +4397,7 @@
       const prev = appData.kursus[idx];
       const newStatus = document.getElementById('det-krs-status').value;
       const newNama = document.getElementById('det-krs-nama').value.trim();
+      const newKeterangan = (document.getElementById('det-krs-keterangan')?.value || '').trim();
 
       const updated = {
         ...prev,
@@ -4529,12 +4405,13 @@
         jenjang: document.getElementById('det-krs-jenjang').value,
         angkatan: document.getElementById('det-krs-angkatan').value.trim(),
         status: newStatus,
-        hari: document.getElementById('det-krs-hari').value.trim(),
+        hari: document.getElementById('det-krs-hari').value.trim() || 'Sesuai Jadwal',
         tanggal: document.getElementById('det-krs-tanggal').value.trim(),
         kuota: parseInt(document.getElementById('det-krs-kuota').value, 10) || 40,
         lokasi: document.getElementById('det-krs-lokasi').value.trim(),
         pelatih: document.getElementById('det-krs-pelatih').value.trim(),
         panitia: document.getElementById('det-krs-panitia').value.trim(),
+        keterangan: newKeterangan,
         _adminEditedName: prev.sourceType === 'kwarran' ? true : prev._adminEditedName
       };
 
@@ -4548,7 +4425,8 @@
             namaKursus: updated.nama,
             hari: updated.hari,
             tanggal: updated.tanggal,
-            lokasi: updated.lokasi
+            lokasi: updated.lokasi,
+            keterangan: newKeterangan
           };
         }
       }
@@ -4612,6 +4490,7 @@
                 <div>
                   <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Nomor Surat Tugas <span class="text-red-600">*</span></label>
                   <input type="text" id="st-nomor" required value="${escapeHtml(st.nomor)}"
+                    placeholder="Contoh: ST-001/28.04-Pusdiklatcab/2026"
                     class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm font-semibold" />
                 </div>
                 <div>
@@ -4630,6 +4509,7 @@
               <div>
                 <label class="block text-xs font-bold uppercase text-scout-brown mb-1">Dasar / Perihal Penugasan</label>
                 <input type="text" id="st-perihal" value="${escapeHtml(st.perihal)}"
+                  placeholder="Contoh: Penugasan Tim Pelatih & Panitia Pelaksana Kursus"
                   class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand text-sm" />
               </div>
 
@@ -5367,17 +5247,17 @@
               <form onsubmit="addCourseRundownItem(event, '${course.id}')" class="space-y-3">
                 <div>
                   <label class="block text-[11px] font-bold uppercase text-scout-brown mb-1">Hari / Sesi Ke- *</label>
-                  <input type="text" id="rnd-sesi" required placeholder="Contoh: Hari Ke-1 / Sesi 3"
+                  <input type="text" id="rnd-sesi" required placeholder="Contoh: Hari Ke-1 / Sesi 1"
                     class="w-full px-3 py-2 rounded-xl border border-scout-sand text-xs" />
                 </div>
                 <div>
                   <label class="block text-[11px] font-bold uppercase text-scout-brown mb-1">Waktu / Jam *</label>
-                  <input type="text" id="rnd-waktu" required placeholder="Contoh: 13.00 - 15.00 WIB"
+                  <input type="text" id="rnd-waktu" required placeholder="Contoh: 08.00 - 09.30 WIB"
                     class="w-full px-3 py-2 rounded-xl border border-scout-sand text-xs" />
                 </div>
                 <div>
                   <label class="block text-[11px] font-bold uppercase text-scout-brown mb-1">Materi / Kegiatan *</label>
-                  <input type="text" id="rnd-materi" required placeholder="Contoh: Dinamika Kelompok & Teknik Kepramukaan"
+                  <input type="text" id="rnd-materi" required placeholder="Contoh: Upacara Pembukaan & Orientasi Kursus"
                     class="w-full px-3 py-2 rounded-xl border border-scout-sand text-xs" />
                 </div>
                 <div>
@@ -5654,7 +5534,7 @@
           ${kopHeaderHtml}
           <div class="text-center my-6">
             <h3 class="text-base font-extrabold uppercase underline text-scout-dark">PAKTA INTEGRITAS ${peranAktif.toUpperCase()} KURSUS</h3>
-            <p class="text-xs text-gray-600 mt-1">Nomor: ${escapeHtml(uiState.adminPrintNomorSurat)}</p>
+            <p class="text-xs text-gray-600 mt-1">Nomor: ${escapeHtml(uiState.adminPrintNomorSurat || '-')}</p>
           </div>
 
           <div class="text-xs sm:text-sm text-gray-800 space-y-4 leading-relaxed">
@@ -5664,7 +5544,7 @@
               ${selectedPerson.nta && selectedPerson.nta !== '-' ? `<tr><td class="py-1 font-semibold border-none">Nomor Tanda Anggota (NTA)</td><td class="py-1 border-none font-mono">: ${escapeHtml(selectedPerson.nta)}</td></tr>` : ''}
               <tr><td class="py-1 font-semibold border-none">Peran dalam Kegiatan</td><td class="py-1 border-none">: ${escapeHtml(peranAktif)} Kursus</td></tr>
               <tr><td class="py-1 font-semibold border-none">Pangkalan / Unit Tugas</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.pangkalan)} (Kwarran ${escapeHtml(selectedPerson.kwarran)})</td></tr>
-              <tr><td class="py-1 font-semibold border-none">Nama Kegiatan</td><td class="py-1 border-none">: ${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Nama Kegiatan</td><td class="py-1 border-none">: ${escapeHtml(course.nama)}${course.angkatan ? ` (${escapeHtml(course.angkatan)})` : ''}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Waktu & Tempat</td><td class="py-1 border-none">: ${escapeHtml(formattedCourseDate)} di ${escapeHtml(course.lokasi)}</td></tr>
             </table>
 
@@ -5698,7 +5578,7 @@
           ${kopHeaderHtml}
           <div class="text-center my-6">
             <h3 class="text-base font-extrabold uppercase underline text-scout-dark">SURAT KETERANGAN LULUS (SKL)</h3>
-            <p class="text-xs text-gray-600 mt-1">Nomor: ${escapeHtml(uiState.adminPrintNomorSurat)}</p>
+            <p class="text-xs text-gray-600 mt-1">Nomor: ${escapeHtml(uiState.adminPrintNomorSurat || '-')}</p>
           </div>
 
           <div class="text-xs sm:text-sm text-gray-800 space-y-4 leading-relaxed">
@@ -5715,7 +5595,7 @@
             </table>
 
             <p>
-              Telah mengikuti seluruh rangkaian pendidikan dan pelatihan serta memenuhi standar evaluasi pada kegiatan <strong>${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</strong> yang diselenggarakan pada tanggal <strong>${escapeHtml(formattedCourseDate)}</strong> bertempat di <strong>${escapeHtml(course.lokasi)}</strong>, dan dinyatakan:
+              Telah mengikuti seluruh rangkaian pendidikan dan pelatihan serta memenuhi standar evaluasi pada kegiatan <strong>${escapeHtml(course.nama)}${course.angkatan ? ` (${escapeHtml(course.angkatan)})` : ''}</strong> yang diselenggarakan pada tanggal <strong>${escapeHtml(formattedCourseDate)}</strong> bertempat di <strong>${escapeHtml(course.lokasi)}</strong>, dan dinyatakan:
             </p>
 
             <div class="my-4 py-3 px-6 rounded-xl bg-scout-cream border-2 border-scout-dark text-center">
@@ -5747,7 +5627,7 @@
               <p class="text-xs font-extrabold uppercase tracking-widest text-scout-brown">Gerakan Pramuka Kwartir Cabang Kabupaten Tangerang</p>
               <h2 class="font-serif font-black text-xl sm:text-2xl text-scout-dark tracking-wider mt-1">IJAZAH KURSUS KEPRAMUKAAN</h2>
               <p class="text-xs font-bold text-scout-forest mt-0.5">${jenjangFullTitle}</p>
-              <p class="text-[11px] text-gray-600 mt-1">Nomor Seri Ijazah: <strong>${escapeHtml(uiState.adminPrintNomorSurat)}</strong></p>
+              <p class="text-[11px] text-gray-600 mt-1">Nomor Seri Ijazah: <strong>${escapeHtml(uiState.adminPrintNomorSurat || '-')}</strong></p>
             </div>
 
             <div class="my-6 text-center space-y-3 text-xs sm:text-sm">
@@ -5761,7 +5641,7 @@
                 Pangkalan: <strong>${escapeHtml(selectedPerson.pangkalan)}</strong> — Kwartir Ranting <strong>${escapeHtml(selectedPerson.kwarran)}</strong>
               </p>
               <p class="max-w-2xl mx-auto leading-relaxed text-gray-800 pt-2">
-                Yang telah menyelesaikan seluruh kurikulum dan lulus pada <strong>${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</strong>, Golongan <strong>${escapeHtml(selectedPerson.golongan)}</strong>, yang diselenggarakan pada tanggal <strong>${escapeHtml(formattedCourseDate)}</strong> di <strong>${escapeHtml(course.lokasi)}</strong> dengan kualifikasi:
+                Yang telah menyelesaikan seluruh kurikulum dan lulus pada <strong>${escapeHtml(course.nama)}${course.angkatan ? ` (${escapeHtml(course.angkatan)})` : ''}</strong>, Golongan <strong>${escapeHtml(selectedPerson.golongan)}</strong>, yang diselenggarakan pada tanggal <strong>${escapeHtml(formattedCourseDate)}</strong> di <strong>${escapeHtml(course.lokasi)}</strong> dengan kualifikasi:
               </p>
               <div class="inline-block px-6 py-2 rounded-full bg-scout-dark text-scout-gold font-extrabold text-sm tracking-wide border border-scout-gold">
                 ${escapeHtml(uiState.adminPrintKualifikasi.toUpperCase())}
@@ -5772,7 +5652,7 @@
               <div class="col-span-4 text-center">
                 <p class="text-gray-600">Pemimpin Kursus,</p>
                 <div class="h-16"></div>
-                <p class="font-extrabold underline text-scout-dark">${escapeHtml(course.pelatih)}</p>
+                <p class="font-extrabold underline text-scout-dark">${escapeHtml(course.pelatih || '-')}</p>
               </div>
               <div class="col-span-4 flex justify-center">
                 ${selectedPerson.fotoUrl ? `
@@ -5801,7 +5681,7 @@
           ${kopHeaderHtml}
           <div class="text-center my-6">
             <h3 class="text-base font-extrabold uppercase underline text-scout-dark">SURAT HAK BINA (SHB)</h3>
-            <p class="text-xs text-gray-600 mt-1">Nomor: ${escapeHtml(uiState.adminPrintNomorSurat)}</p>
+            <p class="text-xs text-gray-600 mt-1">Nomor: ${escapeHtml(uiState.adminPrintNomorSurat || '-')}</p>
           </div>
 
           <div class="text-xs sm:text-sm text-gray-800 space-y-4 leading-relaxed">
@@ -5815,7 +5695,7 @@
               <tr><td class="py-1 font-semibold border-none">Tempat, Tanggal Lahir</td><td class="py-1 border-none">: ${escapeHtml(formatTempatTanggalLahir(selectedPerson.tempatLahir, selectedPerson.tanggalLahir))}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Pangkalan / Gugus Depan</td><td class="py-1 border-none">: ${escapeHtml(selectedPerson.pangkalan)}</td></tr>
               <tr><td class="py-1 font-semibold border-none">Kwartir Ranting</td><td class="py-1 border-none">: Kwartir Ranting ${escapeHtml(selectedPerson.kwarran)}</td></tr>
-              <tr><td class="py-1 font-semibold border-none">Kualifikasi Kelulusan</td><td class="py-1 border-none">: Lulusan ${escapeHtml(course.nama)} (${escapeHtml(course.angkatan)})</td></tr>
+              <tr><td class="py-1 font-semibold border-none">Kualifikasi Kelulusan</td><td class="py-1 border-none">: Lulusan ${escapeHtml(course.nama)}${course.angkatan ? ` (${escapeHtml(course.angkatan)})` : ''}</td></tr>
             </table>
 
             <div class="p-4 rounded-xl bg-scout-cream/80 border border-scout-sand">
@@ -5899,6 +5779,7 @@
             <div>
               <label class="block text-[11px] font-bold uppercase text-scout-brown mb-1">Nomor Surat / Seri Dokumen</label>
               <input type="text" value="${escapeHtml(uiState.adminPrintNomorSurat)}"
+                placeholder="Contoh: 001/28.04-Pusdiklatcab/2026"
                 oninput="uiState.adminPrintNomorSurat = this.value; renderAdminCourseDetailView(document.getElementById('main-content')); lucide.createIcons();"
                 class="w-full px-3 py-2 rounded-xl border border-scout-sand text-xs font-semibold" />
             </div>
@@ -6548,7 +6429,7 @@
                     <option value="">-- Pilih Kursus yang Tersedia --</option>
                     ${appData.kursus.map(k => `
                       <option value="${k.id}" ${selectedKursusId === k.id ? 'selected' : ''}>
-                        ${escapeHtml(k.nama)} (${escapeHtml(k.angkatan)} • ${escapeHtml(formatDateRangeIndo(k.tanggal))})
+                        ${escapeHtml(k.nama)}${k.angkatan ? ` (${escapeHtml(k.angkatan)})` : ''} • ${escapeHtml(formatDateRangeIndo(k.tanggal))}
                       </option>
                     `).join('')}
                   </select>
@@ -6873,13 +6754,13 @@
                 ${appData.kursus.map((k, i) => `
                   <tr>
                     <td class="border border-gray-300 py-2 px-3 text-center">${i + 1}</td>
-                    <td class="border border-gray-300 py-2 px-3 font-semibold">${escapeHtml(k.nama)} (${escapeHtml(k.angkatan)})</td>
+                    <td class="border border-gray-300 py-2 px-3 font-semibold">${escapeHtml(k.nama)}${k.angkatan ? ` (${escapeHtml(k.angkatan)})` : ''}</td>
                     <td class="border border-gray-300 py-2 px-3">${escapeHtml(formatDateRangeIndo(k.tanggal))}</td>
                     <td class="border border-gray-300 py-2 px-3">${escapeHtml(k.lokasi)}</td>
                     <td class="border border-gray-300 py-2 px-3 text-center">${k.terdaftar}/${k.kuota}</td>
                     <td class="border border-gray-300 py-2 px-3">${escapeHtml(k.status)}</td>
                   </tr>
-                `).join('')}
+                `).join('') || '<tr><td colspan="6" class="py-4 text-center text-gray-500">Belum ada jadwal kursus yang diisi.</td></tr>'}
               </tbody>
             </table>
           ` : ''}
@@ -7157,9 +7038,9 @@
           });
         } else {
           filename = 'Laporan_Kursus_Pusdiklatcab_Kab_Tangerang.csv';
-          csvRows.push(['No', 'Nama Kursus', 'Angkatan', 'Tanggal', 'Lokasi', 'Terdaftar', 'Kuota', 'Status']);
+          csvRows.push(['No', 'Nama Kursus', 'Angkatan', 'Tanggal', 'Lokasi', 'Terdaftar', 'Kuota', 'Status', 'Keterangan']);
           appData.kursus.forEach((k, idx) => {
-            csvRows.push([idx + 1, `"${k.nama}"`, `"${k.angkatan}"`, `"${formatDateRangeIndo(k.tanggal)}"`, `"${k.lokasi}"`, k.terdaftar, k.kuota, k.status]);
+            csvRows.push([idx + 1, `"${k.nama}"`, `"${k.angkatan || '-'}"`, `"${formatDateRangeIndo(k.tanggal)}"`, `"${k.lokasi}"`, k.terdaftar, k.kuota, k.status, `"${k.keterangan || '-'}"`]);
           });
         }
       } else {
