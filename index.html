@@ -1650,6 +1650,32 @@
       }
     }
 
+    async function pushRecordToGoogleSheet(entity, action, recordData) {
+      const endpointUrl = (appData.profile && appData.profile.spreadsheetUrl || '').trim();
+      if (!endpointUrl || !endpointUrl.startsWith('https://script.google.com/')) {
+        return;
+      }
+
+      const cleanRecord = { ...recordData };
+      if (cleanRecord.fotoUrl) cleanRecord.fotoUrl = 'TERLAMPIR';
+      if (cleanRecord.lampiranDataUrl) delete cleanRecord.lampiranDataUrl;
+
+      try {
+        await fetch(endpointUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            entity: entity,
+            action: action,
+            data: cleanRecord
+          })
+        });
+      } catch (err) {
+        console.warn('Sinkronisasi ke Google Sheet tertunda:', err);
+      }
+    }
+    
     // =========================================================================
     // 3. RESOLUSI SCOPE WILAYAH & ISOLASI DATA KWARRAN
     // =========================================================================
@@ -3892,6 +3918,7 @@
       }
 
       uiState.potensiDraftPhoto = '';
+      pushRecordToGoogleSheet('potensi', 'upsert', payload); // <-- TAMBAHKAN INI
       saveAppData();
       closeFormModal();
       renderDataPotensiView(document.getElementById('main-content'));
@@ -3912,6 +3939,7 @@
         `Apakah Anda yakin ingin menghapus data pembina "${target.nama}" dari Kwarran ${target.kwarran}?`,
         () => {
           appData.potensi = appData.potensi.filter(p => p.id !== id);
+          pushRecordToGoogleSheet('potensi', 'delete', { id }); // <-- TAMBAHKAN INI
           saveAppData();
           renderDataPotensiView(document.getElementById('main-content'));
           lucide.createIcons();
@@ -4256,6 +4284,7 @@
         appData.kursus.unshift(payload);
         showToast('Jadwal kursus baru berhasil ditambahkan.', 'success');
       }
+      pushRecordToGoogleSheet('kursus', 'upsert', payload); // <-- TAMBAHKAN INI
       saveAppData();
       closeFormModal();
       renderKursusView(document.getElementById('main-content'));
@@ -4276,6 +4305,8 @@
           }
           appData.kursus = appData.kursus.filter(item => item.id !== id);
           delete appData.courseDetails[id];
+          delete appData.courseDetails[id];
+          pushRecordToGoogleSheet('kursus', 'delete', { id }); // <-- TAMBAHKAN INI
           saveAppData();
           renderKursusView(document.getElementById('main-content'));
           lucide.createIcons();
@@ -4590,6 +4621,7 @@
         }
       });
 
+      pushRecordToGoogleSheet('kursus', 'upsert', updated); // <-- TAMBAHKAN INI
       saveAppData();
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -6444,6 +6476,7 @@
         disposisiApprovedBy: currentUser.nama
       };
 
+      pushRecordToGoogleSheet('suratMasuk', 'upsert', appData.suratMasuk[idx]); // <-- TAMBAHKAN INI
       saveAppData();
       closeFormModal();
       renderAdministrasiView(document.getElementById('main-content'));
@@ -6742,6 +6775,7 @@
         } else {
           appData.suratMasuk.unshift(payload);
         }
+        pushRecordToGoogleSheet('suratMasuk', 'upsert', payload); // <-- TAMBAHKAN INI
       } else {
         const jenisSuratVal = document.getElementById('srt-jenis').value;
         const isTugas = jenisSuratVal === 'Tugas';
@@ -6820,8 +6854,10 @@
         () => {
           if (type === 'masuk') {
             appData.suratMasuk = appData.suratMasuk.filter(s => s.id !== id);
+            pushRecordToGoogleSheet('suratMasuk', 'delete', { id }); // <-- TAMBAHKAN INI
           } else {
             appData.suratKeluar = appData.suratKeluar.filter(s => s.id !== id);
+            pushRecordToGoogleSheet('suratKeluar', 'delete', { id }); // <-- TAMBAHKAN INI
           }
           saveAppData();
           renderAdministrasiView(document.getElementById('main-content'));
@@ -7667,6 +7703,7 @@
       };
 
       appData.kwarranCourses.unshift(newCourse);
+      pushRecordToGoogleSheet('kwarranCourses', 'upsert', newCourse); // <-- TAMBAHKAN INI
       saveAppData();
 
       uiState.kwarranSelectedCourseId = newCourse.id;
@@ -7700,6 +7737,7 @@
           if (uiState.kwarranSelectedCourseId === courseId) {
             uiState.kwarranSelectedCourseId = null;
           }
+          pushRecordToGoogleSheet('kwarranCourses', 'delete', { id: courseId }); // <-- TAMBAHKAN INI
           saveAppData();
           renderKwarranDaftarKursusView(document.getElementById('main-content'));
           lucide.createIcons();
@@ -8148,6 +8186,7 @@
       }
 
       uiState.kwarranParticipantDraftPhoto = '';
+      pushRecordToGoogleSheet('kwarranParticipants', 'upsert', payload); // <-- TAMBAHKAN INI
       saveAppData();
       renderKwarranInputPesertaView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -8179,6 +8218,7 @@
             uiState.kwarranEditingParticipantId = null;
             uiState.kwarranParticipantDraftPhoto = '';
           }
+          pushRecordToGoogleSheet('kwarranParticipants', 'delete', { id: participantId }); // <-- TAMBAHKAN INI
           saveAppData();
           renderKwarranInputPesertaView(document.getElementById('main-content'));
           lucide.createIcons();
