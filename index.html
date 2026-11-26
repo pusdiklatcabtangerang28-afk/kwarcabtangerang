@@ -393,9 +393,8 @@
     // =========================================================================
     // 1. KONSTANTA, UTILITAS TANGGAL INDONESIA, NTA MASKING & 29 KWARRAN KAB. TANGERANG
     // =========================================================================
-    const STORAGE_KEY = 'pusdiklatcab_tangerang_v1';
-    const SESSION_STORAGE_KEY = 'pusdiklatcab_tangerang_session_v1';
-
+    const STORAGE_KEY = 'pusdiklatcab_tangerang_v3';
+    const SESSION_STORAGE_KEY = 'pusdiklatcab_tangerang_session_v3';
     const BULAN_INDO = [
       'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
       'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
@@ -930,20 +929,7 @@
             ...buildKwarranMetadata('Curug')
           }
         ],
-        potensi: [
-          { id: 'pot_1', nta: '28.04.01.000101.0001', nama: 'Kak Drs. H. Ahmad Fauzi, M.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1978-04-12', golongan: 'Penegak', jenjang: 'KPL', tahunLulus: '2019', gender: 'Putra', kwarran: 'Tigaraksa', pangkalan: 'SMAN 6 Kab. Tangerang', fotoUrl: '' },
-          { id: 'pot_2', nta: '28.04.01.000102.0001', nama: 'Kak Hj. Nurhayati, S.Pd., M.M.', tempatLahir: 'Serang', tanggalLahir: '1981-08-19', golongan: 'Penggalang', jenjang: 'KPD', tahunLulus: '2021', gender: 'Putri', kwarran: 'Tigaraksa', pangkalan: 'SMPN 1 Tigaraksa', fotoUrl: '' },
-          { id: 'pot_3', nta: '28.04.01.000103.0001', nama: 'Kak Dedi Kurniawan, S.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1988-02-25', golongan: 'Siaga', jenjang: 'KML', tahunLulus: '2023', gender: 'Putra', kwarran: 'Tigaraksa', pangkalan: 'SDN Tigaraksa 01', fotoUrl: '' },
-          { id: 'pot_4', nta: '28.04.05.000201.0001', nama: 'Kak Siti Rahmawati, S.Pd.SD.', tempatLahir: 'Tangerang', tanggalLahir: '1992-11-05', golongan: 'Siaga', jenjang: 'KMD', tahunLulus: '2024', gender: 'Putri', kwarran: 'Curug', pangkalan: 'SDN Curug 01', fotoUrl: '' },
-          { id: 'pot_5', nta: '28.04.05.000202.0001', nama: 'Kak Muhammad Ridwan, S.Kom.', tempatLahir: 'Jakarta', tanggalLahir: '1990-06-14', golongan: 'Penggalang', jenjang: 'KML', tahunLulus: '2022', gender: 'Putra', kwarran: 'Curug', pangkalan: 'SMPN 1 Curug', fotoUrl: '' },
-          { id: 'pot_6', nta: '28.04.05.000203.0001', nama: 'Kak Lilis Suryani, M.Pd.', tempatLahir: 'Bandung', tanggalLahir: '1983-09-30', golongan: 'Penegak', jenjang: 'KPD', tahunLulus: '2020', gender: 'Putri', kwarran: 'Curug', pangkalan: 'SMAN 3 Kab. Tangerang', fotoUrl: '' },
-          { id: 'pot_7', nta: '28.04.05.000204.0001', nama: 'Kak Andi Pratama, S.Or.', tempatLahir: 'Tangerang', tanggalLahir: '1996-01-17', golongan: 'Siaga', jenjang: 'Belum Kursus', tahunLulus: '-', gender: 'Putra', kwarran: 'Curug', pangkalan: 'SDN Binong 02', fotoUrl: '' },
-          { id: 'pot_8', nta: '28.04.02.000301.0001', nama: 'Kak Hendra Gunawan, S.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1991-07-22', golongan: 'Siaga', jenjang: 'KMD', tahunLulus: '2025', gender: 'Putra', kwarran: 'Cikupa', pangkalan: 'SDN Cikupa 01', fotoUrl: '' },
-          { id: 'pot_9', nta: '28.04.03.000401.0001', nama: 'Kak Dewi Kartika, S.Pd.', tempatLahir: 'Bogor', tanggalLahir: '1989-12-08', golongan: 'Penggalang', jenjang: 'KML', tahunLulus: '2023', gender: 'Putri', kwarran: 'Balaraja', pangkalan: 'SMPN 1 Balaraja', fotoUrl: '' },
-          { id: 'pot_10', nta: '28.04.04.000501.0001', nama: 'Kak Agus Salim, M.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1976-08-17', golongan: 'Pandega', jenjang: 'KPL', tahunLulus: '2018', gender: 'Putra', kwarran: 'Pasar Kemis', pangkalan: 'SMAN 13 Kab. Tangerang', fotoUrl: '' },
-          { id: 'pot_11', nta: '28.04.06.000601.0001', nama: 'Kak Fitria Handayani, S.Pd.', tempatLahir: 'Tangerang', tanggalLahir: '1994-03-28', golongan: 'Siaga', jenjang: 'KMD', tahunLulus: '2024', gender: 'Putri', kwarran: 'Kelapa Dua', pangkalan: 'SDN Kelapa Dua 02', fotoUrl: '' },
-          { id: 'pot_12', nta: '28.04.07.000701.0001', nama: 'Kak Rahmat Hidayat, S.T.', tempatLahir: 'Lebak', tanggalLahir: '1995-10-11', golongan: 'Penegak', jenjang: 'Belum Kursus', tahunLulus: '-', gender: 'Putra', kwarran: 'Legok', pangkalan: 'SMKN 12 Kab. Tangerang', fotoUrl: '' }
-        ],
+        potensi: [],
         kursus: [
           {
             id: 'krs_1',
@@ -1152,9 +1138,6 @@
         });
       }
 
-      if (!data.potensi.some(p => isSameKwarran(p.kwarran, 'Curug'))) {
-        data.potensi.push(...seed.potensi.filter(p => isSameKwarran(p.kwarran, 'Curug')));
-      }
       if (!data.kwarranCourses.some(c => isSameKwarran(c.kwarran, 'Curug'))) {
         data.kwarranCourses.push(...seed.kwarranCourses.filter(c => isSameKwarran(c.kwarran, 'Curug')));
         data.kwarranParticipants.push(...seed.kwarranParticipants.filter(pt => isSameKwarran(pt.kwarran, 'Curug')));
