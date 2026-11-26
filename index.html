@@ -6547,12 +6547,28 @@
                   </label>
                   <select id="srt-tugas-kursus" ${isTugasMode ? 'required' : ''}
                     class="w-full px-3.5 py-2.5 rounded-xl border border-scout-sand bg-white text-sm font-semibold text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none">
-                    <option value="">-- Pilih Kursus yang Tersedia --</option>
-                    ${appData.kursus.map(k => `
-                      <option value="${k.id}" ${selectedKursusId === k.id ? 'selected' : ''}>
-                        ${escapeHtml(k.nama)} (${escapeHtml(k.angkatan)} • ${escapeHtml(formatDateRangeIndo(k.tanggal))})
-                      </option>
-                    `).join('')}
+                    <option value="">-- Pilih Kursus / Perihal Surat Masuk --</option>
+                    ${appData.kursus.length > 0 ? `
+                      <optgroup label="Daftar Jadwal Kursus">
+                        ${appData.kursus.map(k => `
+                          <option value="${k.id}" ${selectedKursusId === k.id ? 'selected' : ''}>
+                            ${escapeHtml(k.nama)}${k.angkatan ? ` (${escapeHtml(k.angkatan)})` : ''} • ${escapeHtml(formatDateRangeIndo(k.tanggal))}
+                          </option>
+                        `).join('')}
+                      </optgroup>
+                    ` : ''}
+                    ${(appData.suratMasuk || []).filter(sm => String(sm.perihal || '').trim()).length > 0 ? `
+                      <optgroup label="Berdasarkan Perihal Surat Masuk">
+                        ${(appData.suratMasuk || []).filter(sm => String(sm.perihal || '').trim()).map(sm => {
+                          const optVal = `sm_${sm.id}`;
+                          return `
+                            <option value="${optVal}" ${selectedKursusId === optVal ? 'selected' : ''}>
+                              ${escapeHtml(sm.perihal)} — (${escapeHtml(sm.asal)} • No. ${escapeHtml(sm.nomor)})
+                            </option>
+                          `;
+                        }).join('')}
+                      </optgroup>
+                    ` : ''}
                   </select>
                   <p class="text-[10px] text-scout-forest font-semibold mt-1">
                     Otomatis ditambahkan ke daftar absensi Tim Pelatih / Panitia pada detail kursus terpilih.
@@ -6710,11 +6726,15 @@
           tugasSebagaiVal = document.getElementById('srt-tugas-sebagai').value.trim();
           kursusIdVal = document.getElementById('srt-tugas-kursus').value;
           const targetCourse = appData.kursus.find(c => c.id === kursusIdVal);
-          if (!namaPelatihVal || !tugasSebagaiVal || !targetCourse) {
-            showToast('Lengkapi Nama Pelatih, Tugas Sebagai, dan Kursus Tujuan untuk Surat Tugas.', 'error');
+          const targetSuratMasuk = kursusIdVal.startsWith('sm_')
+            ? (appData.suratMasuk || []).find(sm => `sm_${sm.id}` === kursusIdVal)
+            : null;
+
+          if (!namaPelatihVal || !tugasSebagaiVal || (!targetCourse && !targetSuratMasuk)) {
+            showToast('Lengkapi Nama Pelatih, Tugas Sebagai, dan Kursus / Perihal Surat Masuk untuk Surat Tugas.', 'error');
             return;
           }
-          namaKursusVal = targetCourse.nama;
+          namaKursusVal = targetCourse ? targetCourse.nama : String(targetSuratMasuk.perihal || '').trim();
           isTugasSaved = true;
           savedTargetCourseName = namaKursusVal;
         }
