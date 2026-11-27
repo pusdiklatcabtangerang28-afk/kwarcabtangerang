@@ -115,17 +115,17 @@
 <body class="antialiased selection:bg-scout-khaki selection:text-scout-dark">
 
   <!-- TOAST NOTIFICATION CONTAINER -->
-    <div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none no-print"></div>
-  
+  <div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none no-print"></div>
+
   <!-- GLOBAL SYNC / LOADING INDICATOR -->
   <div id="global-sync-loader" class="fixed bottom-4 right-4 z-[110] hidden items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-scout-dark text-white border border-scout-gold/60 shadow-2xl text-xs font-bold no-print">
     <svg class="animate-spin w-4 h-4 text-scout-gold shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
     </svg>
-    <span id="global-sync-loader-text">Menyinkronkan data ke Spreadsheet...</span>
+    <span id="global-sync-loader-text">Menyinkronkan data dengan Google Spreadsheet...</span>
   </div>
-  
+
   <!-- MODAL KONFIRMASI UNIVERSAL -->
   <div id="confirm-modal" class="fixed inset-0 z-[90] hidden items-center justify-center bg-black/60 backdrop-blur-xs p-4 no-print">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-scout-sand animate-[fadeIn_0.15s_ease-out]">
@@ -400,11 +400,12 @@
   <!-- ===================================================================== -->
   <script>
     // =========================================================================
-    // 1. KONSTANTA, UTILITAS TANGGAL INDONESIA, NTA MASKING & 29 KWARRAN KAB. TANGERANG
+    // 1. KONSTANTA, KONFIGURASI GOOGLE APPS SCRIPT, TANGGAL INDONESIA & 29 KWARRAN
     // =========================================================================
     const STORAGE_KEY = 'pusdiklatcab_tangerang_v1';
     const SESSION_STORAGE_KEY = 'pusdiklatcab_tangerang_session_v1';
-    // TEMPELKAN URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI:
+
+    // TEMPELKAN URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI (atau isi via Menu Profile):
     const GOOGLE_SCRIPT_WEBAPP_URL = 'https://script.google.com/macros/s/PASTE_DEPLOYMENT_ID_ANDA_DI_SINI/exec';
 
     let activeNetworkRequests = 0;
@@ -437,6 +438,7 @@
       }
       return '';
     }
+
     const BULAN_INDO = [
       'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
       'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
@@ -1425,7 +1427,7 @@
         );
       });
 
-   activeTugasLetters.forEach(sk => {
+      activeTugasLetters.forEach(sk => {
         if (String(sk.tugasSebagai || '').trim().toLowerCase() === 'peserta') return;
         const targetCourse = targetData.kursus.find(c => c.id === sk.kursusId);
         if (!targetCourse) return;
@@ -1688,24 +1690,31 @@
         syncGraduatedParticipantsToPotensi(appData);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
       } catch (err) {
-        showToast('Gagal menyimpan data ke penyimpanan browser (kapasitas penuh).', 'error');
+        showToast('Gagal menyimpan cache lokal browser (kapasitas penuh).', 'error');
       }
     }
 
-    // Mengirim perubahan data (Tambah / Edit / Hapus) ke Google Spreadsheet via doPost
+    // =========================================================================
+    // KONEKSI REAL-TIME KE GOOGLE SPREADSHEET (APPS SCRIPT doGet & doPost)
+    // =========================================================================
+    function sanitizeRecordForSheet(recordData) {
+      if (!recordData || typeof recordData !== 'object') return recordData;
+      const cleanRecord = { ...recordData };
+      // Google Sheets memiliki batas maksimal 50.000 karakter per sel
+      if (typeof cleanRecord.fotoUrl === 'string' && cleanRecord.fotoUrl.length > 45000) {
+        cleanRecord.fotoUrl = '';
+      }
+      if (typeof cleanRecord.lampiranDataUrl === 'string' && cleanRecord.lampiranDataUrl.length > 45000) {
+        cleanRecord.lampiranDataUrl = '';
+      }
+      return cleanRecord;
+    }
+
     async function pushRecordToGoogleSheet(entity, action, recordData, extra = {}) {
       const endpointUrl = getActiveGasEndpointUrl();
       if (!endpointUrl) return;
 
-      const cleanRecord = recordData && typeof recordData === 'object' ? { ...recordData } : recordData;
-      // Hindari melebihi batas sel 50.000 karakter Google Sheets jika pas foto base64 terlalu besar
-      if (cleanRecord && typeof cleanRecord.fotoUrl === 'string' && cleanRecord.fotoUrl.length > 45000) {
-        cleanRecord.fotoUrl = '';
-      }
-      if (cleanRecord && typeof cleanRecord.lampiranDataUrl === 'string' && cleanRecord.lampiranDataUrl.length > 45000) {
-        cleanRecord.lampiranDataUrl = '';
-      }
-
+      const cleanRecord = sanitizeRecordForSheet(recordData);
       setGlobalSyncLoading(true, 'Menyimpan perubahan ke Google Spreadsheet...');
       try {
         const response = await fetch(endpointUrl, {
@@ -1724,35 +1733,46 @@
           showToast('Peringatan sinkronisasi Spreadsheet: ' + resJson.message, 'error');
         }
       } catch (err) {
-        console.warn('Gagal mengirim ke Google Spreadsheet:', err);
-        showToast('Perubahan tersimpan lokal, namun gagal terhubung ke server Spreadsheet.', 'error');
+        console.warn('Sinkronisasi POST ke Google Spreadsheet gagal:', err);
+        showToast('Data tersimpan di perangkat ini, namun gagal terhubung ke server Spreadsheet.', 'error');
       } finally {
         setGlobalSyncLoading(false);
       }
     }
 
-    // Mengirim seluruh data awal ke Spreadsheet jika Spreadsheet masih kosong
-    async function syncAllDataToGoogleSheet() {
+    async function syncAllDataToGoogleSheet(showSuccessToast = false) {
       const endpointUrl = getActiveGasEndpointUrl();
       if (!endpointUrl) return;
-      setGlobalSyncLoading(true, 'Mengunggah database awal ke Google Spreadsheet...');
+
+      const sanitizedSnapshot = {
+        ...appData,
+        potensi: (appData.potensi || []).map(sanitizeRecordForSheet),
+        suratMasuk: (appData.suratMasuk || []).map(sanitizeRecordForSheet),
+        suratKeluar: (appData.suratKeluar || []).map(sanitizeRecordForSheet),
+        kwarranParticipants: (appData.kwarranParticipants || []).map(sanitizeRecordForSheet)
+      };
+
+      setGlobalSyncLoading(true, 'Menyinkronkan seluruh database ke Google Spreadsheet...');
       try {
-        await fetch(endpointUrl, {
+        const response = await fetch(endpointUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({
             action: 'sync_all',
-            data: appData
+            data: sanitizedSnapshot
           })
         });
+        const resJson = await response.json();
+        if (resJson && resJson.status === 'success' && showSuccessToast) {
+          showToast('Seluruh database berhasil disinkronkan ke Google Spreadsheet!', 'success');
+        }
       } catch (err) {
-        console.warn('Gagal inisialisasi sync_all:', err);
+        console.warn('Gagal sync_all ke Google Spreadsheet:', err);
       } finally {
         setGlobalSyncLoading(false);
       }
     }
 
-    // Menarik data terbaru dari Google Spreadsheet saat aplikasi dibuka (doGet)
     async function fetchDataFromGoogleSheet(isInitialLoad = false) {
       const endpointUrl = getActiveGasEndpointUrl();
       if (!endpointUrl) return false;
@@ -1771,8 +1791,7 @@
             (!remote.potensi || remote.potensi.length === 0);
 
           if (isRemoteEmpty && isInitialLoad) {
-            // Spreadsheet baru pertama kali dihubungkan: unggah data seed/lokal saat ini ke Spreadsheet
-            await syncAllDataToGoogleSheet();
+            await syncAllDataToGoogleSheet(false);
             return true;
           }
 
@@ -1802,7 +1821,12 @@
 
           renderBrandLogos();
           if (currentUser) {
-            navigateTo(activeRoute || 'dashboard');
+            const refreshedUser = appData.users.find(u => u.id === currentUser.id);
+            if (refreshedUser) {
+              establishUserSession(refreshedUser, false);
+            } else {
+              navigateTo(activeRoute || 'dashboard');
+            }
           }
           return true;
         }
@@ -1816,7 +1840,7 @@
       }
       return false;
     }
-    
+
     // =========================================================================
     // 3. RESOLUSI SCOPE WILAYAH & ISOLASI DATA KWARRAN
     // =========================================================================
@@ -2130,7 +2154,7 @@
         },
         'profile': {
           title: 'Profile Pusdiklatcab',
-          subtitle: 'Pengaturan identitas Kepala Pusdiklatcab dan logo resmi lembaga'
+          subtitle: 'Pengaturan identitas Kepala Pusdiklatcab, logo resmi, dan URL Google Spreadsheet'
         },
         'data-potensi': {
           title: 'Data Potensi Pembina',
@@ -3326,7 +3350,7 @@
     }
 
     // =========================================================================
-    // 8. VIEW: PROFILE PUSDIKLATCAB (ADMIN: EDIT KAPUSDIKLATCAB & UPLOAD LOGO)
+    // 8. VIEW: PROFILE PUSDIKLATCAB (ADMIN: EDIT KAPUSDIKLATCAB, LOGO & GAS URL)
     // =========================================================================
     function renderProfileView(container) {
       if (isPelatihReadOnly()) {
@@ -3370,17 +3394,17 @@
             </div>
 
             <div class="mt-6 p-4 rounded-xl bg-emerald-50/80 border border-emerald-200 text-xs text-emerald-900">
-              <strong>Catatan Sistem:</strong> Perubahan logo tersimpan otomatis di penyimpanan browser dan langsung berlaku di seluruh dokumen cetak.
+              <strong>Catatan Sistem:</strong> Perubahan profil dan tautan Web App Google Apps Script langsung tersinkronisasi ke Google Spreadsheet terpusat.
             </div>
           </div>
 
           <div class="lg:col-span-7 bg-white rounded-2xl p-6 border border-scout-sand shadow-scout">
             <h3 class="text-base font-extrabold text-scout-dark flex items-center gap-2">
               <i data-lucide="award" class="w-5 h-5 text-scout-gold"></i>
-              <span>Identitas Kepala Pusdiklatcab & Sekretariat</span>
+              <span>Identitas Kepala Pusdiklatcab & Koneksi Spreadsheet</span>
             </h3>
             <p class="text-xs text-gray-500 mt-1">
-              Perbarui nama Kapusdiklatcab Tangerang yang akan tercantum pada panel navigasi dan pengesahan laporan.
+              Perbarui nama Kapusdiklatcab Tangerang dan URL Web App Google Apps Script untuk sinkronisasi online lintas perangkat.
             </p>
 
             <form id="profile-form" onsubmit="saveProfileForm(event)" class="mt-6 space-y-4">
@@ -3434,7 +3458,7 @@
 
               <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-scout-brown mb-1.5">
-                  URL Google Spreadsheet (Integrasi Database / Sinkronisasi)
+                  URL Web App Google Apps Script (Sinkronisasi Google Spreadsheet)
                 </label>
                 <div class="relative">
                   <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-scout-forest pointer-events-none">
@@ -3444,7 +3468,7 @@
                     type="password"
                     id="prof-spreadsheet-url"
                     value="${escapeHtml(p.spreadsheetUrl || '')}"
-                    placeholder="https://docs.google.com/spreadsheets/d/..."
+                    placeholder="https://script.google.com/macros/s/.../exec"
                     autocomplete="off"
                     class="w-full pl-10 pr-11 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm font-mono font-medium text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none transition"
                   />
@@ -3452,13 +3476,13 @@
                     type="button"
                     onclick="toggleProfileSpreadsheetUrl()"
                     class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-500 hover:text-scout-dark transition"
-                    title="Tampilkan / Sembunyikan URL Spreadsheet"
+                    title="Tampilkan / Sembunyikan URL Web App"
                   >
                     <i id="prof-spreadsheet-eye-icon" data-lucide="eye" class="w-4 h-4"></i>
                   </button>
                 </div>
                 <p class="text-[10px] text-gray-500 mt-1">
-                  Tautan disembunyikan secara default demi menjaga keamanan akses spreadsheet. Klik ikon mata di kanan untuk melihat atau menyembunyikan URL.
+                  Tempelkan URL deployment Web App Google Apps Script (<code class="font-mono">https://script.google.com/macros/s/.../exec</code>). Klik ikon mata di kanan untuk melihat/menyembunyikan URL.
                 </p>
               </div>
               
@@ -3470,7 +3494,12 @@
                   class="w-full px-4 py-2.5 rounded-xl border border-scout-sand bg-scout-cream/30 text-sm font-medium text-scout-dark focus:ring-2 focus:ring-scout-forest focus:outline-none">${escapeHtml(p.alamat || '')}</textarea>
               </div>
 
-              <div class="pt-2 flex justify-end">
+              <div class="pt-2 flex flex-wrap justify-end gap-2.5">
+                <button type="button" onclick="syncAllDataToGoogleSheet(true)"
+                  class="px-4 py-3 rounded-xl bg-scout-dark hover:bg-scout-brown text-white font-bold text-xs flex items-center gap-2 transition">
+                  <i data-lucide="refresh-cw" class="w-4 h-4 text-scout-gold"></i>
+                  <span>Sinkronkan Semua Data Sekarang</span>
+                </button>
                 <button type="submit" class="px-6 py-3 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white font-bold text-xs sm:text-sm shadow-md flex items-center gap-2 transition">
                   <i data-lucide="save" class="w-4 h-4 text-scout-gold"></i>
                   <span>Simpan Perubahan Profile</span>
@@ -3494,6 +3523,7 @@
       reader.onload = function (e) {
         appData.profile.logoUrl = e.target.result;
         saveAppData();
+        pushRecordToGoogleSheet('profile', 'upsert', appData.profile);
         renderBrandLogos();
         renderProfileView(document.getElementById('main-content'));
         lucide.createIcons();
@@ -3506,6 +3536,7 @@
       if (guardPelatihWriteAction()) return;
       appData.profile.logoUrl = '';
       saveAppData();
+      pushRecordToGoogleSheet('profile', 'upsert', appData.profile);
       renderBrandLogos();
       renderProfileView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -3526,7 +3557,7 @@
       lucide.createIcons();
     }
 
-    function saveProfileForm(e) {
+    async function saveProfileForm(e) {
       e.preventDefault();
       if (guardPelatihWriteAction()) return;
       const ntaFormatted = formatNtaMask(document.getElementById('prof-nta').value);
@@ -3541,8 +3572,8 @@
       appData.profile.email = document.getElementById('prof-email').value.trim();
       appData.profile.alamat = document.getElementById('prof-alamat').value.trim();
       appData.profile.spreadsheetUrl = (document.getElementById('prof-spreadsheet-url')?.value || '').trim();
-      pushRecordToGoogleSheet('profile', 'upsert', appData.profile);
       saveAppData();
+      await pushRecordToGoogleSheet('profile', 'upsert', appData.profile);
       renderBrandLogos();
       renderProfileView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -4060,7 +4091,7 @@
       }
 
       uiState.potensiDraftPhoto = '';
-      pushRecordToGoogleSheet('potensi', 'upsert', payload); // <-- TAMBAHKAN INI
+      pushRecordToGoogleSheet('potensi', 'upsert', payload);
       saveAppData();
       closeFormModal();
       renderDataPotensiView(document.getElementById('main-content'));
@@ -4081,7 +4112,7 @@
         `Apakah Anda yakin ingin menghapus data pembina "${target.nama}" dari Kwarran ${target.kwarran}?`,
         () => {
           appData.potensi = appData.potensi.filter(p => p.id !== id);
-          pushRecordToGoogleSheet('potensi', 'delete', { id }); // <-- TAMBAHKAN INI
+          pushRecordToGoogleSheet('potensi', 'delete', { id });
           saveAppData();
           renderDataPotensiView(document.getElementById('main-content'));
           lucide.createIcons();
@@ -4404,6 +4435,7 @@
             tanggal: newTanggal,
             lokasi: newLokasi
           };
+          pushRecordToGoogleSheet('kwarranCourses', 'upsert', appData.kwarranCourses[kwIdx]);
         }
       }
 
@@ -4426,8 +4458,12 @@
         appData.kursus.unshift(payload);
         showToast('Jadwal kursus baru berhasil ditambahkan.', 'success');
       }
-      pushRecordToGoogleSheet('kursus', 'upsert', payload); // <-- TAMBAHKAN INI
+
       saveAppData();
+      pushRecordToGoogleSheet('kursus', 'upsert', payload);
+      if (newStatus === 'Selesai') {
+        syncAllDataToGoogleSheet();
+      }
       closeFormModal();
       renderKursusView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -4447,9 +4483,9 @@
           }
           appData.kursus = appData.kursus.filter(item => item.id !== id);
           delete appData.courseDetails[id];
-          delete appData.courseDetails[id];
-          pushRecordToGoogleSheet('kursus', 'delete', { id }); // <-- TAMBAHKAN INI
           saveAppData();
+          pushRecordToGoogleSheet('kursus', 'delete', { id });
+          pushRecordToGoogleSheet('courseDetails', 'delete', null, { courseId: id });
           renderKursusView(document.getElementById('main-content'));
           lucide.createIcons();
           showToast('Jadwal kursus telah dihapus.', 'info');
@@ -4754,6 +4790,7 @@
             tanggal: updated.tanggal,
             lokasi: updated.lokasi
           };
+          pushRecordToGoogleSheet('kwarranCourses', 'upsert', appData.kwarranCourses[kwIdx]);
         }
       }
 
@@ -4763,8 +4800,11 @@
         }
       });
 
-      pushRecordToGoogleSheet('kursus', 'upsert', updated); // <-- TAMBAHKAN INI
       saveAppData();
+      pushRecordToGoogleSheet('kursus', 'upsert', updated);
+      if (newStatus === 'Selesai') {
+        syncAllDataToGoogleSheet();
+      }
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
       showToast(
@@ -4947,8 +4987,8 @@
       detail.suratTugas.penandatangan = document.getElementById('st-penandatangan').value.trim();
       detail.suratTugas.perihal = document.getElementById('st-perihal').value.trim();
       detail.suratTugas.personel = document.getElementById('st-personel').value.trim();
-      pushRecordToGoogleSheet('courseDetails', 'upsert', appData.courseDetails[courseId], { courseId: courseId });
       saveAppData();
+      pushRecordToGoogleSheet('courseDetails', 'upsert', detail, { courseId: courseId });
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
       showToast('Data Surat Tugas berhasil disimpan!', 'success');
@@ -4974,6 +5014,7 @@
           dataUrl: ev.target.result
         });
         saveAppData();
+        pushRecordToGoogleSheet('courseDetails', 'upsert', detail, { courseId: courseId });
         renderAdminCourseDetailView(document.getElementById('main-content'));
         lucide.createIcons();
         showToast(`Lampiran "${file.name}" berhasil diunggah!`, 'success');
@@ -4988,6 +5029,7 @@
       const detail = ensureCourseDetailRecord(course);
       detail.suratTugas.attachments = detail.suratTugas.attachments.filter(a => a.id !== attId);
       saveAppData();
+      pushRecordToGoogleSheet('courseDetails', 'upsert', detail, { courseId: courseId });
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
       showToast('Lampiran surat tugas dihapus.', 'info');
@@ -5209,8 +5251,9 @@
         const mp = detail.manualParticipants.find(p => p.id === participantId);
         if (mp) mp.statusKelulusan = statusKelulusan;
       }
-      pushRecordToGoogleSheet('courseDetails', 'upsert', appData.courseDetails[courseId], { courseId: courseId });
+
       saveAppData();
+      syncAllDataToGoogleSheet();
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
 
@@ -5238,8 +5281,9 @@
           if (mp) mp.statusKelulusan = 'Lulus';
         }
       });
-      pushRecordToGoogleSheet('courseDetails', 'upsert', appData.courseDetails[courseId], { courseId: courseId });
+
       saveAppData();
+      syncAllDataToGoogleSheet();
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
       showToast(`Seluruh (${pesertaList.length}) peserta dinyatakan LULUS & otomatis masuk ke Data Potensi!`, 'success');
@@ -5451,6 +5495,11 @@
 
       uiState.cabangParticipantDraftPhoto = '';
       saveAppData();
+      pushRecordToGoogleSheet('courseDetails', 'upsert', detail, { courseId: courseId });
+      pushRecordToGoogleSheet('kursus', 'upsert', course);
+      if (isCourseDone) {
+        syncAllDataToGoogleSheet();
+      }
       closeFormModal();
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -5464,6 +5513,7 @@
       detail.manualParticipants = detail.manualParticipants.filter(p => p.id !== participantId);
       delete detail.graduationStatus[participantId];
       saveAppData();
+      pushRecordToGoogleSheet('courseDetails', 'upsert', detail, { courseId: courseId });
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
       showToast('Peserta dihapus dari daftar kursus.', 'info');
@@ -5488,8 +5538,8 @@
         const item = list.find(x => x.id === personId);
         if (item) item.statusHadir = status;
       }
-      pushRecordToGoogleSheet('courseDetails', 'upsert', appData.courseDetails[courseId], { courseId: courseId });
       saveAppData();
+      pushRecordToGoogleSheet('courseDetails', 'upsert', detail, { courseId: courseId });
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
     }
@@ -5540,6 +5590,7 @@
         detail.pelatihList.push(entry);
       }
       saveAppData();
+      pushRecordToGoogleSheet('courseDetails', 'upsert', detail, { courseId: courseId });
       closeFormModal();
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -5557,6 +5608,7 @@
         detail.pelatihList = detail.pelatihList.filter(x => x.id !== staffId);
       }
       saveAppData();
+      pushRecordToGoogleSheet('courseDetails', 'upsert', detail, { courseId: courseId });
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
       showToast('Personel dihapus dari daftar.', 'info');
@@ -5691,8 +5743,8 @@
         narasumber: document.getElementById('rnd-narasumber').value.trim(),
         keterangan: document.getElementById('rnd-ket').value.trim()
       });
-      pushRecordToGoogleSheet('courseDetails', 'upsert', appData.courseDetails[courseId], { courseId: courseId });
       saveAppData();
+      pushRecordToGoogleSheet('courseDetails', 'upsert', detail, { courseId: courseId });
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
       showToast('Sesi jadwal berhasil ditambahkan!', 'success');
@@ -5704,8 +5756,8 @@
       if (!course) return;
       const detail = ensureCourseDetailRecord(course);
       detail.rundown = detail.rundown.filter(r => r.id !== rndId);
-      pushRecordToGoogleSheet('courseDetails', 'upsert', appData.courseDetails[courseId], { courseId: courseId });
       saveAppData();
+      pushRecordToGoogleSheet('courseDetails', 'upsert', detail, { courseId: courseId });
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
       showToast('Sesi jadwal dihapus.', 'info');
@@ -5729,8 +5781,8 @@
           name: file.name,
           dataUrl: ev.target.result
         });
-        pushRecordToGoogleSheet('courseDetails', 'upsert', appData.courseDetails[courseId], { courseId: courseId });
         saveAppData();
+        pushRecordToGoogleSheet('courseDetails', 'upsert', detail, { courseId: courseId });
         renderAdminCourseDetailView(document.getElementById('main-content'));
         lucide.createIcons();
         showToast(`File jadwal "${file.name}" berhasil diunggah!`, 'success');
@@ -5745,6 +5797,7 @@
       const detail = ensureCourseDetailRecord(course);
       detail.rundownFiles = detail.rundownFiles.filter(f => f.id !== fileId);
       saveAppData();
+      pushRecordToGoogleSheet('courseDetails', 'upsert', detail, { courseId: courseId });
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
     }
@@ -5765,6 +5818,7 @@
             if (mp) mp.statusKelulusan = 'Lulus';
           }
           saveAppData();
+          syncAllDataToGoogleSheet();
         }
       }
       window.print();
@@ -6623,7 +6677,7 @@
         disposisiApprovedBy: currentUser.nama
       };
 
-      pushRecordToGoogleSheet('suratMasuk', 'upsert', appData.suratMasuk[idx]); // <-- TAMBAHKAN INI
+      pushRecordToGoogleSheet('suratMasuk', 'upsert', appData.suratMasuk[idx]);
       saveAppData();
       closeFormModal();
       renderAdministrasiView(document.getElementById('main-content'));
@@ -6922,7 +6976,7 @@
         } else {
           appData.suratMasuk.unshift(payload);
         }
-        pushRecordToGoogleSheet('suratMasuk', 'upsert', payload); // <-- TAMBAHKAN INI
+        pushRecordToGoogleSheet('suratMasuk', 'upsert', payload);
       } else {
         const jenisSuratVal = document.getElementById('srt-jenis').value;
         const isTugas = jenisSuratVal === 'Tugas';
@@ -6971,12 +7025,15 @@
           if (idx !== -1) appData.suratKeluar[idx] = payload;
         } else {
           appData.suratKeluar.unshift(payload);
-          pushRecordToGoogleSheet('suratKeluar', 'upsert', payload);
         }
+        pushRecordToGoogleSheet('suratKeluar', 'upsert', payload);
       }
 
       uiState.suratDraftAttachment = null;
       saveAppData();
+      if (isTugasSaved) {
+        syncAllDataToGoogleSheet();
+      }
       closeFormModal();
       renderAdministrasiView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -7002,10 +7059,10 @@
         () => {
           if (type === 'masuk') {
             appData.suratMasuk = appData.suratMasuk.filter(s => s.id !== id);
-            pushRecordToGoogleSheet('suratMasuk', 'delete', { id }); // <-- TAMBAHKAN INI
+            pushRecordToGoogleSheet('suratMasuk', 'delete', { id });
           } else {
             appData.suratKeluar = appData.suratKeluar.filter(s => s.id !== id);
-            pushRecordToGoogleSheet('suratKeluar', 'delete', { id }); // <-- TAMBAHKAN INI
+            pushRecordToGoogleSheet('suratKeluar', 'delete', { id });
           }
           saveAppData();
           renderAdministrasiView(document.getElementById('main-content'));
@@ -7652,6 +7709,7 @@
         appData.users.push(payload);
         showToast('Akun user baru berhasil dibuat.', 'success');
       }
+
       pushRecordToGoogleSheet('users', 'upsert', payload);
       saveAppData();
       closeFormModal();
@@ -7852,8 +7910,12 @@
       };
 
       appData.kwarranCourses.unshift(newCourse);
-      pushRecordToGoogleSheet('kwarranCourses', 'upsert', newCourse); // <-- TAMBAHKAN INI
       saveAppData();
+      pushRecordToGoogleSheet('kwarranCourses', 'upsert', newCourse);
+      const syncedAdmin = appData.kursus.find(k => k.sourceCourseId === newCourse.id);
+      if (syncedAdmin) {
+        pushRecordToGoogleSheet('kursus', 'upsert', syncedAdmin);
+      }
 
       uiState.kwarranSelectedCourseId = newCourse.id;
       uiState.kwarranEditingParticipantId = null;
@@ -7886,8 +7948,8 @@
           if (uiState.kwarranSelectedCourseId === courseId) {
             uiState.kwarranSelectedCourseId = null;
           }
-          pushRecordToGoogleSheet('kwarranCourses', 'delete', { id: courseId }); // <-- TAMBAHKAN INI
           saveAppData();
+          syncAllDataToGoogleSheet();
           renderKwarranDaftarKursusView(document.getElementById('main-content'));
           lucide.createIcons();
           showToast('Data kursus Kwarran berhasil dihapus.', 'info');
@@ -8277,6 +8339,7 @@
       }
 
       saveAppData();
+      syncAllDataToGoogleSheet();
       renderKwarranInputPesertaView(document.getElementById('main-content'));
       lucide.createIcons();
       if (nextStatus === 'Lulus') {
@@ -8335,8 +8398,12 @@
       }
 
       uiState.kwarranParticipantDraftPhoto = '';
-      pushRecordToGoogleSheet('kwarranParticipants', 'upsert', payload); // <-- TAMBAHKAN INI
       saveAppData();
+      pushRecordToGoogleSheet('kwarranParticipants', 'upsert', payload);
+      const linkedAdminCourse = appData.kursus.find(k => k.sourceCourseId === ownedCourse.id);
+      if (linkedAdminCourse) {
+        pushRecordToGoogleSheet('kursus', 'upsert', linkedAdminCourse);
+      }
       renderKwarranInputPesertaView(document.getElementById('main-content'));
       lucide.createIcons();
     }
@@ -8367,8 +8434,8 @@
             uiState.kwarranEditingParticipantId = null;
             uiState.kwarranParticipantDraftPhoto = '';
           }
-          pushRecordToGoogleSheet('kwarranParticipants', 'delete', { id: participantId }); // <-- TAMBAHKAN INI
           saveAppData();
+          pushRecordToGoogleSheet('kwarranParticipants', 'delete', { id: participantId });
           renderKwarranInputPesertaView(document.getElementById('main-content'));
           lucide.createIcons();
           showToast('Data peserta telah dihapus dari daftar.', 'info');
@@ -8435,12 +8502,21 @@
       restorePersistedSession();
       lucide.createIcons();
 
-      // Tarik data terbaru dari Google Spreadsheet saat halaman dibuka di perangkat mana pun
+      // Otomatis menarik data terbaru dari Google Spreadsheet saat halaman dibuka di perangkat mana pun
       const synced = await fetchDataFromGoogleSheet(true);
       if (synced) {
+        // Pastikan sesi aktif disegarkan dengan data user/profil terbaru dari Spreadsheet
+        if (currentUser) {
+          const freshUser = appData.users.find(u => u.id === currentUser.id);
+          if (freshUser) {
+            establishUserSession(freshUser, false);
+          }
+          navigateTo(activeRoute || 'dashboard');
+        }
+        lucide.createIcons();
         showToast('Data berhasil disinkronkan dengan Google Spreadsheet.', 'info');
       }
     });
   </script>
 </body>
-</html> 
+</html>
