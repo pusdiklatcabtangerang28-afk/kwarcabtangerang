@@ -115,8 +115,17 @@
 <body class="antialiased selection:bg-scout-khaki selection:text-scout-dark">
 
   <!-- TOAST NOTIFICATION CONTAINER -->
-  <div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none no-print"></div>
-
+    <div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none no-print"></div>
+  
+  <!-- GLOBAL SYNC / LOADING INDICATOR -->
+  <div id="global-sync-loader" class="fixed bottom-4 right-4 z-[110] hidden items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-scout-dark text-white border border-scout-gold/60 shadow-2xl text-xs font-bold no-print">
+    <svg class="animate-spin w-4 h-4 text-scout-gold shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+    </svg>
+    <span id="global-sync-loader-text">Menyinkronkan data ke Spreadsheet...</span>
+  </div>
+  
   <!-- MODAL KONFIRMASI UNIVERSAL -->
   <div id="confirm-modal" class="fixed inset-0 z-[90] hidden items-center justify-center bg-black/60 backdrop-blur-xs p-4 no-print">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-scout-sand animate-[fadeIn_0.15s_ease-out]">
@@ -395,6 +404,39 @@
     // =========================================================================
     const STORAGE_KEY = 'pusdiklatcab_tangerang_v1';
     const SESSION_STORAGE_KEY = 'pusdiklatcab_tangerang_session_v1';
+    // TEMPELKAN URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI:
+    const GOOGLE_SCRIPT_WEBAPP_URL = 'https://script.google.com/macros/s/PASTE_DEPLOYMENT_ID_ANDA_DI_SINI/exec';
+
+    let activeNetworkRequests = 0;
+    function setGlobalSyncLoading(isLoading, message = 'Menyinkronkan data dengan Google Spreadsheet...') {
+      const loaderEl = document.getElementById('global-sync-loader');
+      const textEl = document.getElementById('global-sync-loader-text');
+      if (!loaderEl) return;
+
+      if (isLoading) {
+        activeNetworkRequests++;
+        if (textEl) textEl.textContent = message;
+        loaderEl.classList.remove('hidden');
+        loaderEl.classList.add('flex');
+      } else {
+        activeNetworkRequests = Math.max(0, activeNetworkRequests - 1);
+        if (activeNetworkRequests === 0) {
+          loaderEl.classList.add('hidden');
+          loaderEl.classList.remove('flex');
+        }
+      }
+    }
+
+    function getActiveGasEndpointUrl() {
+      const fromProfile = (appData && appData.profile && appData.profile.spreadsheetUrl || '').trim();
+      if (fromProfile && fromProfile.startsWith('https://script.google.com/macros/s/')) {
+        return fromProfile;
+      }
+      if (GOOGLE_SCRIPT_WEBAPP_URL && !GOOGLE_SCRIPT_WEBAPP_URL.includes('PASTE_DEPLOYMENT_ID')) {
+        return GOOGLE_SCRIPT_WEBAPP_URL.trim();
+      }
+      return '';
+    }
     const BULAN_INDO = [
       'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
       'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
@@ -1650,30 +1692,129 @@
       }
     }
 
-    async function pushRecordToGoogleSheet(entity, action, recordData) {
-      const endpointUrl = (appData.profile && appData.profile.spreadsheetUrl || '').trim();
-      if (!endpointUrl || !endpointUrl.startsWith('https://script.google.com/')) {
-        return;
+    // Mengirim perubahan data (Tambah / Edit / Hapus) ke Google Spreadsheet via doPost
+    async function pushRecordToGoogleSheet(entity, action, recordData, extra = {}) {
+      const endpointUrl = getActiveGasEndpointUrl();
+      if (!endpointUrl) return;
+
+      const cleanRecord = recordData && typeof recordData === 'object' ? { ...recordData } : recordData;
+      // Hindari melebihi batas sel 50.000 karakter Google Sheets jika pas foto base64 terlalu besar
+      if (cleanRecord && typeof cleanRecord.fotoUrl === 'string' && cleanRecord.fotoUrl.length > 45000) {
+        cleanRecord.fotoUrl = '';
+      }
+      if (cleanRecord && typeof cleanRecord.lampiranDataUrl === 'string' && cleanRecord.lampiranDataUrl.length > 45000) {
+        cleanRecord.lampiranDataUrl = '';
       }
 
-      const cleanRecord = { ...recordData };
-      if (cleanRecord.fotoUrl) cleanRecord.fotoUrl = 'TERLAMPIR';
-      if (cleanRecord.lampiranDataUrl) delete cleanRecord.lampiranDataUrl;
-
+      setGlobalSyncLoading(true, 'Menyimpan perubahan ke Google Spreadsheet...');
       try {
-        await fetch(endpointUrl, {
+        const response = await fetch(endpointUrl, {
           method: 'POST',
-          mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({
             entity: entity,
             action: action,
-            data: cleanRecord
+            data: cleanRecord,
+            ...extra
+          })
+        });
+        const resJson = await response.json();
+        if (resJson && resJson.status === 'error') {
+          console.error('GAS Error:', resJson.message);
+          showToast('Peringatan sinkronisasi Spreadsheet: ' + resJson.message, 'error');
+        }
+      } catch (err) {
+        console.warn('Gagal mengirim ke Google Spreadsheet:', err);
+        showToast('Perubahan tersimpan lokal, namun gagal terhubung ke server Spreadsheet.', 'error');
+      } finally {
+        setGlobalSyncLoading(false);
+      }
+    }
+
+    // Mengirim seluruh data awal ke Spreadsheet jika Spreadsheet masih kosong
+    async function syncAllDataToGoogleSheet() {
+      const endpointUrl = getActiveGasEndpointUrl();
+      if (!endpointUrl) return;
+      setGlobalSyncLoading(true, 'Mengunggah database awal ke Google Spreadsheet...');
+      try {
+        await fetch(endpointUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'sync_all',
+            data: appData
           })
         });
       } catch (err) {
-        console.warn('Sinkronisasi ke Google Sheet tertunda:', err);
+        console.warn('Gagal inisialisasi sync_all:', err);
+      } finally {
+        setGlobalSyncLoading(false);
       }
+    }
+
+    // Menarik data terbaru dari Google Spreadsheet saat aplikasi dibuka (doGet)
+    async function fetchDataFromGoogleSheet(isInitialLoad = false) {
+      const endpointUrl = getActiveGasEndpointUrl();
+      if (!endpointUrl) return false;
+
+      setGlobalSyncLoading(true, 'Mengambil data terbaru dari Google Spreadsheet...');
+      try {
+        const cacheBusterUrl = `${endpointUrl}${endpointUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+        const response = await fetch(cacheBusterUrl, { method: 'GET' });
+        const json = await response.json();
+
+        if (json && json.status === 'success' && json.data) {
+          const remote = json.data;
+          const isRemoteEmpty =
+            (!remote.users || remote.users.length === 0) &&
+            (!remote.kursus || remote.kursus.length === 0) &&
+            (!remote.potensi || remote.potensi.length === 0);
+
+          if (isRemoteEmpty && isInitialLoad) {
+            // Spreadsheet baru pertama kali dihubungkan: unggah data seed/lokal saat ini ke Spreadsheet
+            await syncAllDataToGoogleSheet();
+            return true;
+          }
+
+          const preservedUrl = getActiveGasEndpointUrl();
+          const mergedRaw = {
+            ...appData,
+            profile: remote.profile ? { ...appData.profile, ...remote.profile } : appData.profile,
+            users: Array.isArray(remote.users) && remote.users.length ? remote.users : appData.users,
+            potensi: Array.isArray(remote.potensi) ? remote.potensi : appData.potensi,
+            kursus: Array.isArray(remote.kursus) ? remote.kursus : appData.kursus,
+            courseDetails: (remote.courseDetails && typeof remote.courseDetails === 'object') ? remote.courseDetails : appData.courseDetails,
+            suratMasuk: Array.isArray(remote.suratMasuk) ? remote.suratMasuk : appData.suratMasuk,
+            suratKeluar: Array.isArray(remote.suratKeluar) ? remote.suratKeluar : appData.suratKeluar,
+            kwarranCourses: Array.isArray(remote.kwarranCourses) ? remote.kwarranCourses : appData.kwarranCourses,
+            kwarranParticipants: Array.isArray(remote.kwarranParticipants) ? remote.kwarranParticipants : appData.kwarranParticipants
+          };
+
+          if (preservedUrl && !mergedRaw.profile.spreadsheetUrl) {
+            mergedRaw.profile.spreadsheetUrl = preservedUrl;
+          }
+
+          appData = migrateAndNormalizeAppData(mergedRaw);
+          syncKwarranCoursesToAdmin(appData);
+          syncSuratTugasToCourseAttendance(appData);
+          syncGraduatedParticipantsToPotensi(appData);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+
+          renderBrandLogos();
+          if (currentUser) {
+            navigateTo(activeRoute || 'dashboard');
+          }
+          return true;
+        }
+      } catch (err) {
+        console.warn('Gagal mengambil data dari Google Spreadsheet:', err);
+        if (isInitialLoad) {
+          showToast('Tidak dapat memuat data dari Spreadsheet. Periksa koneksi internet atau URL Web App.', 'error');
+        }
+      } finally {
+        setGlobalSyncLoading(false);
+      }
+      return false;
     }
     
     // =========================================================================
@@ -3400,6 +3541,7 @@
       appData.profile.email = document.getElementById('prof-email').value.trim();
       appData.profile.alamat = document.getElementById('prof-alamat').value.trim();
       appData.profile.spreadsheetUrl = (document.getElementById('prof-spreadsheet-url')?.value || '').trim();
+      pushRecordToGoogleSheet('profile', 'upsert', appData.profile);
       saveAppData();
       renderBrandLogos();
       renderProfileView(document.getElementById('main-content'));
@@ -4805,6 +4947,7 @@
       detail.suratTugas.penandatangan = document.getElementById('st-penandatangan').value.trim();
       detail.suratTugas.perihal = document.getElementById('st-perihal').value.trim();
       detail.suratTugas.personel = document.getElementById('st-personel').value.trim();
+      pushRecordToGoogleSheet('courseDetails', 'upsert', appData.courseDetails[courseId], { courseId: courseId });
       saveAppData();
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -5066,7 +5209,7 @@
         const mp = detail.manualParticipants.find(p => p.id === participantId);
         if (mp) mp.statusKelulusan = statusKelulusan;
       }
-
+      pushRecordToGoogleSheet('courseDetails', 'upsert', appData.courseDetails[courseId], { courseId: courseId });
       saveAppData();
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -5095,7 +5238,7 @@
           if (mp) mp.statusKelulusan = 'Lulus';
         }
       });
-
+      pushRecordToGoogleSheet('courseDetails', 'upsert', appData.courseDetails[courseId], { courseId: courseId });
       saveAppData();
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -5345,6 +5488,7 @@
         const item = list.find(x => x.id === personId);
         if (item) item.statusHadir = status;
       }
+      pushRecordToGoogleSheet('courseDetails', 'upsert', appData.courseDetails[courseId], { courseId: courseId });
       saveAppData();
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -5547,6 +5691,7 @@
         narasumber: document.getElementById('rnd-narasumber').value.trim(),
         keterangan: document.getElementById('rnd-ket').value.trim()
       });
+      pushRecordToGoogleSheet('courseDetails', 'upsert', appData.courseDetails[courseId], { courseId: courseId });
       saveAppData();
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -5559,6 +5704,7 @@
       if (!course) return;
       const detail = ensureCourseDetailRecord(course);
       detail.rundown = detail.rundown.filter(r => r.id !== rndId);
+      pushRecordToGoogleSheet('courseDetails', 'upsert', appData.courseDetails[courseId], { courseId: courseId });
       saveAppData();
       renderAdminCourseDetailView(document.getElementById('main-content'));
       lucide.createIcons();
@@ -5583,6 +5729,7 @@
           name: file.name,
           dataUrl: ev.target.result
         });
+        pushRecordToGoogleSheet('courseDetails', 'upsert', appData.courseDetails[courseId], { courseId: courseId });
         saveAppData();
         renderAdminCourseDetailView(document.getElementById('main-content'));
         lucide.createIcons();
@@ -6824,6 +6971,7 @@
           if (idx !== -1) appData.suratKeluar[idx] = payload;
         } else {
           appData.suratKeluar.unshift(payload);
+          pushRecordToGoogleSheet('suratKeluar', 'upsert', payload);
         }
       }
 
@@ -7504,7 +7652,7 @@
         appData.users.push(payload);
         showToast('Akun user baru berhasil dibuat.', 'success');
       }
-
+      pushRecordToGoogleSheet('users', 'upsert', payload);
       saveAppData();
       closeFormModal();
       renderUserView(document.getElementById('main-content'));
@@ -7525,6 +7673,7 @@
         `Apakah Anda yakin ingin menghapus akun "${target.nama}" (${target.role})?`,
         () => {
           appData.users = appData.users.filter(u => u.id !== id);
+          pushRecordToGoogleSheet('users', 'delete', { id });
           saveAppData();
           renderUserView(document.getElementById('main-content'));
           lucide.createIcons();
@@ -8276,15 +8425,21 @@
     }
 
     // =========================================================================
-    // 16. INISIALISASI SAAT HALAMAN DIMUAT
+    // 16. INISIALISASI SAAT HALAMAN DIMUAT (TARIK DATA REAL-TIME SPREADSHEET)
     // =========================================================================
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('load', async () => {
       syncKwarranCoursesToAdmin(appData);
       syncSuratTugasToCourseAttendance(appData);
       syncGraduatedParticipantsToPotensi(appData);
       renderBrandLogos();
       restorePersistedSession();
       lucide.createIcons();
+
+      // Tarik data terbaru dari Google Spreadsheet saat halaman dibuka di perangkat mana pun
+      const synced = await fetchDataFromGoogleSheet(true);
+      if (synced) {
+        showToast('Data berhasil disinkronkan dengan Google Spreadsheet.', 'info');
+      }
     });
   </script>
 </body>
