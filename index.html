@@ -48,6 +48,9 @@
   <!-- Chart.js via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+  <!-- SheetJS (XLSX) via CDN untuk Import/Export Excel sisi klien -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
   <style>
     body {
       background-color: #FAF7F2;
@@ -3845,6 +3848,31 @@
         existing ? 'Edit Data Potensi Pembina' : 'Tambah Data Potensi Pembina',
         `
           <form onsubmit="savePotensiForm(event, '${id || ''}')" class="space-y-4">
+            ${!existing ? `
+              <!-- BAR IMPORT EXCEL DATA POTENSI -->
+              <div class="p-3.5 rounded-2xl bg-emerald-50/80 border border-scout-forest/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <p class="text-xs font-extrabold text-scout-forest flex items-center gap-1.5">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                    <span>Import Massal dari File Excel (.xlsx / .xls / .csv)</span>
+                  </p>
+                  <p class="text-[11px] text-gray-600 mt-0.5">Unduh template agar susunan kolom sesuai standar sistem.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 shrink-0">
+                  <button type="button" onclick="downloadTemplateExcelPotensi()"
+                    class="px-3 py-2 rounded-xl bg-white hover:bg-scout-cream text-scout-dark border border-scout-sand text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition">
+                    <i data-lucide="download" class="w-3.5 h-3.5 text-scout-brown"></i>
+                    <span>Download Template Excel</span>
+                  </button>
+                  <label class="cursor-pointer px-3.5 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-xs transition">
+                    <i data-lucide="upload" class="w-3.5 h-3.5 text-scout-gold"></i>
+                    <span>Upload File Excel</span>
+                    <input type="file" accept=".xlsx,.xls,.csv" onchange="handleImportExcelPotensi(event)" class="hidden" />
+                  </label>
+                </div>
+              </div>
+            ` : ''}
+
             <div class="p-4 rounded-2xl bg-scout-cream/70 border border-dashed border-scout-khaki flex flex-col sm:flex-row items-center gap-4">
               <div id="pot-photo-preview" class="w-16 h-24 rounded-xl bg-white border-2 border-scout-gold/70 shadow-sm overflow-hidden flex flex-col items-center justify-center shrink-0">
                 ${uiState.potensiDraftPhoto
@@ -4785,7 +4813,7 @@
         if (kwIdx !== -1) {
           appData.kwarranCourses[kwIdx] = {
             ...appData.kwarranCourses[kwIdx],
-            namaKursus: updated.nama,
+            namaKursus: newNama,
             hari: updated.hari,
             tanggal: updated.tanggal,
             lokasi: updated.lokasi
@@ -5316,6 +5344,31 @@
         existing ? 'Edit Peserta Kursus Cabang (Kwarcab)' : 'Tambah Peserta Kursus Cabang (Kwarcab)',
         `
           <form onsubmit="saveCabangParticipantModal(event, '${courseId}', '${participantId || ''}')" class="space-y-4">
+            ${!existing ? `
+              <!-- BAR IMPORT EXCEL PESERTA CABANG -->
+              <div class="p-3.5 rounded-2xl bg-emerald-50/80 border border-scout-forest/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <p class="text-xs font-extrabold text-scout-forest flex items-center gap-1.5">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                    <span>Import Peserta dari Excel (.xlsx / .xls / .csv)</span>
+                  </p>
+                  <p class="text-[11px] text-gray-600 mt-0.5">Gunakan template resmi agar kolom terbaca otomatis.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 shrink-0">
+                  <button type="button" onclick="downloadTemplateExcelPeserta('cabang')"
+                    class="px-3 py-2 rounded-xl bg-white hover:bg-scout-cream text-scout-dark border border-scout-sand text-xs font-bold inline-flex items-center gap-1.5 transition">
+                    <i data-lucide="download" class="w-3.5 h-3.5 text-scout-brown"></i>
+                    <span>Download Template Excel</span>
+                  </button>
+                  <label class="cursor-pointer px-3.5 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-xs transition">
+                    <i data-lucide="upload" class="w-3.5 h-3.5 text-scout-gold"></i>
+                    <span>Upload File Excel</span>
+                    <input type="file" accept=".xlsx,.xls,.csv" onchange="handleImportExcelPesertaCabang(event, '${courseId}')" class="hidden" />
+                  </label>
+                </div>
+              </div>
+            ` : ''}
+
             <div class="p-3.5 rounded-2xl bg-scout-cream/70 border border-dashed border-scout-khaki flex items-center gap-4">
               <div id="cb-p-photo-preview" class="w-16 h-24 rounded-xl bg-white border-2 border-scout-gold/80 shadow-xs overflow-hidden flex flex-col items-center justify-center shrink-0">
                 ${uiState.cabangParticipantDraftPhoto
@@ -6201,7 +6254,7 @@
       `;
     }
 
-    // =========================================================================
+  // =========================================================================
     // 11. VIEW: ADMINISTRASI (PENYEDERHANAAN: RINGKAS & LAMPIRAN LANGSUNG DOWNLOAD)
     // =========================================================================
     function renderJenisSuratKeluarBadge(jenis) {
@@ -8131,6 +8184,31 @@
             </div>
 
             <form onsubmit="saveKwarranParticipant(event)" class="mt-4 space-y-3.5">
+              ${!editingParticipant ? `
+                <!-- BAR IMPORT EXCEL DATA PESERTA KWARRAN -->
+                <div class="p-3 rounded-2xl bg-emerald-50/80 border border-scout-forest/30 space-y-2">
+                  <div>
+                    <p class="text-xs font-extrabold text-scout-forest flex items-center gap-1.5">
+                      <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                      <span>Import Peserta dari Excel (.xlsx / .xls / .csv)</span>
+                    </p>
+                    <p class="text-[11px] text-gray-600 mt-0.5">Impor banyak peserta sekaligus ke jadwal kursus aktif ini.</p>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" onclick="downloadTemplateExcelPeserta('kwarran')"
+                      class="px-3 py-1.5 rounded-xl bg-white hover:bg-scout-cream text-scout-dark border border-scout-sand text-xs font-bold inline-flex items-center gap-1.5 transition">
+                      <i data-lucide="download" class="w-3.5 h-3.5 text-scout-brown"></i>
+                      <span>Download Template Excel</span>
+                    </button>
+                    <label class="cursor-pointer px-3 py-1.5 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition">
+                      <i data-lucide="upload" class="w-3.5 h-3.5 text-scout-gold"></i>
+                      <span>Upload File Excel</span>
+                      <input type="file" accept=".xlsx,.xls,.csv" onchange="handleImportExcelPesertaKwarran(event)" class="hidden" />
+                    </label>
+                  </div>
+                </div>
+              ` : ''}
+
               <div class="p-3.5 rounded-2xl bg-scout-cream/70 border border-dashed border-scout-khaki flex items-center gap-4">
                 <div id="kp-photo-preview" class="w-16 h-24 rounded-xl bg-white border-2 border-scout-gold/80 shadow-xs overflow-hidden flex flex-col items-center justify-center shrink-0">
                   ${activeDraftPhoto
@@ -8441,6 +8519,417 @@
           showToast('Data peserta telah dihapus dari daftar.', 'info');
         }
       );
+    }
+
+    // =========================================================================
+    // 14B. MODUL IMPORT & TEMPLATE EXCEL (SHEETJS) — DATA POTENSI & PESERTA
+    // =========================================================================
+    function normalizeExcelHeaderKey(str) {
+      return String(str || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+    }
+
+    function excelSerialToIsoDate(val) {
+      if (val === null || val === undefined || val === '') return '';
+      if (typeof val === 'number' && !isNaN(val)) {
+        const utcDays = Math.floor(val - 25569);
+        const dateObj = new Date(utcDays * 86400 * 1000);
+        if (!isNaN(dateObj.getTime())) {
+          const y = dateObj.getUTCFullYear();
+          const m = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+          const d = String(dateObj.getUTCDate()).padStart(2, '0');
+          return `${y}-${m}-${d}`;
+        }
+      }
+      const str = String(val).trim();
+      const isoMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+      if (isoMatch) {
+        return `${isoMatch[1]}-${isoMatch[2].padStart(2, '0')}-${isoMatch[3].padStart(2, '0')}`;
+      }
+      const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (dmyMatch) {
+        return `${dmyMatch[3]}-${dmyMatch[2].padStart(2, '0')}-${dmyMatch[1].padStart(2, '0')}`;
+      }
+      return str;
+    }
+
+    function normalizeGolonganExcel(raw) {
+      const cleaned = String(raw || '').trim().toLowerCase();
+      const found = GOLONGAN_OPTIONS.find(g => g.toLowerCase() === cleaned);
+      return found || 'Penggalang';
+    }
+
+    function normalizeJenjangExcel(raw) {
+      const cleaned = String(raw || '').trim().toLowerCase();
+      if (!cleaned || cleaned.includes('belum')) return 'Belum Kursus';
+      const found = JENJANG_OPTIONS.find(j => j.toLowerCase() === cleaned);
+      return found || 'Belum Kursus';
+    }
+
+    function normalizeGenderExcel(raw) {
+      const cleaned = String(raw || '').trim().toLowerCase();
+      if (cleaned === 'putri' || cleaned === 'p' || cleaned === 'perempuan' || cleaned === 'wanita') {
+        return 'Putri';
+      }
+      return 'Putra';
+    }
+
+    function readExcelRowsFromFile(file, onSuccess) {
+      if (typeof XLSX === 'undefined') {
+        showToast('Library pembaca Excel (SheetJS) belum termuat. Periksa koneksi internet Anda.', 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        try {
+          const data = new Uint8Array(ev.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+          if (!Array.isArray(rawRows) || rawRows.length === 0) {
+            showToast('File Excel kosong atau tidak memiliki baris data.', 'error');
+            return;
+          }
+
+          const normalizedRows = rawRows.map(row => {
+            const mapped = {};
+            Object.keys(row).forEach(k => {
+              mapped[normalizeExcelHeaderKey(k)] = row[k];
+            });
+            return mapped;
+          });
+
+          onSuccess(normalizedRows);
+        } catch (err) {
+          console.error('Gagal membaca file Excel:', err);
+          showToast('Format file Excel tidak valid atau rusak. Gunakan format .xlsx / .xls / .csv.', 'error');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // -------------------------------------------------------------------------
+    // A. TEMPLATE & IMPORT EXCEL — DATA POTENSI PEMBINA
+    // -------------------------------------------------------------------------
+    function downloadTemplateExcelPotensi() {
+      if (typeof XLSX === 'undefined') {
+        showToast('Library Excel belum siap. Silakan muat ulang halaman.', 'error');
+        return;
+      }
+      const scope = getActiveKwarranScope();
+      const contohKwarran = scope.isKwarran ? scope.kwarranName : 'Tigaraksa';
+
+      const templateRows = [
+        {
+          'NTA': '28.04.01.000101.0001',
+          'Nama Lengkap': 'Kak Budi Santoso, S.Pd.',
+          'Tempat Lahir': 'Tangerang',
+          'Tanggal Lahir': '1990-05-17',
+          'Golongan': 'Penggalang',
+          'Jenjang Kursus': 'KMD',
+          'Tahun Lulus': '2024',
+          'Jenis Kelamin': 'Putra',
+          'Asal Kwarran': contohKwarran,
+          'Nama Pangkalan': 'SDN Tigaraksa 01'
+        },
+        {
+          'NTA': '28.04.05.000202.0001',
+          'Nama Lengkap': 'Kak Siti Aminah, S.Pd.SD.',
+          'Tempat Lahir': 'Tangerang',
+          'Tanggal Lahir': '1993-08-22',
+          'Golongan': 'Siaga',
+          'Jenjang Kursus': 'KML',
+          'Tahun Lulus': '2025',
+          'Jenis Kelamin': 'Putri',
+          'Asal Kwarran': contohKwarran,
+          'Nama Pangkalan': 'SDN Curug 01'
+        }
+      ];
+
+      const ws = XLSX.utils.json_to_sheet(templateRows);
+      ws['!cols'] = [
+        { wch: 24 }, { wch: 28 }, { wch: 16 }, { wch: 15 },
+        { wch: 14 }, { wch: 16 }, { wch: 13 }, { wch: 15 },
+        { wch: 18 }, { wch: 24 }
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Template_Data_Potensi');
+      XLSX.writeFile(wb, 'Template_Import_Data_Potensi.xlsx');
+      showToast('Template Excel Data Potensi berhasil diunduh!', 'success');
+    }
+
+    function handleImportExcelPotensi(event) {
+      if (guardPelatihWriteAction()) return;
+      const file = event.target.files[0];
+      if (!file) return;
+
+      readExcelRowsFromFile(file, (rows) => {
+        const firstRow = rows[0] || {};
+        const hasNtaCol = 'nta' in firstRow || 'nomortandaanggota' in firstRow;
+        const hasNamaCol = 'namalengkap' in firstRow || 'nama' in firstRow || 'namapembina' in firstRow;
+
+        if (!hasNtaCol || !hasNamaCol) {
+          showToast('Format kolom Excel tidak sesuai! Pastikan memiliki kolom "NTA" dan "Nama Lengkap" sesuai template.', 'error');
+          event.target.value = '';
+          return;
+        }
+
+        const scope = getActiveKwarranScope();
+        let importedCount = 0;
+        let skippedCount = 0;
+
+        rows.forEach(r => {
+          const rawNta = r.nta || r.nomortandaanggota || '';
+          const rawNama = String(r.namalengkap || r.nama || r.namapembina || '').trim();
+          const ntaFormatted = formatNtaMask(rawNta);
+
+          if (!rawNama || !isValidNtaPattern(ntaFormatted)) {
+            skippedCount++;
+            return;
+          }
+
+          const jenjangVal = normalizeJenjangExcel(r.jenjangkursus || r.jenjang || r.statuskursus);
+          const rawTahun = String(r.tahunlulus || r.tahun || '').trim();
+          const normalizedTahun = jenjangVal === 'Belum Kursus' ? '-' : (rawTahun || '-');
+          const kwRaw = r.asalkwarran || r.kwarran || 'Tigaraksa';
+          const resolvedKwarran = scope.isKwarran
+            ? scope.kwarranName
+            : normalizeKwarranName(kwRaw);
+
+          const payload = {
+            id: generateId('pot'),
+            nta: ntaFormatted,
+            nama: rawNama,
+            tempatLahir: String(r.tempatlahir || '').trim(),
+            tanggalLahir: excelSerialToIsoDate(r.tanggallahir),
+            golongan: normalizeGolonganExcel(r.golongan || r.golonganpembinaan),
+            jenjang: jenjangVal,
+            tahunLulus: normalizedTahun,
+            gender: normalizeGenderExcel(r.jeniskelamin || r.gender),
+            kwarran: resolvedKwarran,
+            pangkalan: String(r.namapangkalan || r.pangkalan || r.gugusdepan || '-').trim(),
+            fotoUrl: ''
+          };
+
+          appData.potensi.unshift(payload);
+          importedCount++;
+        });
+
+        event.target.value = '';
+
+        if (importedCount === 0) {
+          showToast('Tidak ada baris valid yang dapat diimpor. Pastikan NTA berisi 16 digit angka & Nama Lengkap terisi.', 'error');
+          return;
+        }
+
+        saveAppData();
+        syncAllDataToGoogleSheet();
+        closeFormModal();
+        renderDataPotensiView(document.getElementById('main-content'));
+        lucide.createIcons();
+
+        const extraInfo = skippedCount > 0 ? ` (${skippedCount} baris dilewati karena NTA/Nama tidak lengkap)` : '';
+        showToast(`Berhasil mengimpor ${importedCount} data potensi pembina!${extraInfo}`, 'success');
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // B. TEMPLATE & IMPORT EXCEL — DATA PESERTA BARU (KWARRAN & CABANG)
+    // -------------------------------------------------------------------------
+    function downloadTemplateExcelPeserta(mode = 'kwarran') {
+      if (typeof XLSX === 'undefined') {
+        showToast('Library Excel belum siap. Silakan muat ulang halaman.', 'error');
+        return;
+      }
+
+      const templateRows = mode === 'cabang'
+        ? [
+            {
+              'NTA': '28.04.01.000142.0001',
+              'Nama Lengkap + Gelar': 'Ahmad Subagja, S.Pd.',
+              'Tempat Lahir': 'Tangerang',
+              'Tanggal Lahir': '1992-05-14',
+              'Jenis Kelamin': 'Putra',
+              'Golongan': 'Penggalang',
+              'Asal Kwarran': 'Tigaraksa',
+              'Nama Pangkalan': 'SDN Tigaraksa 01'
+            }
+          ]
+        : [
+            {
+              'NTA': '28.04.01.000142.0001',
+              'Nama Lengkap + Gelar': 'Ahmad Subagja, S.Pd.',
+              'Tempat Lahir': 'Tangerang',
+              'Tanggal Lahir': '1992-05-14',
+              'Golongan': 'Penggalang',
+              'Nama Pangkalan': 'SDN Tigaraksa 01',
+              'Jenis Kelamin': 'Putra'
+            }
+          ];
+
+      const ws = XLSX.utils.json_to_sheet(templateRows);
+      ws['!cols'] = [
+        { wch: 24 }, { wch: 28 }, { wch: 16 }, { wch: 15 },
+        { wch: 14 }, { wch: 24 }, { wch: 16 }, { wch: 22 }
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Template_Peserta_Kursus');
+      XLSX.writeFile(wb, `Template_Import_Peserta_${mode === 'cabang' ? 'Cabang' : 'Kwarran'}.xlsx`);
+      showToast('Template Excel Data Peserta berhasil diunduh!', 'success');
+    }
+
+    function handleImportExcelPesertaKwarran(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const scope = getActiveKwarranScope();
+      const myKwarran = scope.kwarranName;
+      const ownedCourse = getScopedKwarranCourses().find(c => c.id === uiState.kwarranSelectedCourseId);
+
+      if (!ownedCourse) {
+        showToast('Pilih penyelenggaraan kursus terlebih dahulu sebelum mengimpor peserta.', 'error');
+        event.target.value = '';
+        return;
+      }
+
+      readExcelRowsFromFile(file, (rows) => {
+        const firstRow = rows[0] || {};
+        const hasNtaCol = 'nta' in firstRow || 'nomortandaanggota' in firstRow;
+        const hasNamaCol = 'namalengkapgelar' in firstRow || 'namalengkap' in firstRow || 'nama' in firstRow;
+
+        if (!hasNtaCol || !hasNamaCol) {
+          showToast('Format kolom Excel tidak sesuai! Pastikan memiliki kolom "NTA" dan "Nama Lengkap + Gelar" sesuai template.', 'error');
+          event.target.value = '';
+          return;
+        }
+
+        let importedCount = 0;
+        let skippedCount = 0;
+
+        rows.forEach(r => {
+          const rawNta = r.nta || r.nomortandaanggota || '';
+          const rawNama = String(r.namalengkapgelar || r.namalengkap || r.nama || '').trim();
+          const ntaFormatted = formatNtaMask(rawNta);
+
+          if (!rawNama || !isValidNtaPattern(ntaFormatted)) {
+            skippedCount++;
+            return;
+          }
+
+          const payload = {
+            id: generateId('kp'),
+            courseId: ownedCourse.id,
+            kwarran: myKwarran,
+            kwarran_id: scope.kwarran_id,
+            nta: ntaFormatted,
+            namaGelar: rawNama,
+            tempatLahir: String(r.tempatlahir || '').trim(),
+            tanggalLahir: excelSerialToIsoDate(r.tanggallahir),
+            golongan: normalizeGolonganExcel(r.golongan),
+            namaPangkalan: String(r.namapangkalan || r.pangkalan || '-').trim(),
+            gender: normalizeGenderExcel(r.jeniskelamin || r.gender),
+            fotoUrl: '',
+            statusKelulusan: 'Belum Lulus'
+          };
+
+          appData.kwarranParticipants.unshift(payload);
+          importedCount++;
+        });
+
+        event.target.value = '';
+
+        if (importedCount === 0) {
+          showToast('Tidak ada baris valid yang dapat diimpor. Pastikan NTA berisi 16 digit angka & Nama terisi.', 'error');
+          return;
+        }
+
+        saveAppData();
+        syncAllDataToGoogleSheet();
+        renderKwarranInputPesertaView(document.getElementById('main-content'));
+        lucide.createIcons();
+
+        const extraInfo = skippedCount > 0 ? ` (${skippedCount} baris dilewati karena NTA/Nama tidak lengkap)` : '';
+        showToast(`Berhasil mengimpor ${importedCount} data peserta!${extraInfo}`, 'success');
+      });
+    }
+
+    function handleImportExcelPesertaCabang(event, courseId) {
+      if (guardPelatihWriteAction()) return;
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const course = appData.kursus.find(c => c.id === courseId);
+      if (!course) return;
+      const detail = ensureCourseDetailRecord(course);
+      const isCourseDone = course.status === 'Selesai';
+
+      readExcelRowsFromFile(file, (rows) => {
+        const firstRow = rows[0] || {};
+        const hasNtaCol = 'nta' in firstRow || 'nomortandaanggota' in firstRow;
+        const hasNamaCol = 'namalengkapgelar' in firstRow || 'namalengkap' in firstRow || 'nama' in firstRow;
+
+        if (!hasNtaCol || !hasNamaCol) {
+          showToast('Format kolom Excel tidak sesuai! Gunakan tombol Download Template Excel terlebih dahulu.', 'error');
+          event.target.value = '';
+          return;
+        }
+
+        let importedCount = 0;
+        let skippedCount = 0;
+
+        rows.forEach(r => {
+          const rawNta = r.nta || r.nomortandaanggota || '';
+          const rawNama = String(r.namalengkapgelar || r.namalengkap || r.nama || '').trim();
+          const ntaFormatted = formatNtaMask(rawNta);
+
+          if (!rawNama || !isValidNtaPattern(ntaFormatted)) {
+            skippedCount++;
+            return;
+          }
+
+          const newId = generateId('mp');
+          const payload = {
+            id: newId,
+            nta: ntaFormatted,
+            nama: rawNama,
+            tempatLahir: String(r.tempatlahir || '').trim(),
+            tanggalLahir: excelSerialToIsoDate(r.tanggallahir),
+            gender: normalizeGenderExcel(r.jeniskelamin || r.gender),
+            golongan: normalizeGolonganExcel(r.golongan),
+            kwarran: normalizeKwarranName(r.asalkwarran || r.kwarran || 'Tigaraksa'),
+            pangkalan: String(r.namapangkalan || r.pangkalan || '-').trim(),
+            fotoUrl: '',
+            statusKelulusan: isCourseDone ? 'Lulus' : 'Belum Lulus',
+            source: 'cabang'
+          };
+
+          detail.manualParticipants.push(payload);
+          if (isCourseDone) {
+            detail.graduationStatus[newId] = 'Lulus';
+          }
+          importedCount++;
+        });
+
+        event.target.value = '';
+
+        if (importedCount === 0) {
+          showToast('Tidak ada baris valid yang dapat diimpor. Pastikan NTA berisi 16 digit angka & Nama terisi.', 'error');
+          return;
+        }
+
+        course.terdaftar = Math.max(course.terdaftar, detail.manualParticipants.length);
+        saveAppData();
+        syncAllDataToGoogleSheet();
+        closeFormModal();
+        renderAdminCourseDetailView(document.getElementById('main-content'));
+        lucide.createIcons();
+
+        const extraInfo = skippedCount > 0 ? ` (${skippedCount} baris dilewati)` : '';
+        showToast(`Berhasil mengimpor ${importedCount} data peserta kursus cabang!${extraInfo}`, 'success');
+      });
     }
 
     // =========================================================================
