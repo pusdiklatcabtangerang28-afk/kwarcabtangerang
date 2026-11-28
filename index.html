@@ -409,7 +409,45 @@
     const SESSION_STORAGE_KEY = 'pusdiklatcab_tangerang_session_v1';
 
     // TEMPELKAN URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI (atau isi via Menu Profile):
-    const GOOGLE_SCRIPT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzaYcXWrIpMX0nfdFjwLvCEo_PknvRQvh4gFRfsOdO9MI5_y23K0JoL5yYBIG0heQz6LA/exec';
+    const GOOGLE_SCRIPT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby3z30F2_k84NtWYhA59bw9aQQiZRXkwlBX2iEpg__sSaOxEiDiodIkp5nIihCOfC1xtA/exec';
+
+    // =========================================================================
+    // ENGINE LIVE SEARCH REAL-TIME (DEBOUNCE + PARTIAL MATCH + ZERO FOCUS LOSS)
+    // =========================================================================
+    const liveSearchTimers = {};
+
+    function scheduleLiveSearch(channelKey, callback, delayMs = 180) {
+      if (liveSearchTimers[channelKey]) {
+        clearTimeout(liveSearchTimers[channelKey]);
+      }
+      liveSearchTimers[channelKey] = setTimeout(() => {
+        delete liveSearchTimers[channelKey];
+        if (typeof callback === 'function') callback();
+      }, delayMs);
+    }
+
+    function matchesFlexibleSearch(rawQuery, searchableParts) {
+      const cleaned = String(rawQuery || '').trim().toLowerCase();
+      if (!cleaned) return true;
+      const tokens = cleaned.split(/\s+/).filter(Boolean);
+      const haystack = searchableParts
+        .filter(v => v !== null && v !== undefined)
+        .join(' ')
+        .toLowerCase();
+      return tokens.every(token => haystack.includes(token));
+    }
+
+    function toggleSearchClearButton(btnId, hasValue) {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      if (hasValue) {
+        btn.classList.remove('hidden');
+        btn.classList.add('flex');
+      } else {
+        btn.classList.add('hidden');
+        btn.classList.remove('flex');
+      }
+    }
 
     let activeNetworkRequests = 0;
     function setGlobalSyncLoading(isLoading, message = 'Menyinkronkan data dengan Google Spreadsheet...') {
@@ -3584,12 +3622,163 @@
     }
 
     // =========================================================================
-    // 9. VIEW: DATA POTENSI (NTA ##.##.##.######.#### + GOLONGAN + TTL + FOTO 4x6)
+    // 9. VIEW: DATA POTENSI (LIVE SEARCH PARTIAL RENDER + NTA + TTL + FOTO 4x6)
     // =========================================================================
     function formatTahunLulusDisplay(item) {
       if (!item || item.jenjang === 'Belum Kursus') return '-';
       const val = String(item.tahunLulus || '').trim();
       return val && val !== '-' ? val : '-';
+    }
+
+    function getFilteredPotensiList() {
+      const scope = getActiveKwarranScope();
+      const lockedKwarran = scope.isKwarran ? scope.kwarranName : null;
+      const scopeBase = getScopedPotensiList();
+
+      return scopeBase.filter(item => {
+        if (!lockedKwarran && uiState.potensiKwarran !== 'ALL' && !isSameKwarran(item.kwarran, uiState.potensiKwarran)) return false;
+        if (uiState.potensiJenjang !== 'ALL' && item.jenjang !== uiState.potensiJenjang) return false;
+        if (uiState.potensiGolongan !== 'ALL' && item.golongan !== uiState.potensiGolongan) return false;
+        if (uiState.potensiGender !== 'ALL' && item.gender !== uiState.potensiGender) return false;
+        if (uiState.potensiSearch) {
+          const ttlStr = formatTempatTanggalLahir(item.tempatLahir, item.tanggalLahir);
+          return matchesFlexibleSearch(uiState.potensiSearch, [
+            item.nama,
+            item.nta,
+            ttlStr,
+            item.golongan,
+            item.jenjang,
+            item.kwarran,
+            item.pangkalan,
+            item.tahunLulus
+          ]);
+        }
+        return true;
+      });
+    }
+
+    function buildPotensiTableRowsHtml(paginated, startIdx, readOnly) {
+      return paginated.map((item, idx) => {
+        const tahunDisplay = formatTahunLulusDisplay(item);
+        const ttlDisplay = formatTempatTanggalLahir(item.tempatLahir, item.tanggalLahir);
+        return `
+          <tr class="hover:bg-scout-cream/40 transition">
+            <td class="py-3.5 px-4 font-semibold text-gray-500">${startIdx + idx + 1}</td>
+            <td class="py-2.5 px-3">${renderPembinaAvatarHtml(item, 'w-9 h-[54px]', true)}</td>
+            <td class="py-3.5 px-4">
+              <p class="font-bold text-scout-dark">${escapeHtml(item.nama)}</p>
+              <p class="text-[11px] font-mono font-bold text-scout-brown mt-0.5">
+                NTA: ${escapeHtml(item.nta || '-')}
+              </p>
+              <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
+                ${item.fotoUrl ? '<span class="text-[10px] font-semibold text-scout-forest">Pas foto 4x6 terlampir</span>' : '<span class="text-[10px] text-gray-400">Belum ada foto 4x6</span>'}
+                ${item.sourceCourseId ? '<span class="px-1.5 py-0.2 rounded bg-emerald-50 text-scout-forest border border-emerald-200 text-[9px] font-bold">Lulusan Kursus</span>' : ''}
+              </div>
+            </td>
+            <td class="py-3.5 px-4 whitespace-nowrap text-gray-700 font-medium">${escapeHtml(ttlDisplay)}</td>
+            <td class="py-3.5 px-4 whitespace-nowrap">${renderGolonganBadge(item.golongan || 'Penggalang')}</td>
+            <td class="py-3.5 px-4">${renderJenjangBadge(item.jenjang)}</td>
+            <td class="py-3.5 px-4 text-center whitespace-nowrap">
+              ${tahunDisplay !== '-'
+                ? `<span class="inline-block px-2.5 py-0.5 rounded-md bg-scout-cream border border-scout-sand font-extrabold text-scout-dark">${escapeHtml(tahunDisplay)}</span>`
+                : `<span class="text-gray-400 font-semibold">-</span>`}
+            </td>
+            <td class="py-3.5 px-4">
+              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                item.gender === 'Putra' ? 'bg-blue-50 text-blue-800 border border-blue-200' : 'bg-pink-50 text-pink-800 border border-pink-200'
+              }">
+                ${escapeHtml(item.gender)}
+              </span>
+            </td>
+            <td class="py-3.5 px-4 font-semibold text-scout-brown">Kwarran ${escapeHtml(item.kwarran)}</td>
+            <td class="py-3.5 px-4 text-gray-600">${escapeHtml(item.pangkalan || '-')}</td>
+            ${!readOnly ? `
+              <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                <button type="button" onclick="openPotensiModal('${item.id}')"
+                  class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 mr-1 transition" title="Edit">
+                  <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="deletePotensi('${item.id}')"
+                  class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition" title="Hapus">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </td>
+            ` : ''}
+          </tr>
+        `;
+      }).join('') || `
+        <tr>
+          <td colspan="${readOnly ? 10 : 11}" class="py-10 text-center text-gray-500">
+            Tidak ditemukan data potensi pembina yang sesuai filter${uiState.potensiSearch ? ` untuk kata kunci "<strong>${escapeHtml(uiState.potensiSearch)}</strong>"` : ''}.
+          </td>
+        </tr>
+      `;
+    }
+
+    function buildPotensiPaginationHtml(listLength, startIdx, totalPages) {
+      return `
+        <span class="text-gray-600">
+          Menampilkan <strong>${listLength ? startIdx + 1 : 0}</strong> - <strong>${Math.min(startIdx + uiState.potensiPerPage, listLength)}</strong> dari <strong>${listLength}</strong> data pembina
+        </span>
+        <div class="flex items-center gap-1.5">
+          <button type="button" ${uiState.potensiPage <= 1 ? 'disabled' : ''}
+            onclick="changePotensiPage(-1)"
+            class="px-3 py-1.5 rounded-lg border border-scout-sand bg-white disabled:opacity-40 font-semibold hover:bg-scout-cream">
+            Sebelumnya
+          </button>
+          <span class="px-3 py-1.5 font-bold text-scout-dark">Hal ${uiState.potensiPage} / ${totalPages}</span>
+          <button type="button" ${uiState.potensiPage >= totalPages ? 'disabled' : ''}
+            onclick="changePotensiPage(1)"
+            class="px-3 py-1.5 rounded-lg border border-scout-sand bg-white disabled:opacity-40 font-semibold hover:bg-scout-cream">
+            Berikutnya
+          </button>
+        </div>
+      `;
+    }
+
+    function updatePotensiTableOnly() {
+      const tbodyEl = document.getElementById('potensi-table-body');
+      const pagEl = document.getElementById('potensi-pagination-bar');
+      if (!tbodyEl || !pagEl) {
+        renderDataPotensiView(document.getElementById('main-content'));
+        lucide.createIcons();
+        return;
+      }
+
+      const readOnly = isPelatihReadOnly();
+      const list = getFilteredPotensiList();
+      const totalPages = Math.max(1, Math.ceil(list.length / uiState.potensiPerPage));
+      if (uiState.potensiPage > totalPages) uiState.potensiPage = totalPages;
+      const startIdx = (uiState.potensiPage - 1) * uiState.potensiPerPage;
+      const paginated = list.slice(startIdx, startIdx + uiState.potensiPerPage);
+
+      tbodyEl.innerHTML = buildPotensiTableRowsHtml(paginated, startIdx, readOnly);
+      pagEl.innerHTML = buildPotensiPaginationHtml(list.length, startIdx, totalPages);
+      lucide.createIcons();
+    }
+
+    function handlePotensiLiveSearch(value) {
+      uiState.potensiSearch = value;
+      uiState.potensiPage = 1;
+      toggleSearchClearButton('potensi-search-clear-btn', Boolean(value && value.length > 0));
+      scheduleLiveSearch('potensi', updatePotensiTableOnly, 150);
+    }
+
+    function clearPotensiLiveSearch() {
+      uiState.potensiSearch = '';
+      uiState.potensiPage = 1;
+      const inputEl = document.getElementById('potensi-search-input');
+      if (inputEl) {
+        inputEl.value = '';
+        inputEl.focus();
+      }
+      toggleSearchClearButton('potensi-search-clear-btn', false);
+      updatePotensiTableOnly();
+    }
+
+    function changePotensiPage(delta) {
+      uiState.potensiPage = Math.max(1, uiState.potensiPage + delta);
+      updatePotensiTableOnly();
     }
 
     function renderDataPotensiView(container) {
@@ -3600,26 +3789,7 @@
       const readOnly = isPelatihReadOnly();
 
       const scopeBase = getScopedPotensiList();
-      let list = scopeBase.filter(item => {
-        if (!lockedKwarran && uiState.potensiKwarran !== 'ALL' && !isSameKwarran(item.kwarran, uiState.potensiKwarran)) return false;
-        if (uiState.potensiJenjang !== 'ALL' && item.jenjang !== uiState.potensiJenjang) return false;
-        if (uiState.potensiGolongan !== 'ALL' && item.golongan !== uiState.potensiGolongan) return false;
-        if (uiState.potensiGender !== 'ALL' && item.gender !== uiState.potensiGender) return false;
-        if (uiState.potensiSearch) {
-          const q = uiState.potensiSearch.toLowerCase();
-          const ttlStr = formatTempatTanggalLahir(item.tempatLahir, item.tanggalLahir).toLowerCase();
-          const match =
-            item.nama.toLowerCase().includes(q) ||
-            (item.nta || '').toLowerCase().includes(q) ||
-            ttlStr.includes(q) ||
-            (item.golongan || '').toLowerCase().includes(q) ||
-            item.kwarran.toLowerCase().includes(q) ||
-            (item.pangkalan || '').toLowerCase().includes(q) ||
-            String(item.tahunLulus || '').toLowerCase().includes(q);
-          if (!match) return false;
-        }
-        return true;
-      });
+      const list = getFilteredPotensiList();
 
       const totalPages = Math.max(1, Math.ceil(list.length / uiState.potensiPerPage));
       if (uiState.potensiPage > totalPages) uiState.potensiPage = totalPages;
@@ -3648,14 +3818,20 @@
           <div class="p-5 border-b border-scout-sand/70 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 flex-1">
               <div class="relative sm:col-span-2 lg:col-span-1">
-                <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3"></i>
-                <input type="text" value="${escapeHtml(uiState.potensiSearch)}"
-                  oninput="uiState.potensiSearch = this.value; uiState.potensiPage = 1; renderDataPotensiView(document.getElementById('main-content')); lucide.createIcons();"
+                <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3 pointer-events-none"></i>
+                <input type="text" id="potensi-search-input" value="${escapeHtml(uiState.potensiSearch)}"
+                  oninput="handlePotensiLiveSearch(this.value)"
+                  autocomplete="off"
                   placeholder="Cari NTA, nama, TTL, pangkalan..."
-                  class="w-full pl-9 pr-3 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                  class="w-full pl-9 pr-8 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                <button type="button" id="potensi-search-clear-btn" onclick="clearPotensiLiveSearch()"
+                  class="${uiState.potensiSearch ? 'flex' : 'hidden'} absolute inset-y-0 right-0 pr-2.5 items-center text-gray-400 hover:text-scout-dark"
+                  title="Hapus kata kunci">
+                  <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
               </div>
 
-              <select onchange="uiState.potensiGolongan = this.value; uiState.potensiPage = 1; renderDataPotensiView(document.getElementById('main-content')); lucide.createIcons();"
+              <select onchange="uiState.potensiGolongan = this.value; uiState.potensiPage = 1; updatePotensiTableOnly();"
                 class="px-3 py-2 rounded-xl border border-scout-sand text-xs font-semibold text-scout-dark bg-scout-cream/30 focus:outline-none">
                 <option value="ALL">Semua Golongan</option>
                 ${GOLONGAN_OPTIONS.map(g => `<option value="${g}" ${uiState.potensiGolongan === g ? 'selected' : ''}>Golongan ${g}</option>`).join('')}
@@ -3667,7 +3843,7 @@
                 ${JENJANG_OPTIONS.map(j => `<option value="${j}" ${uiState.potensiJenjang === j ? 'selected' : ''}>${j}</option>`).join('')}
               </select>
 
-              <select onchange="uiState.potensiGender = this.value; uiState.potensiPage = 1; renderDataPotensiView(document.getElementById('main-content')); lucide.createIcons();"
+              <select onchange="uiState.potensiGender = this.value; uiState.potensiPage = 1; updatePotensiTableOnly();"
                 class="px-3 py-2 rounded-xl border border-scout-sand text-xs font-semibold text-scout-dark bg-scout-cream/30 focus:outline-none">
                 <option value="ALL">Semua Jenis Kelamin</option>
                 <option value="Putra" ${uiState.potensiGender === 'Putra' ? 'selected' : ''}>Putra</option>
@@ -3680,7 +3856,7 @@
                   <span>Kwarran: ${escapeHtml(lockedKwarran)}</span>
                 </div>
               ` : `
-                <select onchange="uiState.potensiKwarran = this.value; uiState.potensiPage = 1; renderDataPotensiView(document.getElementById('main-content')); lucide.createIcons();"
+                <select onchange="uiState.potensiKwarran = this.value; uiState.potensiPage = 1; updatePotensiTableOnly();"
                   class="px-3 py-2 rounded-xl border border-scout-sand text-xs font-semibold text-scout-dark bg-scout-cream/30 focus:outline-none">
                   <option value="ALL">Semua Asal Kwarran (29)</option>
                   ${KWARRAN_LIST.map(kw => `<option value="${kw}" ${uiState.potensiKwarran === kw ? 'selected' : ''}>Kwarran ${kw}</option>`).join('')}
@@ -3720,83 +3896,14 @@
                   ${!readOnly ? '<th class="py-3.5 px-4 text-right">Aksi</th>' : ''}
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-100 text-xs">
-                ${paginated.map((item, idx) => {
-                  const tahunDisplay = formatTahunLulusDisplay(item);
-                  const ttlDisplay = formatTempatTanggalLahir(item.tempatLahir, item.tanggalLahir);
-                  return `
-                    <tr class="hover:bg-scout-cream/40 transition">
-                      <td class="py-3.5 px-4 font-semibold text-gray-500">${startIdx + idx + 1}</td>
-                      <td class="py-2.5 px-3">${renderPembinaAvatarHtml(item, 'w-9 h-[54px]', true)}</td>
-                      <td class="py-3.5 px-4">
-                        <p class="font-bold text-scout-dark">${escapeHtml(item.nama)}</p>
-                        <p class="text-[11px] font-mono font-bold text-scout-brown mt-0.5">
-                          NTA: ${escapeHtml(item.nta || '-')}
-                        </p>
-                        <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
-                          ${item.fotoUrl ? '<span class="text-[10px] font-semibold text-scout-forest">Pas foto 4x6 terlampir</span>' : '<span class="text-[10px] text-gray-400">Belum ada foto 4x6</span>'}
-                          ${item.sourceCourseId ? '<span class="px-1.5 py-0.2 rounded bg-emerald-50 text-scout-forest border border-emerald-200 text-[9px] font-bold">Lulusan Kursus</span>' : ''}
-                        </div>
-                      </td>
-                      <td class="py-3.5 px-4 whitespace-nowrap text-gray-700 font-medium">${escapeHtml(ttlDisplay)}</td>
-                      <td class="py-3.5 px-4 whitespace-nowrap">${renderGolonganBadge(item.golongan || 'Penggalang')}</td>
-                      <td class="py-3.5 px-4">${renderJenjangBadge(item.jenjang)}</td>
-                      <td class="py-3.5 px-4 text-center whitespace-nowrap">
-                        ${tahunDisplay !== '-'
-                          ? `<span class="inline-block px-2.5 py-0.5 rounded-md bg-scout-cream border border-scout-sand font-extrabold text-scout-dark">${escapeHtml(tahunDisplay)}</span>`
-                          : `<span class="text-gray-400 font-semibold">-</span>`}
-                      </td>
-                      <td class="py-3.5 px-4">
-                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                          item.gender === 'Putra' ? 'bg-blue-50 text-blue-800 border border-blue-200' : 'bg-pink-50 text-pink-800 border border-pink-200'
-                        }">
-                          ${escapeHtml(item.gender)}
-                        </span>
-                      </td>
-                      <td class="py-3.5 px-4 font-semibold text-scout-brown">Kwarran ${escapeHtml(item.kwarran)}</td>
-                      <td class="py-3.5 px-4 text-gray-600">${escapeHtml(item.pangkalan || '-')}</td>
-                      ${!readOnly ? `
-                        <td class="py-3.5 px-4 text-right whitespace-nowrap">
-                          <button type="button" onclick="openPotensiModal('${item.id}')"
-                            class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 mr-1 transition" title="Edit">
-                            <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                          </button>
-                          <button type="button" onclick="deletePotensi('${item.id}')"
-                            class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition" title="Hapus">
-                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                          </button>
-                        </td>
-                      ` : ''}
-                    </tr>
-                  `;
-                }).join('') || `
-                  <tr>
-                    <td colspan="${readOnly ? 10 : 11}" class="py-10 text-center text-gray-500">
-                      Tidak ditemukan data potensi pembina yang sesuai filter.
-                    </td>
-                  </tr>
-                `}
+              <tbody id="potensi-table-body" class="divide-y divide-gray-100 text-xs">
+                ${buildPotensiTableRowsHtml(paginated, startIdx, readOnly)}
               </tbody>
             </table>
           </div>
 
-          <div class="px-5 py-3.5 bg-scout-cream/40 border-t border-scout-sand/70 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-            <span class="text-gray-600">
-              Menampilkan <strong>${list.length ? startIdx + 1 : 0}</strong> - <strong>${Math.min(startIdx + uiState.potensiPerPage, list.length)}</strong> dari <strong>${list.length}</strong> data pembina
-            </span>
-            <div class="flex items-center gap-1.5">
-              <button type="button" ${uiState.potensiPage <= 1 ? 'disabled' : ''}
-                onclick="uiState.potensiPage--; renderDataPotensiView(document.getElementById('main-content')); lucide.createIcons();"
-                class="px-3 py-1.5 rounded-lg border border-scout-sand bg-white disabled:opacity-40 font-semibold hover:bg-scout-cream">
-                Sebelumnya
-              </button>
-              <span class="px-3 py-1.5 font-bold text-scout-dark">Hal ${uiState.potensiPage} / ${totalPages}</span>
-              <button type="button" ${uiState.potensiPage >= totalPages ? 'disabled' : ''}
-                onclick="uiState.potensiPage++; renderDataPotensiView(document.getElementById('main-content')); lucide.createIcons();"
-                class="px-3 py-1.5 rounded-lg border border-scout-sand bg-white disabled:opacity-40 font-semibold hover:bg-scout-cream">
-                Berikutnya
-              </button>
-            </div>
+          <div id="potensi-pagination-bar" class="px-5 py-3.5 bg-scout-cream/40 border-t border-scout-sand/70 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            ${buildPotensiPaginationHtml(list.length, startIdx, totalPages)}
           </div>
         </div>
       `;
@@ -4150,32 +4257,180 @@
     }
 
     // =========================================================================
-    // 10. VIEW: KURSUS (ADMIN, PELATIH [TUGAS & READ-ONLY], PANITIA)
+    // 10. VIEW: KURSUS (LIVE SEARCH PARTIAL RENDER + ADMIN, PELATIH, PANITIA)
     // =========================================================================
+    function getFilteredKursusList() {
+      return appData.kursus.filter(k => {
+        if (uiState.kursusStatus !== 'ALL' && k.status !== uiState.kursusStatus) return false;
+        if (uiState.kursusOriginFilter === 'cabang' && k.sourceType === 'kwarran') return false;
+        if (uiState.kursusOriginFilter === 'kwarran' && k.sourceType !== 'kwarran') return false;
+        if (uiState.kursusSearch) {
+          return matchesFlexibleSearch(uiState.kursusSearch, [
+            k.nama,
+            k.jenjang,
+            k.lokasi,
+            k.angkatan,
+            k.hari,
+            k.tanggal,
+            formatDateRangeIndo(k.tanggal),
+            k.pelatih,
+            k.panitia,
+            k.sourceKwarran
+          ]);
+        }
+        return true;
+      });
+    }
+
+    function buildKursusCardsHtml(list, isAdmin, readOnly, pelatihTugasList) {
+      return list.map(k => {
+        const pct = Math.min(100, Math.round((k.terdaftar / Math.max(1, k.kuota)) * 100));
+        const isKwarranOrigin = k.sourceType === 'kwarran';
+        const myAssignedSurat = readOnly
+          ? pelatihTugasList.find(sk => sk.kursusId === k.id)
+          : null;
+
+        return `
+          <div onclick="${isAdmin ? `openAdminCourseDetail('${k.id}')` : ''}"
+            class="bg-white rounded-2xl p-5 border ${myAssignedSurat ? 'border-scout-forest ring-2 ring-scout-forest/15' : (isKwarranOrigin ? 'border-teal-300/90' : 'border-scout-sand')} shadow-scout flex flex-col justify-between ${isAdmin ? 'cursor-pointer hover:border-scout-forest hover:shadow-lg transition' : ''}">
+            <div>
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  ${isKwarranOrigin ? `
+                    <span class="px-2.5 py-1 rounded-lg bg-teal-800 text-white text-[11px] font-extrabold inline-flex items-center gap-1">
+                      <i data-lucide="git-merge" class="w-3 h-3 text-scout-gold"></i>
+                      <span>Usulan Kwarran ${escapeHtml(k.sourceKwarran)}</span>
+                    </span>
+                  ` : `
+                    <span class="px-2.5 py-1 rounded-lg bg-scout-dark text-scout-gold text-[11px] font-bold">
+                      Pusdiklatcab Cabang
+                    </span>
+                  `}
+                  <span class="px-2.5 py-1 rounded-lg bg-scout-cream border border-scout-sand text-[11px] font-bold text-scout-brown">
+                    ${escapeHtml(k.angkatan)}
+                  </span>
+                </div>
+                ${renderStatusBadge(k.status)}
+              </div>
+              <h4 class="text-base font-extrabold text-scout-dark leading-snug">${escapeHtml(k.nama)}</h4>
+
+              ${myAssignedSurat ? `
+                <div class="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <p class="font-extrabold text-scout-forest flex items-center gap-1">
+                      <i data-lucide="badge-check" class="w-3.5 h-3.5"></i>
+                      <span>Tugas Anda: ${escapeHtml(formatTugasRoleLabel(myAssignedSurat.tugasSebagai))}</span>
+                    </p>
+                    <p class="text-[11px] text-gray-600 mt-0.5">ST No. ${escapeHtml(myAssignedSurat.nomor)}</p>
+                  </div>
+                  <button type="button" onclick="downloadSuratTugasPelatih('${myAssignedSurat.id}')"
+                    class="px-3 py-1.5 rounded-lg bg-scout-forest hover:bg-scout-forestDark text-white font-bold text-[11px] inline-flex items-center gap-1 self-start sm:self-center shrink-0">
+                    <i data-lucide="download" class="w-3 h-3 text-scout-gold"></i>
+                    <span>Download ST</span>
+                  </button>
+                </div>
+              ` : ''}
+
+              <div class="mt-4 space-y-2 text-xs text-gray-600">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="calendar" class="w-4 h-4 text-scout-forest shrink-0"></i>
+                  <span class="font-semibold text-scout-dark">${escapeHtml(k.hari && k.hari !== 'Sesuai Jadwal' ? `${k.hari}, ` : '')}${escapeHtml(formatDateRangeIndo(k.tanggal))}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <i data-lucide="map-pin" class="w-4 h-4 text-scout-forest shrink-0"></i>
+                  <span>${escapeHtml(k.lokasi)}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <i data-lucide="award" class="w-4 h-4 text-amber-700 shrink-0"></i>
+                  <span><strong>Pinsus:</strong> ${escapeHtml(k.pelatih)}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <i data-lucide="clipboard-list" class="w-4 h-4 text-scout-medium shrink-0"></i>
+                  <span><strong>Panitia:</strong> ${escapeHtml(k.panitia)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-5 pt-4 border-t border-gray-100">
+              <div class="flex items-center justify-between text-xs mb-1.5">
+                <span class="font-semibold text-gray-600">
+                  ${isKwarranOrigin ? 'Peserta Tersinkronisasi dari Kwarran' : 'Keterisian Kuota Peserta'}
+                </span>
+                <span class="font-extrabold text-scout-dark">${k.terdaftar} / ${k.kuota} Orang (${pct}%)</span>
+              </div>
+              <div class="w-full h-2 rounded-full bg-gray-100 overflow-hidden ${readOnly ? '' : 'mb-4'}">
+                <div class="h-full ${isKwarranOrigin ? 'bg-teal-700' : 'bg-scout-forest'} rounded-full" style="width: ${pct}%"></div>
+              </div>
+
+              ${!readOnly ? `
+                <div class="flex flex-wrap items-center justify-between gap-2" onclick="event.stopPropagation()">
+                  ${isAdmin ? `
+                    <button type="button" onclick="openAdminCourseDetail('${k.id}')"
+                      class="px-3.5 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-extrabold flex items-center gap-1.5 shadow-xs transition">
+                      <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-scout-gold"></i>
+                      <span>Kelola Detail & Kelulusan</span>
+                    </button>
+                  ` : '<div></div>'}
+
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="openKursusModal('${k.id}')"
+                      class="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold flex items-center gap-1.5 transition">
+                      <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                      <span>Edit</span>
+                    </button>
+                    <button type="button" onclick="deleteKursus('${k.id}')"
+                      class="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-1.5 transition">
+                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                      <span>Hapus</span>
+                    </button>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('') || `<div class="col-span-2 bg-white rounded-2xl p-10 text-center text-sm text-gray-500 border border-scout-sand">Belum ada jadwal kursus yang sesuai pencarian${uiState.kursusSearch ? ` "<strong>${escapeHtml(uiState.kursusSearch)}</strong>"` : ''}.</div>`;
+    }
+
+    function updateKursusCardsOnly() {
+      const gridEl = document.getElementById('kursus-cards-grid');
+      if (!gridEl) {
+        renderKursusView(document.getElementById('main-content'));
+        lucide.createIcons();
+        return;
+      }
+      const isAdmin = currentUser && currentUser.role === 'Admin';
+      const readOnly = isPelatihReadOnly();
+      const pelatihTugasList = readOnly ? getSuratTugasForCurrentPelatih() : [];
+      const list = getFilteredKursusList();
+      gridEl.innerHTML = buildKursusCardsHtml(list, isAdmin, readOnly, pelatihTugasList);
+      lucide.createIcons();
+    }
+
+    function handleKursusLiveSearch(value) {
+      uiState.kursusSearch = value;
+      toggleSearchClearButton('kursus-search-clear-btn', Boolean(value && value.length > 0));
+      scheduleLiveSearch('kursus', updateKursusCardsOnly, 150);
+    }
+
+    function clearKursusLiveSearch() {
+      uiState.kursusSearch = '';
+      const inputEl = document.getElementById('kursus-search-input');
+      if (inputEl) {
+        inputEl.value = '';
+        inputEl.focus();
+      }
+      toggleSearchClearButton('kursus-search-clear-btn', false);
+      updateKursusCardsOnly();
+    }
+
     function renderKursusView(container) {
       syncKwarranCoursesToAdmin(appData);
       syncSuratTugasToCourseAttendance(appData);
       const isAdmin = currentUser && currentUser.role === 'Admin';
       const readOnly = isPelatihReadOnly();
       const pelatihTugasList = readOnly ? getSuratTugasForCurrentPelatih() : [];
-
-      const list = appData.kursus.filter(k => {
-        if (uiState.kursusStatus !== 'ALL' && k.status !== uiState.kursusStatus) return false;
-        if (uiState.kursusOriginFilter === 'cabang' && k.sourceType === 'kwarran') return false;
-        if (uiState.kursusOriginFilter === 'kwarran' && k.sourceType !== 'kwarran') return false;
-        if (uiState.kursusSearch) {
-          const q = uiState.kursusSearch.toLowerCase();
-          return (
-            k.nama.toLowerCase().includes(q) ||
-            k.lokasi.toLowerCase().includes(q) ||
-            k.angkatan.toLowerCase().includes(q) ||
-            formatDateRangeIndo(k.tanggal).toLowerCase().includes(q) ||
-            (k.sourceKwarran || '').toLowerCase().includes(q)
-          );
-        }
-        return true;
-      });
-
+      const list = getFilteredKursusList();
       const usulanCount = appData.kursus.filter(k => k.sourceType === 'kwarran').length;
 
       container.innerHTML = `
@@ -4184,19 +4439,25 @@
         <div class="bg-white rounded-2xl p-5 border border-scout-sand shadow-scout mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div class="flex flex-col sm:flex-row gap-3 flex-1">
             <div class="relative flex-1 max-w-md">
-              <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3"></i>
-              <input type="text" value="${escapeHtml(uiState.kursusSearch)}"
-                oninput="uiState.kursusSearch = this.value; renderKursusView(document.getElementById('main-content')); lucide.createIcons();"
+              <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3 pointer-events-none"></i>
+              <input type="text" id="kursus-search-input" value="${escapeHtml(uiState.kursusSearch)}"
+                oninput="handleKursusLiveSearch(this.value)"
+                autocomplete="off"
                 placeholder="Cari nama kursus, Kwarran, tanggal, atau lokasi..."
-                class="w-full pl-9 pr-3 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                class="w-full pl-9 pr-8 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+              <button type="button" id="kursus-search-clear-btn" onclick="clearKursusLiveSearch()"
+                class="${uiState.kursusSearch ? 'flex' : 'hidden'} absolute inset-y-0 right-0 pr-2.5 items-center text-gray-400 hover:text-scout-dark"
+                title="Hapus kata kunci">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
             </div>
-            <select onchange="uiState.kursusOriginFilter = this.value; renderKursusView(document.getElementById('main-content')); lucide.createIcons();"
+            <select onchange="uiState.kursusOriginFilter = this.value; updateKursusCardsOnly();"
               class="px-3.5 py-2 rounded-xl border border-scout-sand text-xs font-semibold text-scout-dark bg-scout-cream/30">
               <option value="ALL" ${uiState.kursusOriginFilter === 'ALL' ? 'selected' : ''}>Semua Penyelenggara (${appData.kursus.length})</option>
               <option value="cabang" ${uiState.kursusOriginFilter === 'cabang' ? 'selected' : ''}>Kursus Cabang (${appData.kursus.length - usulanCount})</option>
               <option value="kwarran" ${uiState.kursusOriginFilter === 'kwarran' ? 'selected' : ''}>Usulan Kwarran (${usulanCount})</option>
             </select>
-            <select onchange="uiState.kursusStatus = this.value; renderKursusView(document.getElementById('main-content')); lucide.createIcons();"
+            <select onchange="uiState.kursusStatus = this.value; updateKursusCardsOnly();"
               class="px-3.5 py-2 rounded-xl border border-scout-sand text-xs font-semibold text-scout-dark bg-scout-cream/30">
               <option value="ALL">Semua Status Kegiatan</option>
               <option value="Akan Datang" ${uiState.kursusStatus === 'Akan Datang' ? 'selected' : ''}>Akan Datang</option>
@@ -4219,114 +4480,8 @@
           `}
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          ${list.map(k => {
-            const pct = Math.min(100, Math.round((k.terdaftar / Math.max(1, k.kuota)) * 100));
-            const isKwarranOrigin = k.sourceType === 'kwarran';
-            const myAssignedSurat = readOnly
-              ? pelatihTugasList.find(sk => sk.kursusId === k.id)
-              : null;
-
-            return `
-              <div onclick="${isAdmin ? `openAdminCourseDetail('${k.id}')` : ''}"
-                class="bg-white rounded-2xl p-5 border ${myAssignedSurat ? 'border-scout-forest ring-2 ring-scout-forest/15' : (isKwarranOrigin ? 'border-teal-300/90' : 'border-scout-sand')} shadow-scout flex flex-col justify-between ${isAdmin ? 'cursor-pointer hover:border-scout-forest hover:shadow-lg transition' : ''}">
-                <div>
-                  <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-                    <div class="flex flex-wrap items-center gap-1.5">
-                      ${isKwarranOrigin ? `
-                        <span class="px-2.5 py-1 rounded-lg bg-teal-800 text-white text-[11px] font-extrabold inline-flex items-center gap-1">
-                          <i data-lucide="git-merge" class="w-3 h-3 text-scout-gold"></i>
-                          <span>Usulan Kwarran ${escapeHtml(k.sourceKwarran)}</span>
-                        </span>
-                      ` : `
-                        <span class="px-2.5 py-1 rounded-lg bg-scout-dark text-scout-gold text-[11px] font-bold">
-                          Pusdiklatcab Cabang
-                        </span>
-                      `}
-                      <span class="px-2.5 py-1 rounded-lg bg-scout-cream border border-scout-sand text-[11px] font-bold text-scout-brown">
-                        ${escapeHtml(k.angkatan)}
-                      </span>
-                    </div>
-                    ${renderStatusBadge(k.status)}
-                  </div>
-                  <h4 class="text-base font-extrabold text-scout-dark leading-snug">${escapeHtml(k.nama)}</h4>
-
-                  ${myAssignedSurat ? `
-                    <div class="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <p class="font-extrabold text-scout-forest flex items-center gap-1">
-                          <i data-lucide="badge-check" class="w-3.5 h-3.5"></i>
-                          <span>Tugas Anda: ${escapeHtml(formatTugasRoleLabel(myAssignedSurat.tugasSebagai))}</span>
-                        </p>
-                        <p class="text-[11px] text-gray-600 mt-0.5">ST No. ${escapeHtml(myAssignedSurat.nomor)}</p>
-                      </div>
-                      <button type="button" onclick="downloadSuratTugasPelatih('${myAssignedSurat.id}')"
-                        class="px-3 py-1.5 rounded-lg bg-scout-forest hover:bg-scout-forestDark text-white font-bold text-[11px] inline-flex items-center gap-1 self-start sm:self-center shrink-0">
-                        <i data-lucide="download" class="w-3 h-3 text-scout-gold"></i>
-                        <span>Download ST</span>
-                      </button>
-                    </div>
-                  ` : ''}
-
-                  <div class="mt-4 space-y-2 text-xs text-gray-600">
-                    <div class="flex items-center gap-2">
-                      <i data-lucide="calendar" class="w-4 h-4 text-scout-forest shrink-0"></i>
-                      <span class="font-semibold text-scout-dark">${escapeHtml(k.hari && k.hari !== 'Sesuai Jadwal' ? `${k.hari}, ` : '')}${escapeHtml(formatDateRangeIndo(k.tanggal))}</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <i data-lucide="map-pin" class="w-4 h-4 text-scout-forest shrink-0"></i>
-                      <span>${escapeHtml(k.lokasi)}</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <i data-lucide="award" class="w-4 h-4 text-amber-700 shrink-0"></i>
-                      <span><strong>Pinsus:</strong> ${escapeHtml(k.pelatih)}</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <i data-lucide="clipboard-list" class="w-4 h-4 text-scout-medium shrink-0"></i>
-                      <span><strong>Panitia:</strong> ${escapeHtml(k.panitia)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="mt-5 pt-4 border-t border-gray-100">
-                  <div class="flex items-center justify-between text-xs mb-1.5">
-                    <span class="font-semibold text-gray-600">
-                      ${isKwarranOrigin ? 'Peserta Tersinkronisasi dari Kwarran' : 'Keterisian Kuota Peserta'}
-                    </span>
-                    <span class="font-extrabold text-scout-dark">${k.terdaftar} / ${k.kuota} Orang (${pct}%)</span>
-                  </div>
-                  <div class="w-full h-2 rounded-full bg-gray-100 overflow-hidden ${readOnly ? '' : 'mb-4'}">
-                    <div class="h-full ${isKwarranOrigin ? 'bg-teal-700' : 'bg-scout-forest'} rounded-full" style="width: ${pct}%"></div>
-                  </div>
-
-                  ${!readOnly ? `
-                    <div class="flex flex-wrap items-center justify-between gap-2" onclick="event.stopPropagation()">
-                      ${isAdmin ? `
-                        <button type="button" onclick="openAdminCourseDetail('${k.id}')"
-                          class="px-3.5 py-2 rounded-xl bg-scout-forest hover:bg-scout-forestDark text-white text-xs font-extrabold flex items-center gap-1.5 shadow-xs transition">
-                          <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-scout-gold"></i>
-                          <span>Kelola Detail & Kelulusan</span>
-                        </button>
-                      ` : '<div></div>'}
-
-                      <div class="flex items-center gap-1.5">
-                        <button type="button" onclick="openKursusModal('${k.id}')"
-                          class="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold flex items-center gap-1.5 transition">
-                          <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                          <span>Edit</span>
-                        </button>
-                        <button type="button" onclick="deleteKursus('${k.id}')"
-                          class="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-1.5 transition">
-                          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                          <span>Hapus</span>
-                        </button>
-                      </div>
-                    </div>
-                  ` : ''}
-                </div>
-              </div>
-            `;
-          }).join('') || '<div class="col-span-2 bg-white rounded-2xl p-10 text-center text-sm text-gray-500 border border-scout-sand">Belum ada jadwal kursus yang sesuai pencarian.</div>'}
+        <div id="kursus-cards-grid" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          ${buildKursusCardsHtml(list, isAdmin, readOnly, pelatihTugasList)}
         </div>
       `;
     }
@@ -6254,8 +6409,8 @@
       `;
     }
 
-  // =========================================================================
-    // 11. VIEW: ADMINISTRASI (PENYEDERHANAAN: RINGKAS & LAMPIRAN LANGSUNG DOWNLOAD)
+    // =========================================================================
+    // 11. VIEW: ADMINISTRASI (LIVE SEARCH PARTIAL RENDER + RINGKAS & DOWNLOAD)
     // =========================================================================
     function renderJenisSuratKeluarBadge(jenis) {
       const val = jenis || 'Pemberitahuan';
@@ -6375,20 +6530,11 @@
       lucide.createIcons();
     }
 
-    function renderAdministrasiView(container) {
-      if (isPelatihReadOnly()) {
-        navigateTo('dashboard');
-        return;
-      }
-      const isAdmin = isAdminUser();
+    function getFilteredSuratList() {
       const isMasuk = uiState.adminTab === 'masuk';
       const sourceList = isMasuk ? appData.suratMasuk : appData.suratKeluar;
 
-      const menungguCount = appData.suratMasuk.filter(
-        s => normalizeDisposisiStatusLabel(s.disposisi) === 'Menunggu Disposisi'
-      ).length;
-
-      const filtered = sourceList.filter(s => {
+      return sourceList.filter(s => {
         if (isMasuk && uiState.suratDisposisiFilter !== 'ALL') {
           if (normalizeDisposisiStatusLabel(s.disposisi) !== uiState.suratDisposisiFilter) return false;
         }
@@ -6396,14 +6542,166 @@
           if ((s.jenisSurat || 'Pemberitahuan') !== uiState.suratKeluarJenisFilter) return false;
         }
         if (uiState.suratSearch) {
-          const q = uiState.suratSearch.toLowerCase();
-          const text = isMasuk
-            ? `${s.nomor} ${s.asal} ${s.perihal} ${s.disposisi} ${s.tujuanDisposisi || ''} ${s.catatanDisposisi || ''} ${s.lampiran || ''} ${formatDateIndo(s.tanggalTerima)} ${formatDateIndo(s.tanggalSurat)}`
-            : `${s.nomor} ${s.jenisSurat || ''} ${s.tujuan} ${s.perihal} ${s.penanggungJawab} ${s.namaPelatih || ''} ${s.tugasSebagai || ''} ${s.namaKursus || ''} ${s.lampiran || ''} ${formatDateIndo(s.tanggalKeluar)}`;
-          if (!text.toLowerCase().includes(q)) return false;
+          const parts = isMasuk
+            ? [s.nomor, s.asal, s.perihal, s.disposisi, s.tujuanDisposisi, s.catatanDisposisi, s.lampiran, formatDateIndo(s.tanggalTerima), formatDateIndo(s.tanggalSurat)]
+            : [s.nomor, s.jenisSurat, s.tujuan, s.perihal, s.penanggungJawab, s.namaPelatih, s.tugasSebagai, s.namaKursus, s.lampiran, formatDateIndo(s.tanggalKeluar)];
+          return matchesFlexibleSearch(uiState.suratSearch, parts);
         }
         return true;
       });
+    }
+
+    function buildSuratTableRowsHtml(filtered, isMasuk, isAdmin) {
+      return filtered.map(s => {
+        const statusDisp = isMasuk ? normalizeDisposisiStatusLabel(s.disposisi) : '';
+        const isPendingDisp = statusDisp === 'Menunggu Disposisi';
+        const jenisSk = !isMasuk ? (s.jenisSurat || 'Pemberitahuan') : '';
+        const isTugasSk = !isMasuk && jenisSk === 'Tugas';
+        const targetAttendTab = isPanitiaTugasRole(s.tugasSebagai) ? 'panitia' : 'pelatih';
+        const hasAttachment = Boolean(String(s.lampiran || '').trim() || s.lampiranDataUrl);
+        const displayAttachmentName = s.lampiran || `Lampiran_${s.nomor}.txt`;
+
+        return `
+          <tr class="hover:bg-scout-cream/40">
+            <td class="py-3.5 px-4 font-extrabold text-scout-dark whitespace-nowrap">${escapeHtml(s.nomor)}</td>
+            ${!isMasuk ? `<td class="py-3.5 px-4 whitespace-nowrap">${renderJenisSuratKeluarBadge(jenisSk)}</td>` : ''}
+            <td class="py-3.5 px-4 whitespace-nowrap text-gray-600">
+              ${isMasuk
+                ? `<div>Terima: <strong>${formatDateIndo(s.tanggalTerima)}</strong></div><div class="text-[11px]">Surat: ${formatDateIndo(s.tanggalSurat)}</div>`
+                : `<strong>${formatDateIndo(s.tanggalKeluar)}</strong>`}
+            </td>
+            <td class="py-3.5 px-4 font-semibold text-scout-brown">${escapeHtml(isMasuk ? s.asal : s.tujuan)}</td>
+            <td class="py-3.5 px-4 text-gray-800 max-w-sm">
+              <p>${escapeHtml(s.perihal)}</p>
+              ${isTugasSk && (s.namaPelatih || s.tugasSebagai || s.namaKursus) ? `
+                <div class="mt-1.5 p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-950 space-y-0.5">
+                  <p><strong>Pelatih:</strong> ${escapeHtml(s.namaPelatih || '-')}</p>
+                  <p><strong>Tugas sebagai:</strong> <span class="uppercase font-extrabold text-scout-forest">${escapeHtml(s.tugasSebagai || '-')}</span></p>
+                  <p><strong>Kursus:</strong> ${escapeHtml(s.namaKursus || '-')}</p>
+                  <div class="pt-1 flex flex-wrap items-center gap-2">
+                    <span class="inline-flex items-center gap-1 text-[10px] font-bold text-scout-forest">
+                      <i data-lucide="check-circle-2" class="w-3 h-3"></i>
+                      <span>Tersinkron ke Absensi ${isPanitiaTugasRole(s.tugasSebagai) ? 'Panitia' : 'Tim Pelatih'}</span>
+                    </span>
+                    ${isAdmin && s.kursusId ? `
+                      <button type="button" onclick="uiState.adminAttendanceRoleTab = '${targetAttendTab}'; openAdminCourseDetail('${s.kursusId}', 'absensi')"
+                        class="text-[10px] font-extrabold underline text-scout-dark hover:text-scout-forest">
+                        Lihat Absensi Kursus &rarr;
+                      </button>
+                    ` : ''}
+                  </div>
+                </div>
+              ` : ''}
+            </td>
+            <td class="py-3.5 px-4">
+              ${isMasuk ? `
+                <div class="space-y-1">
+                  <div>${renderStatusBadge(isAdmin ? statusDisp : (isPendingDisp ? 'Menunggu Disposisi Admin' : statusDisp))}</div>
+                  ${s.tujuanDisposisi ? `
+                    <p class="text-[11px] font-bold text-scout-dark">
+                      Tujuan: <span class="text-scout-forest">${escapeHtml(s.tujuanDisposisi)}</span>
+                    </p>
+                  ` : ''}
+                  ${s.catatanDisposisi ? `
+                    <p class="text-[11px] text-gray-600 italic max-w-xs leading-snug">"${escapeHtml(s.catatanDisposisi)}"</p>
+                  ` : ''}
+                  ${s.disposisiApprovedAt ? `
+                    <p class="text-[10px] text-gray-400">
+                      Disetujui: ${escapeHtml(s.disposisiApprovedAt)}${s.disposisiApprovedBy ? ` (${escapeHtml(s.disposisiApprovedBy)})` : ''}
+                    </p>
+                  ` : ''}
+                </div>
+              ` : `<span class="font-medium text-gray-700">${escapeHtml(s.penanggungJawab)}</span>`}
+            </td>
+            <td class="py-3.5 px-4">
+              ${hasAttachment ? `
+                <div class="flex flex-col items-start gap-1">
+                  <span class="text-[11px] font-semibold text-scout-dark max-w-[165px] truncate" title="${escapeHtml(displayAttachmentName)}">
+                    ${escapeHtml(displayAttachmentName)}
+                  </span>
+                  <button type="button" onclick="downloadSuratAttachment('${uiState.adminTab}', '${s.id}')"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-scout-forest hover:bg-scout-forestDark text-white text-[11px] font-extrabold shadow-xs transition"
+                    title="Download file lampiran surat">
+                    <i data-lucide="download" class="w-3.5 h-3.5 text-scout-gold"></i>
+                    <span>Download</span>
+                  </button>
+                </div>
+              ` : `
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 border border-gray-200 text-[11px] font-semibold">
+                  <i data-lucide="file-x" class="w-3 h-3"></i>
+                  <span>Belum ada lampiran</span>
+                </span>
+              `}
+            </td>
+            <td class="py-3.5 px-4 text-right whitespace-nowrap">
+              <div class="inline-flex items-center gap-1.5">
+                ${isMasuk && isAdmin ? `
+                  <button type="button" onclick="openDisposisiModal('${s.id}')"
+                    class="px-3 py-1.5 rounded-lg ${isPendingDisp ? 'bg-scout-forest hover:bg-scout-forestDark text-white shadow-xs' : 'bg-emerald-50 hover:bg-emerald-100 text-scout-forest border border-emerald-300'} font-bold text-[11px] inline-flex items-center gap-1 transition"
+                    title="Approve & Tetapkan Disposisi Surat Masuk">
+                    <i data-lucide="stamp" class="w-3.5 h-3.5 ${isPendingDisp ? 'text-scout-gold' : ''}"></i>
+                    <span>Approve / Disposisi</span>
+                  </button>
+                ` : ''}
+                <button type="button" onclick="openSuratModal('${uiState.adminTab}', '${s.id}')"
+                  class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition" title="Edit Surat">
+                  <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="deleteSurat('${uiState.adminTab}', '${s.id}')"
+                  class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition" title="Hapus Surat">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('') || `
+        <tr><td colspan="${isMasuk ? 7 : 8}" class="py-10 text-center text-gray-500">Belum ada arsip surat pada kategori ini${uiState.suratSearch ? ` untuk kata kunci "<strong>${escapeHtml(uiState.suratSearch)}</strong>"` : ''}.</td></tr>
+      `;
+    }
+
+    function updateSuratTableOnly() {
+      const tbodyEl = document.getElementById('surat-table-body');
+      if (!tbodyEl) {
+        renderAdministrasiView(document.getElementById('main-content'));
+        lucide.createIcons();
+        return;
+      }
+      const isAdmin = isAdminUser();
+      const isMasuk = uiState.adminTab === 'masuk';
+      const filtered = getFilteredSuratList();
+      tbodyEl.innerHTML = buildSuratTableRowsHtml(filtered, isMasuk, isAdmin);
+      lucide.createIcons();
+    }
+
+    function handleSuratLiveSearch(value) {
+      uiState.suratSearch = value;
+      toggleSearchClearButton('surat-search-clear-btn', Boolean(value && value.length > 0));
+      scheduleLiveSearch('surat', updateSuratTableOnly, 150);
+    }
+
+    function clearSuratLiveSearch() {
+      uiState.suratSearch = '';
+      const inputEl = document.getElementById('surat-search-input');
+      if (inputEl) {
+        inputEl.value = '';
+        inputEl.focus();
+      }
+      toggleSearchClearButton('surat-search-clear-btn', false);
+      updateSuratTableOnly();
+    }
+
+    function renderAdministrasiView(container) {
+      if (isPelatihReadOnly()) {
+        navigateTo('dashboard');
+        return;
+      }
+      const isAdmin = isAdminUser();
+      const isMasuk = uiState.adminTab === 'masuk';
+      const menungguCount = appData.suratMasuk.filter(
+        s => normalizeDisposisiStatusLabel(s.disposisi) === 'Menunggu Disposisi'
+      ).length;
+      const filtered = getFilteredSuratList();
 
       container.innerHTML = `
         <!-- Tab Switcher Surat Masuk & Surat Keluar -->
@@ -6457,15 +6755,21 @@
         <div class="bg-white rounded-2xl border border-scout-sand shadow-scout overflow-hidden">
           <div class="p-4 border-b border-scout-sand/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="relative flex-1 max-w-md">
-              <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3"></i>
-              <input type="text" value="${escapeHtml(uiState.suratSearch)}"
-                oninput="uiState.suratSearch = this.value; renderAdministrasiView(document.getElementById('main-content')); lucide.createIcons();"
+              <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3 pointer-events-none"></i>
+              <input type="text" id="surat-search-input" value="${escapeHtml(uiState.suratSearch)}"
+                oninput="handleSuratLiveSearch(this.value)"
+                autocomplete="off"
                 placeholder="${isMasuk ? 'Cari nomor surat, asal, disposisi, lampiran, atau perihal...' : 'Cari nomor surat, jenis, tujuan, pelatih, atau lampiran...'}"
-                class="w-full pl-9 pr-3 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                class="w-full pl-9 pr-8 py-2 rounded-xl border border-scout-sand text-xs font-medium focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+              <button type="button" id="surat-search-clear-btn" onclick="clearSuratLiveSearch()"
+                class="${uiState.suratSearch ? 'flex' : 'hidden'} absolute inset-y-0 right-0 pr-2.5 items-center text-gray-400 hover:text-scout-dark"
+                title="Hapus kata kunci">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
             </div>
 
             ${isMasuk ? `
-              <select onchange="uiState.suratDisposisiFilter = this.value; renderAdministrasiView(document.getElementById('main-content')); lucide.createIcons();"
+              <select onchange="uiState.suratDisposisiFilter = this.value; updateSuratTableOnly();"
                 class="px-3.5 py-2 rounded-xl border border-scout-sand text-xs font-semibold text-scout-dark bg-scout-cream/40 focus:outline-none">
                 <option value="ALL" ${uiState.suratDisposisiFilter === 'ALL' ? 'selected' : ''}>Semua Status Disposisi (${appData.suratMasuk.length})</option>
                 <option value="Menunggu Disposisi" ${uiState.suratDisposisiFilter === 'Menunggu Disposisi' ? 'selected' : ''}>Menunggu Disposisi (${menungguCount})</option>
@@ -6473,7 +6777,7 @@
                 <option value="Selesai" ${uiState.suratDisposisiFilter === 'Selesai' ? 'selected' : ''}>Selesai</option>
               </select>
             ` : `
-              <select onchange="uiState.suratKeluarJenisFilter = this.value; renderAdministrasiView(document.getElementById('main-content')); lucide.createIcons();"
+              <select onchange="uiState.suratKeluarJenisFilter = this.value; updateSuratTableOnly();"
                 class="px-3.5 py-2 rounded-xl border border-scout-sand text-xs font-semibold text-scout-dark bg-scout-cream/40 focus:outline-none">
                 <option value="ALL" ${uiState.suratKeluarJenisFilter === 'ALL' ? 'selected' : ''}>Semua Jenis Surat (${appData.suratKeluar.length})</option>
                 ${JENIS_SURAT_KELUAR_OPTIONS.map(j => `
@@ -6497,113 +6801,8 @@
                   <th class="py-3.5 px-4 text-right">Aksi</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-100 text-xs">
-                ${filtered.map(s => {
-                  const statusDisp = isMasuk ? normalizeDisposisiStatusLabel(s.disposisi) : '';
-                  const isPendingDisp = statusDisp === 'Menunggu Disposisi';
-                  const jenisSk = !isMasuk ? (s.jenisSurat || 'Pemberitahuan') : '';
-                  const isTugasSk = !isMasuk && jenisSk === 'Tugas';
-                  const targetAttendTab = isPanitiaTugasRole(s.tugasSebagai) ? 'panitia' : 'pelatih';
-                  const hasAttachment = Boolean(String(s.lampiran || '').trim() || s.lampiranDataUrl);
-                  const displayAttachmentName = s.lampiran || `Lampiran_${s.nomor}.txt`;
-
-                  return `
-                    <tr class="hover:bg-scout-cream/40">
-                      <td class="py-3.5 px-4 font-extrabold text-scout-dark whitespace-nowrap">${escapeHtml(s.nomor)}</td>
-                      ${!isMasuk ? `<td class="py-3.5 px-4 whitespace-nowrap">${renderJenisSuratKeluarBadge(jenisSk)}</td>` : ''}
-                      <td class="py-3.5 px-4 whitespace-nowrap text-gray-600">
-                        ${isMasuk
-                          ? `<div>Terima: <strong>${formatDateIndo(s.tanggalTerima)}</strong></div><div class="text-[11px]">Surat: ${formatDateIndo(s.tanggalSurat)}</div>`
-                          : `<strong>${formatDateIndo(s.tanggalKeluar)}</strong>`}
-                      </td>
-                      <td class="py-3.5 px-4 font-semibold text-scout-brown">${escapeHtml(isMasuk ? s.asal : s.tujuan)}</td>
-                      <td class="py-3.5 px-4 text-gray-800 max-w-sm">
-                        <p>${escapeHtml(s.perihal)}</p>
-                        ${isTugasSk && (s.namaPelatih || s.tugasSebagai || s.namaKursus) ? `
-                          <div class="mt-1.5 p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-950 space-y-0.5">
-                            <p><strong>Pelatih:</strong> ${escapeHtml(s.namaPelatih || '-')}</p>
-                            <p><strong>Tugas sebagai:</strong> <span class="uppercase font-extrabold text-scout-forest">${escapeHtml(s.tugasSebagai || '-')}</span></p>
-                            <p><strong>Kursus:</strong> ${escapeHtml(s.namaKursus || '-')}</p>
-                            <div class="pt-1 flex flex-wrap items-center gap-2">
-                              <span class="inline-flex items-center gap-1 text-[10px] font-bold text-scout-forest">
-                                <i data-lucide="check-circle-2" class="w-3 h-3"></i>
-                                <span>Tersinkron ke Absensi ${isPanitiaTugasRole(s.tugasSebagai) ? 'Panitia' : 'Tim Pelatih'}</span>
-                              </span>
-                              ${isAdmin && s.kursusId ? `
-                                <button type="button" onclick="uiState.adminAttendanceRoleTab = '${targetAttendTab}'; openAdminCourseDetail('${s.kursusId}', 'absensi')"
-                                  class="text-[10px] font-extrabold underline text-scout-dark hover:text-scout-forest">
-                                  Lihat Absensi Kursus &rarr;
-                                </button>
-                              ` : ''}
-                            </div>
-                          </div>
-                        ` : ''}
-                      </td>
-                      <td class="py-3.5 px-4">
-                        ${isMasuk ? `
-                          <div class="space-y-1">
-                            <div>${renderStatusBadge(isAdmin ? statusDisp : (isPendingDisp ? 'Menunggu Disposisi Admin' : statusDisp))}</div>
-                            ${s.tujuanDisposisi ? `
-                              <p class="text-[11px] font-bold text-scout-dark">
-                                Tujuan: <span class="text-scout-forest">${escapeHtml(s.tujuanDisposisi)}</span>
-                              </p>
-                            ` : ''}
-                            ${s.catatanDisposisi ? `
-                              <p class="text-[11px] text-gray-600 italic max-w-xs leading-snug">"${escapeHtml(s.catatanDisposisi)}"</p>
-                            ` : ''}
-                            ${s.disposisiApprovedAt ? `
-                              <p class="text-[10px] text-gray-400">
-                                Disetujui: ${escapeHtml(s.disposisiApprovedAt)}${s.disposisiApprovedBy ? ` (${escapeHtml(s.disposisiApprovedBy)})` : ''}
-                              </p>
-                            ` : ''}
-                          </div>
-                        ` : `<span class="font-medium text-gray-700">${escapeHtml(s.penanggungJawab)}</span>`}
-                      </td>
-                      <td class="py-3.5 px-4">
-                        ${hasAttachment ? `
-                          <div class="flex flex-col items-start gap-1">
-                            <span class="text-[11px] font-semibold text-scout-dark max-w-[165px] truncate" title="${escapeHtml(displayAttachmentName)}">
-                              ${escapeHtml(displayAttachmentName)}
-                            </span>
-                            <button type="button" onclick="downloadSuratAttachment('${uiState.adminTab}', '${s.id}')"
-                              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-scout-forest hover:bg-scout-forestDark text-white text-[11px] font-extrabold shadow-xs transition"
-                              title="Download file lampiran surat">
-                              <i data-lucide="download" class="w-3.5 h-3.5 text-scout-gold"></i>
-                              <span>Download</span>
-                            </button>
-                          </div>
-                        ` : `
-                          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 border border-gray-200 text-[11px] font-semibold">
-                            <i data-lucide="file-x" class="w-3 h-3"></i>
-                            <span>Belum ada lampiran</span>
-                          </span>
-                        `}
-                      </td>
-                      <td class="py-3.5 px-4 text-right whitespace-nowrap">
-                        <div class="inline-flex items-center gap-1.5">
-                          ${isMasuk && isAdmin ? `
-                            <button type="button" onclick="openDisposisiModal('${s.id}')"
-                              class="px-3 py-1.5 rounded-lg ${isPendingDisp ? 'bg-scout-forest hover:bg-scout-forestDark text-white shadow-xs' : 'bg-emerald-50 hover:bg-emerald-100 text-scout-forest border border-emerald-300'} font-bold text-[11px] inline-flex items-center gap-1 transition"
-                              title="Approve & Tetapkan Disposisi Surat Masuk">
-                              <i data-lucide="stamp" class="w-3.5 h-3.5 ${isPendingDisp ? 'text-scout-gold' : ''}"></i>
-                              <span>Approve / Disposisi</span>
-                            </button>
-                          ` : ''}
-                          <button type="button" onclick="openSuratModal('${uiState.adminTab}', '${s.id}')"
-                            class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition" title="Edit Surat">
-                            <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                          </button>
-                          <button type="button" onclick="deleteSurat('${uiState.adminTab}', '${s.id}')"
-                            class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition" title="Hapus Surat">
-                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  `;
-                }).join('') || `
-                  <tr><td colspan="${isMasuk ? 7 : 8}" class="py-10 text-center text-gray-500">Belum ada arsip surat pada kategori ini.</td></tr>
-                `}
+              <tbody id="surat-table-body" class="divide-y divide-gray-100 text-xs">
+                ${buildSuratTableRowsHtml(filtered, isMasuk, isAdmin)}
               </tbody>
             </table>
           </div>
@@ -7794,7 +7993,7 @@
     }
 
     // =========================================================================
-    // 14. ATURAN KHUSUS ROLE KWARRAN: MANAJEMEN KURSUS
+    // 14. ATURAN KHUSUS ROLE KWARRAN: MANAJEMEN KURSUS & LIVE SEARCH PESERTA
     // =========================================================================
     function renderKwarranDaftarKursusView(container) {
       const scope = getActiveKwarranScope();
@@ -8049,6 +8248,105 @@
       }
     }
 
+    function buildKwarranParticipantRowsHtml(courseParticipants) {
+      return courseParticipants.map((p, idx) => {
+        const isLulus = p.statusKelulusan === 'Lulus';
+        return `
+          <tr class="hover:bg-scout-cream/40 transition ${uiState.kwarranEditingParticipantId === p.id ? 'bg-amber-50/80' : ''}">
+            <td class="py-3 px-3 font-semibold text-gray-500">${idx + 1}</td>
+            <td class="py-2.5 px-3">${renderParticipant4x6AvatarHtml(p, 'w-9 h-[54px]', true)}</td>
+            <td class="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-scout-brown">${escapeHtml(p.nta || '-')}</td>
+            <td class="py-3 px-3.5 font-bold text-scout-dark">${escapeHtml(p.namaGelar)}</td>
+            <td class="py-3 px-3.5 text-gray-600 whitespace-nowrap">
+              ${escapeHtml(formatTempatTanggalLahir(p.tempatLahir, p.tanggalLahir))}
+            </td>
+            <td class="py-3 px-3.5 whitespace-nowrap">${renderGolonganBadge(p.golongan)}</td>
+            <td class="py-3 px-3.5 font-medium text-scout-brown">${escapeHtml(p.namaPangkalan)}</td>
+            <td class="py-3 px-3.5 whitespace-nowrap">
+              <button type="button" onclick="toggleKwarranParticipantGraduation('${p.id}')"
+                class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold border transition ${
+                  isLulus
+                    ? 'bg-scout-forest text-white border-scout-forest'
+                    : 'bg-gray-100 hover:bg-emerald-50 text-gray-700 border-gray-300'
+                }"
+                title="Klik untuk menetapkan kelulusan & otomatis sinkron ke Data Potensi">
+                ${isLulus ? 'Lulus (Di Potensi)' : 'Belum Lulus'}
+              </button>
+            </td>
+            <td class="py-3 px-3.5 text-right whitespace-nowrap">
+              <button type="button" onclick="editKwarranParticipant('${p.id}')"
+                class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[11px] inline-flex items-center gap-1 mr-1 transition"
+                title="Edit Peserta & Foto 4x6">
+                <i data-lucide="pencil" class="w-3 h-3"></i>
+                <span>Edit</span>
+              </button>
+              <button type="button" onclick="deleteKwarranParticipant('${p.id}')"
+                class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-[11px] inline-flex items-center gap-1 transition"
+                title="Hapus Peserta">
+                <i data-lucide="trash-2" class="w-3 h-3"></i>
+                <span>Hapus</span>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('') || `
+        <tr>
+          <td colspan="9" class="py-10 text-center text-gray-500">
+            ${uiState.kwarranParticipantSearch
+              ? `Tidak ditemukan peserta yang cocok dengan kata kunci "<strong>${escapeHtml(uiState.kwarranParticipantSearch)}</strong>".`
+              : 'Belum ada peserta yang diinput untuk kursus ini. Silakan isi form di samping.'}
+          </td>
+        </tr>
+      `;
+    }
+
+    function updateKwarranParticipantTableOnly() {
+      const tbodyEl = document.getElementById('kwarran-participant-table-body');
+      const countEl = document.getElementById('kwarran-participant-count-label');
+      if (!tbodyEl) {
+        renderKwarranInputPesertaView(document.getElementById('main-content'));
+        lucide.createIcons();
+        return;
+      }
+
+      const scopedCourseParticipants = getScopedKwarranParticipants(uiState.kwarranSelectedCourseId);
+      const filteredParticipants = scopedCourseParticipants.filter(p => {
+        if (!uiState.kwarranParticipantSearch) return true;
+        const ttlStr = formatTempatTanggalLahir(p.tempatLahir, p.tanggalLahir);
+        return matchesFlexibleSearch(uiState.kwarranParticipantSearch, [
+          p.nta,
+          p.namaGelar,
+          ttlStr,
+          p.namaPangkalan,
+          p.golongan,
+          p.statusKelulusan
+        ]);
+      });
+
+      tbodyEl.innerHTML = buildKwarranParticipantRowsHtml(filteredParticipants);
+      if (countEl) {
+        countEl.textContent = `Daftar Peserta Kursus (${filteredParticipants.length})`;
+      }
+      lucide.createIcons();
+    }
+
+    function handleKwarranParticipantLiveSearch(value) {
+      uiState.kwarranParticipantSearch = value;
+      toggleSearchClearButton('kp-search-clear-btn', Boolean(value && value.length > 0));
+      scheduleLiveSearch('kwarranParticipants', updateKwarranParticipantTableOnly, 150);
+    }
+
+    function clearKwarranParticipantLiveSearch() {
+      uiState.kwarranParticipantSearch = '';
+      const inputEl = document.getElementById('kp-search-input');
+      if (inputEl) {
+        inputEl.value = '';
+        inputEl.focus();
+      }
+      toggleSearchClearButton('kp-search-clear-btn', false);
+      updateKwarranParticipantTableOnly();
+    }
+
     function renderKwarranInputPesertaView(container) {
       const scope = getActiveKwarranScope();
       const myKwarran = scope.kwarranName;
@@ -8082,18 +8380,16 @@
 
       const scopedCourseParticipants = getScopedKwarranParticipants(selectedCourse.id);
       const courseParticipants = scopedCourseParticipants.filter(p => {
-        if (uiState.kwarranParticipantSearch) {
-          const q = uiState.kwarranParticipantSearch.toLowerCase();
-          const ttlStr = formatTempatTanggalLahir(p.tempatLahir, p.tanggalLahir).toLowerCase();
-          return (
-            (p.nta || '').toLowerCase().includes(q) ||
-            p.namaGelar.toLowerCase().includes(q) ||
-            ttlStr.includes(q) ||
-            p.namaPangkalan.toLowerCase().includes(q) ||
-            p.golongan.toLowerCase().includes(q)
-          );
-        }
-        return true;
+        if (!uiState.kwarranParticipantSearch) return true;
+        const ttlStr = formatTempatTanggalLahir(p.tempatLahir, p.tanggalLahir);
+        return matchesFlexibleSearch(uiState.kwarranParticipantSearch, [
+          p.nta,
+          p.namaGelar,
+          ttlStr,
+          p.namaPangkalan,
+          p.golongan,
+          p.statusKelulusan
+        ]);
       });
 
       const editingParticipant = uiState.kwarranEditingParticipantId
@@ -8321,15 +8617,21 @@
           <div class="lg:col-span-7 bg-white rounded-2xl border border-scout-sand shadow-scout overflow-hidden flex flex-col">
             <div class="p-5 border-b border-scout-sand/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h4 class="text-base font-extrabold text-scout-dark">Daftar Peserta Kursus (${courseParticipants.length})</h4>
+                <h4 id="kwarran-participant-count-label" class="text-base font-extrabold text-scout-dark">Daftar Peserta Kursus (${courseParticipants.length})</h4>
                 <p class="text-xs text-gray-500">Peserta yang dinyatakan Lulus otomatis masuk ke Data Potensi beserta NTA, TTL & foto 4x6</p>
               </div>
               <div class="relative w-full sm:w-60">
-                <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-2.5"></i>
-                <input type="text" value="${escapeHtml(uiState.kwarranParticipantSearch)}"
-                  oninput="uiState.kwarranParticipantSearch = this.value; renderKwarranInputPesertaView(document.getElementById('main-content')); lucide.createIcons();"
+                <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-2.5 pointer-events-none"></i>
+                <input type="text" id="kp-search-input" value="${escapeHtml(uiState.kwarranParticipantSearch)}"
+                  oninput="handleKwarranParticipantLiveSearch(this.value)"
+                  autocomplete="off"
                   placeholder="Cari NTA, nama, TTL, pangkalan..."
-                  class="w-full pl-9 pr-3 py-2 rounded-xl border border-scout-sand text-xs focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                  class="w-full pl-9 pr-8 py-2 rounded-xl border border-scout-sand text-xs focus:ring-2 focus:ring-scout-forest focus:outline-none" />
+                <button type="button" id="kp-search-clear-btn" onclick="clearKwarranParticipantLiveSearch()"
+                  class="${uiState.kwarranParticipantSearch ? 'flex' : 'hidden'} absolute inset-y-0 right-0 pr-2.5 items-center text-gray-400 hover:text-scout-dark"
+                  title="Hapus kata kunci">
+                  <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
               </div>
             </div>
 
@@ -8348,54 +8650,8 @@
                     <th class="py-3 px-3.5 text-right">Aksi</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100 text-xs">
-                  ${courseParticipants.map((p, idx) => {
-                    const isLulus = p.statusKelulusan === 'Lulus';
-                    return `
-                      <tr class="hover:bg-scout-cream/40 transition ${uiState.kwarranEditingParticipantId === p.id ? 'bg-amber-50/80' : ''}">
-                        <td class="py-3 px-3 font-semibold text-gray-500">${idx + 1}</td>
-                        <td class="py-2.5 px-3">${renderParticipant4x6AvatarHtml(p, 'w-9 h-[54px]', true)}</td>
-                        <td class="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-scout-brown">${escapeHtml(p.nta || '-')}</td>
-                        <td class="py-3 px-3.5 font-bold text-scout-dark">${escapeHtml(p.namaGelar)}</td>
-                        <td class="py-3 px-3.5 text-gray-600 whitespace-nowrap">
-                          ${escapeHtml(formatTempatTanggalLahir(p.tempatLahir, p.tanggalLahir))}
-                        </td>
-                        <td class="py-3 px-3.5 whitespace-nowrap">${renderGolonganBadge(p.golongan)}</td>
-                        <td class="py-3 px-3.5 font-medium text-scout-brown">${escapeHtml(p.namaPangkalan)}</td>
-                        <td class="py-3 px-3.5 whitespace-nowrap">
-                          <button type="button" onclick="toggleKwarranParticipantGraduation('${p.id}')"
-                            class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold border transition ${
-                              isLulus
-                                ? 'bg-scout-forest text-white border-scout-forest'
-                                : 'bg-gray-100 hover:bg-emerald-50 text-gray-700 border-gray-300'
-                            }"
-                            title="Klik untuk menetapkan kelulusan & otomatis sinkron ke Data Potensi">
-                            ${isLulus ? 'Lulus (Di Potensi)' : 'Belum Lulus'}
-                          </button>
-                        </td>
-                        <td class="py-3 px-3.5 text-right whitespace-nowrap">
-                          <button type="button" onclick="editKwarranParticipant('${p.id}')"
-                            class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[11px] inline-flex items-center gap-1 mr-1 transition"
-                            title="Edit Peserta & Foto 4x6">
-                            <i data-lucide="pencil" class="w-3 h-3"></i>
-                            <span>Edit</span>
-                          </button>
-                          <button type="button" onclick="deleteKwarranParticipant('${p.id}')"
-                            class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-[11px] inline-flex items-center gap-1 transition"
-                            title="Hapus Peserta">
-                            <i data-lucide="trash-2" class="w-3 h-3"></i>
-                            <span>Hapus</span>
-                          </button>
-                        </td>
-                      </tr>
-                    `;
-                  }).join('') || `
-                    <tr>
-                      <td colspan="9" class="py-10 text-center text-gray-500">
-                        Belum ada peserta yang diinput untuk kursus ini. Silakan isi form di samping.
-                      </td>
-                    </tr>
-                  `}
+                <tbody id="kwarran-participant-table-body" class="divide-y divide-gray-100 text-xs">
+                  ${buildKwarranParticipantRowsHtml(courseParticipants)}
                 </tbody>
               </table>
             </div>
